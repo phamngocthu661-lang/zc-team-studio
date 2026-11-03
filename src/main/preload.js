@@ -18,12 +18,33 @@ const {
 
 const SCRIPT_STUDIO_PORT = 8098;
 const SCRIPT_STUDIO_ALT_PORT = 8099;
+const CANDIDATE_STUDIO_PORTS = [8098, 8099, 8100, 8101, 8102, 8103];
 const PORTABLE_PYTHON_ZIP_URL = 'https://github.com/phamngocthu661-lang/zc-team-studio/releases/download/V1.0.0/python_runtime_win64.zip';
 
 let _activeScriptStudioPort = SCRIPT_STUDIO_PORT;
 let _realPythonOnline = false;
 let _preloadSpawnPromise = null;
 let _pythonDownloadPromise = null;
+
+function syncIframeToRealPythonUrl(port) {
+  try {
+    if (typeof document === 'undefined') return;
+    const targetBase = `http://127.0.0.1:${port}`;
+    const iframe = document.getElementById('scriptStudioIframe');
+    if (iframe) {
+      const curSrc = String(iframe.getAttribute('src') || '');
+      if (!curSrc.startsWith(targetBase)) {
+        iframe.src = `${targetBase}/?embedded=1&t=${Date.now()}`;
+      }
+    }
+    const badge = document.getElementById('scriptStudioServerBadge');
+    if (badge) {
+      badge.style.background = '#065f46';
+      badge.style.color = '#34d399';
+      badge.textContent = `🟢 Engine Kịch Bản: Đang hoạt động (${port})`;
+    }
+  } catch {}
+}
 
 function checkPortQuick(port = _activeScriptStudioPort, timeoutMs = 1000) {
   return new Promise((resolve) => {
@@ -146,6 +167,22 @@ function ensureCustomerFilesSynced(appDir, exeDir) {
   } catch {}
 }
 
+function isValidPortableOrSysPython(exe) {
+  try {
+    if (!exe || !fs.existsSync(exe)) return false;
+    const dir = path.dirname(exe);
+    // Portable Python 3.14 must have python314.zip and _socket.pyd
+    if (fs.existsSync(path.join(dir, 'python314.zip')) && fs.existsSync(path.join(dir, '_socket.pyd'))) {
+      return true;
+    }
+    // System Python installation must have Lib/os.py
+    if (fs.existsSync(path.join(dir, 'Lib', 'os.py'))) {
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
 function resolveBestPythonExe(appDir, exeDir) {
   const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
   const portableCandidates = [
@@ -157,14 +194,11 @@ function resolveBestPythonExe(appDir, exeDir) {
     'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\engine\\python_runtime\\python.exe'
   ];
   for (const exe of portableCandidates) {
-    try {
-      if (fs.existsSync(exe) && fs.existsSync(path.join(path.dirname(exe), 'python314.zip'))) {
-        return exe;
-      }
-    } catch {}
+    if (isValidPortableOrSysPython(exe)) {
+      return exe;
+    }
   }
   const sysCandidates = [
-    ...portableCandidates,
     path.join(localAppData, 'Programs', 'Python', 'Python314', 'python.exe'),
     path.join(localAppData, 'Programs', 'Python', 'Python313', 'python.exe'),
     path.join(localAppData, 'Programs', 'Python', 'Python312', 'python.exe'),
@@ -174,14 +208,21 @@ function resolveBestPythonExe(appDir, exeDir) {
     'C:\\Python312\\python.exe'
   ];
   for (const exe of sysCandidates) {
-    try {
-      if (fs.existsSync(exe)) return exe;
-    } catch {}
+    if (isValidPortableOrSysPython(exe)) {
+      return exe;
+    }
   }
   return 'python';
 }
 
 function ensurePortablePythonReady(appDir, exeDir) {
+  const appPortable = path.join(appDir, 'python_runtime', 'python.exe');
+  const exePortable = path.join(exeDir, 'python_runtime', 'python.exe');
+  if (isValidPortableOrSysPython(appPortable) && exeDir && path.resolve(exeDir) !== path.resolve(appDir) && !isValidPortableOrSysPython(exePortable)) {
+    syncDirRecursiveSafe(path.dirname(appPortable), path.dirname(exePortable));
+  } else if (isValidPortableOrSysPython(exePortable) && !isValidPortableOrSysPython(appPortable)) {
+    syncDirRecursiveSafe(path.dirname(exePortable), path.dirname(appPortable));
+  }
   const existing = resolveBestPythonExe(appDir, exeDir);
   if (existing && existing !== 'python') {
     return Promise.resolve(existing);
@@ -222,9 +263,7 @@ function ensurePortablePythonReady(appDir, exeDir) {
             try { fs.unlinkSync(tmpZip); } catch {}
             if (exeDir && path.resolve(exeDir) !== path.resolve(appDir)) {
               const exeRuntimeDir = path.join(exeDir, 'python_runtime');
-              if (!fs.existsSync(path.join(exeRuntimeDir, 'python.exe'))) {
-                syncDirRecursiveSafe(targetRuntimeDir, exeRuntimeDir);
-              }
+              syncDirRecursiveSafe(targetRuntimeDir, exeRuntimeDir);
             }
           }
         } catch {}
@@ -259,7 +298,7 @@ function resolveBestServerScript(appDir, exeDir) {
 function launchChromeWebLoginNode(rootDir, slotId = 1) {
   const slot = Math.max(1, Math.min(3, Number(slotId) || 1));
   const debugPort = 9221 + slot;
-  const profileDirName = slot === 1 ? '.chrome_chatgpt_profile' : `.chrome_chatgpt_profile_acc${slot}`;
+  const profileDirName = slot === 1 ? 'BROWSER_PROFILE' : `BROWSER_PROFILE_${slot}`;
   const profileDir = path.join(rootDir, profileDirName);
   try { fs.mkdirSync(profileDir, { recursive: true }); } catch {}
 
@@ -286,10 +325,15 @@ function launchChromeWebLoginNode(rootDir, slotId = 1) {
   try {
     const child = spawn(browserExe, [
       `--remote-debugging-port=${debugPort}`,
+      '--remote-allow-origins=*',
       `--user-data-dir=${profileDir}`,
       '--no-first-run',
       '--no-default-browser-check',
-      'https://chatgpt.com'
+      '--disable-background-timer-throttling',
+      '--disable-renderer-backgrounding',
+      '--disable-backgrounding-occluded-windows',
+      '--new-window',
+      'https://chatgpt.com/'
     ], {
       detached: true,
       stdio: 'ignore',
@@ -310,9 +354,29 @@ function launchChromeWebLoginNode(rootDir, slotId = 1) {
   }
 }
 
-function parseTitlesInputNode(rawText) {
-  const lines = String(rawText || '').replace(/\r/g, '').split('\n');
+function parseTitlesPayloadNode(body = {}) {
   const items = [];
+  if (Array.isArray(body.titles) && body.titles.length > 0) {
+    const cNames = Array.isArray(body.custom_names) ? body.custom_names : [];
+    for (let i = 0; i < body.titles.length; i += 1) {
+      let s = String(body.titles[i] || '').trim();
+      if (!s) continue;
+      let cname = String(cNames[i] || '').trim().replace(/[\\/:*?"<>|]/g, '_');
+      if (!cname && s.includes('\t')) {
+        const parts = s.split('\t');
+        if (parts.length >= 2 && parts[0].trim().length <= 45 && parts[1].trim().length >= 8) {
+          cname = parts[0].trim().replace(/[\\/:*?"<>|]/g, '_');
+          s = parts.slice(1).join(' ').trim();
+        }
+      }
+      const cleaned = s.replace(/^\s*(?:\d+[\.\)\-:]|[-*•]+)\s*/, '').trim();
+      if (cleaned) {
+        items.push({ title: cleaned, custom_name: cname });
+      }
+    }
+    return items;
+  }
+  const lines = String(body.text || '').replace(/\r/g, '').split('\n');
   for (const rawLine of lines) {
     let s = rawLine.trim();
     if (!s) continue;
@@ -334,6 +398,136 @@ function parseTitlesInputNode(rawText) {
     }
   }
   return items;
+}
+
+function resolveBacklogAndProjectsDirsNode(rootDir, niche) {
+  const n = String(niche || 'mafia').trim();
+  const low = n.toLowerCase();
+  if (low === 'mafia') {
+    return {
+      backlogPath: path.join(rootDir, 'QUEUE_BACKLOG.json'),
+      projectsRoot: path.join(rootDir, 'PROJECTS')
+    };
+  }
+  if (low === 'homeless') {
+    return {
+      backlogPath: path.join(rootDir, 'QUEUE_BACKLOG_HOMELESS.json'),
+      projectsRoot: path.join(rootDir, 'PROJECTS_HOMELESS')
+    };
+  }
+  if (low === 'mexico') {
+    return {
+      backlogPath: path.join(rootDir, 'QUEUE_BACKLOG_MEXICO.json'),
+      projectsRoot: path.join(rootDir, 'PROJECTS_MEXICO')
+    };
+  }
+  return {
+    backlogPath: path.join(rootDir, `QUEUE_BACKLOG_${n}.json`),
+    projectsRoot: path.join(rootDir, `PROJECTS_${n}`)
+  };
+}
+
+function persistTitlesToDiskNode(rootDir, niche, parsedItems, skipTitleRewrite = false) {
+  const { backlogPath, projectsRoot } = resolveBacklogAndProjectsDirsNode(rootDir, niche);
+  try { fs.mkdirSync(projectsRoot, { recursive: true }); } catch {}
+  let backlog = { max_parallel_threads: 3, thinking_effort: 'medium', niche, items: [] };
+  try {
+    if (fs.existsSync(backlogPath)) {
+      backlog = JSON.parse(fs.readFileSync(backlogPath, 'utf8') || '{}') || backlog;
+      if (!Array.isArray(backlog.items)) backlog.items = [];
+    }
+  } catch {}
+
+  let maxNum = 0;
+  for (const it of backlog.items) {
+    const m = String(it.project_id || '').match(/^(\d+)_/);
+    if (m) maxNum = Math.max(maxNum, Number(m[1]) || 0);
+  }
+  let nextNum = maxNum + 1;
+  const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const added = [];
+
+  for (const entry of parsedItems) {
+    const t = String(entry.title || '').trim();
+    if (!t) continue;
+    const cname = String(entry.custom_name || '').trim().replace(/[\\/:*?"<>|\s]+/g, '_');
+    const slug = t.replace(/[^a-zA-Z0-9\u00C0-\u024F]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 28) || 'Story';
+    const numStr = String(nextNum).padStart(3, '0');
+    const pid = cname ? `${numStr}_${cname}_${slug}` : `${numStr}_${slug}`;
+    nextNum += 1;
+    const pdir = path.join(projectsRoot, pid);
+    try { fs.mkdirSync(pdir, { recursive: true }); } catch {}
+
+    const item = {
+      project_id: pid,
+      project_dir: pdir,
+      source_title: t,
+      custom_name: cname,
+      niche,
+      skip_title_rewrite: Boolean(skipTitleRewrite),
+      winner_title: skipTitleRewrite ? t : '',
+      winner_title_score: skipTitleRewrite ? 100 : 0,
+      status: skipTitleRewrite ? 'QUEUED_SKIP_STEP_1' : 'QUEUED',
+      added_at: nowStr
+    };
+    const stPath = path.join(pdir, 'STATE.json');
+    if (!fs.existsSync(stPath)) {
+      try {
+        fs.writeFileSync(stPath, JSON.stringify({
+          project_id: pid,
+          project_dir: pdir,
+          source_title: t,
+          custom_name: cname,
+          skip_title_rewrite: Boolean(skipTitleRewrite),
+          winner_title: skipTitleRewrite ? t : '',
+          winner_title_score: skipTitleRewrite ? 100 : 0,
+          thinking_effort: 'medium',
+          thread_id: '',
+          host_id: 'chatgpt_web',
+          completed_steps: skipTitleRewrite ? ['STEP_1_DONE'] : [],
+          current_step_status: skipTitleRewrite ? 'QUEUED_SKIP_STEP_1' : 'QUEUED',
+          live_note: skipTitleRewrite
+            ? '🎯 Sử dụng luôn tiêu đề đã dán (Bỏ qua Bàn #1) ➔ Sẵn sàng chạy thẳng Bàn #1.5 & Bàn #2'
+            : '📥 Đang nằm trong hàng đợi (Chưa chạy).',
+          completed: false,
+          updated_at: nowStr
+        }, null, 2), 'utf8');
+      } catch {}
+    }
+    backlog.items.push(item);
+    added.push(item);
+  }
+  try {
+    fs.writeFileSync(backlogPath, JSON.stringify(backlog, null, 2), 'utf8');
+  } catch {}
+  return added;
+}
+
+function triggerPipelineWorkerNode(appDir, exeDir, rootDir, niche, maxWorkers = 3, thinking = 'medium') {
+  ensurePortablePythonReady(appDir, exeDir).then((pyExe) => {
+    const pipelineScript = path.join(rootDir, 'engine', 'mafia_chatgpt_pipeline.py');
+    if (!fs.existsSync(pipelineScript)) return;
+    try {
+      const child = spawn(pyExe, [
+        pipelineScript,
+        '--niche', String(niche || 'mafia'),
+        '--run_queue',
+        '--max_workers', String(maxWorkers || 3),
+        '--thinking', String(thinking || 'medium')
+      ], {
+        cwd: rootDir,
+        windowsHide: true,
+        stdio: 'ignore',
+        detached: false,
+        env: {
+          ...process.env,
+          PYTHONUTF8: '1',
+          PYTHONIOENCODING: 'utf-8'
+        }
+      });
+      child.on('error', () => {});
+    } catch {}
+  }).catch(() => {});
 }
 
 let _nodeFallbackServer = null;
@@ -414,7 +608,7 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
               }
 
               if (u.pathname === '/api/open_web_login') {
-                const loginRes = launchChromeWebLoginNode(rootDir, body.slot_id || 1);
+                const loginRes = launchChromeWebLoginNode(rootDir, body.slot_id || body.acc_id || 1);
                 const out = Buffer.from(JSON.stringify(loginRes), 'utf8');
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
                 res.end(out);
@@ -422,7 +616,7 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
               }
 
               if (u.pathname === '/api/add_titles') {
-                const parsed = parseTitlesInputNode(body.text || '');
+                const parsed = parseTitlesPayloadNode(body);
                 if (!parsed.length) {
                   const out = Buffer.from(JSON.stringify({
                     ok: false,
@@ -432,42 +626,71 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
                   res.end(out);
                   return;
                 }
+                const skipRewrite = Boolean(body.skip_title_rewrite);
+                const addedOnDisk = persistTitlesToDiskNode(rootDir, _nodeSelectedNiche, parsed, skipRewrite);
                 if (curSt) {
                   if (!Array.isArray(curSt.backlog)) curSt.backlog = [];
                   if (!Array.isArray(curSt.projects)) curSt.projects = [];
-                  for (const item of parsed) {
-                    const pid = item.custom_name || `KB_${String(curSt.projects.length + 1).padStart(3, '0')}`;
-                    curSt.backlog.push({ title: item.title, custom_name: pid });
+                  for (const item of addedOnDisk) {
+                    const pid = item.project_id;
+                    curSt.backlog.push({ title: item.source_title, custom_name: item.custom_name || pid });
                     curSt.projects.unshift({
                       project_id: pid,
-                      source_title: item.title,
-                      winner_title: '',
-                      status: 'NEW',
-                      next_step: 1,
-                      progress_pct: 5,
-                      steps: [
-                        { num: 1, label: 'Tiêu Đề', state: 'active', summary: 'Sẵn sàng chạy Bàn #1' },
-                        { num: 2, label: 'Giàn Ý', state: 'pending', summary: 'Chờ' },
-                        { num: 3, label: 'Viết KB', state: 'pending', summary: 'Chờ' },
-                        { num: 4, label: 'QA Lần 1', state: 'pending', summary: 'Chờ' },
-                        { num: 5, label: 'Sửa KB', state: 'pending', summary: 'Chờ' },
-                        { num: 6, label: 'Đóng Gói SEO', state: 'pending', summary: 'Chờ' }
-                      ],
-                      word_count: 0,
-                      char_count: 0,
-                      qa_verdict: '',
-                      live_note: '📥 Đã lưu tiêu đề & mã vào danh sách chờ sản xuất.',
-                      assigned_worker: 0,
+                      project_dir: item.project_dir,
+                      custom_name: item.custom_name || '',
+                      export_prefix: item.custom_name || pid.slice(0, 3),
+                      account_id: 'acc_1',
+                      account_label: 'Acc #1',
+                      source_title: item.source_title,
+                      winner_title: skipRewrite ? item.source_title : '',
+                      winner_title_score: skipRewrite ? 100 : 0,
+                      skip_title_rewrite: skipRewrite,
+                      completed_steps: skipRewrite ? ['STEP_1_DONE'] : [],
+                      current_step_status: body.run_now ? 'STEP_1_RUNNING' : 'QUEUED',
+                      active_stage: body.run_now ? (skipRewrite ? 1.5 : 1) : 0,
+                      progress_pct: body.run_now ? 15 : 5,
+                      live_note: body.run_now
+                        ? '🚀 Đang khởi chạy Pipeline 9 Bàn AI Agent & tự động chuyển sang Bàn #7 làm Video...'
+                        : '📥 Đã lưu tiêu đề & mã vào danh sách chờ sản xuất.',
+                      completed: false,
                       updated_at: new Date().toLocaleTimeString('vi-VN')
                     });
                   }
+                }
+                if (body.run_now) {
+                  checkPortQuick(9222, 400).then((port9222Up) => {
+                    if (!port9222Up) {
+                      launchChromeWebLoginNode(rootDir, 1);
+                    }
+                  }).catch(() => {});
+                  triggerPipelineWorkerNode(appDir, exeDir, rootDir, _nodeSelectedNiche, body.max_workers || 3, body.thinking || 'medium');
                 }
                 // Tự động kích hoạt tải và bật Python thật ngầm nếu chưa bật
                 ensurePort8098FromPreload().catch(() => {});
                 const out = Buffer.from(JSON.stringify({
                   ok: true,
-                  added_titles: parsed.map((x) => x.title),
-                  message: `✅ Đã lưu ${parsed.length} tiêu đề & mã vào danh sách kịch bản (${_nodeSelectedNiche})!`
+                  added_count: addedOnDisk.length,
+                  added_titles: addedOnDisk.map((x) => x.source_title),
+                  message: body.run_now
+                    ? `🚀 Đã lưu ${addedOnDisk.length} kịch bản & khởi chạy Pipeline Viết Kịch Bản ➔ Làm Video (${_nodeSelectedNiche})!`
+                    : `✅ Đã lưu ${addedOnDisk.length} tiêu đề & mã vào danh sách kịch bản (${_nodeSelectedNiche})!`
+                }), 'utf8');
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+                res.end(out);
+                return;
+              }
+
+              if (u.pathname === '/api/run_queue' || u.pathname === '/api/run_single') {
+                checkPortQuick(9222, 400).then((port9222Up) => {
+                  if (!port9222Up) {
+                    launchChromeWebLoginNode(rootDir, 1);
+                  }
+                }).catch(() => {});
+                triggerPipelineWorkerNode(appDir, exeDir, rootDir, _nodeSelectedNiche, body.max_workers || 3, body.thinking || 'medium');
+                ensurePort8098FromPreload().catch(() => {});
+                const out = Buffer.from(JSON.stringify({
+                  ok: true,
+                  message: `🚀 Đã kích hoạt chạy Hàng đợi kịch bản (${_nodeSelectedNiche})!`
                 }), 'utf8');
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
                 res.end(out);
@@ -507,15 +730,13 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
 
 async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
   if (!forceRestart) {
-    if (await checkIsRealPythonServer(SCRIPT_STUDIO_PORT, 900)) {
-      _activeScriptStudioPort = SCRIPT_STUDIO_PORT;
-      _realPythonOnline = true;
-      return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
-    }
-    if (await checkIsRealPythonServer(SCRIPT_STUDIO_ALT_PORT, 900)) {
-      _activeScriptStudioPort = SCRIPT_STUDIO_ALT_PORT;
-      _realPythonOnline = true;
-      return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
+    for (const p of CANDIDATE_STUDIO_PORTS) {
+      if (await checkIsRealPythonServer(p, 650)) {
+        _activeScriptStudioPort = p;
+        _realPythonOnline = true;
+        syncIframeToRealPythonUrl(p);
+        return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
+      }
     }
   }
   if (_preloadSpawnPromise) {
@@ -531,16 +752,22 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
       if (serverScript) {
         const rootDir = path.dirname(serverScript);
         const pyExe = await ensurePortablePythonReady(appDir, exeDir);
-        const port8098Occupied = await checkPortQuick(SCRIPT_STUDIO_PORT, 600);
-        const targetPort = (!port8098Occupied || await checkIsRealPythonServer(SCRIPT_STUDIO_PORT, 600))
-          ? SCRIPT_STUDIO_PORT
-          : SCRIPT_STUDIO_ALT_PORT;
+
+        if (_nodeFallbackServer) {
+          try { _nodeFallbackServer.close(); } catch {}
+          _nodeFallbackServer = null;
+        }
+
+        let targetPort = SCRIPT_STUDIO_PORT;
+        for (const p of CANDIDATE_STUDIO_PORTS) {
+          const occupied = await checkPortQuick(p, 450);
+          if (!occupied || await checkIsRealPythonServer(p, 500)) {
+            targetPort = p;
+            break;
+          }
+        }
 
         try {
-          if (_nodeFallbackServer && targetPort === SCRIPT_STUDIO_PORT) {
-            try { _nodeFallbackServer.close(); } catch {}
-            _nodeFallbackServer = null;
-          }
           const child = spawn(pyExe, [serverScript, '--no-browser', '--port', String(targetPort)], {
             cwd: rootDir,
             windowsHide: true,
@@ -555,25 +782,30 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
           child.on('error', () => {});
         } catch {}
 
-        for (let i = 0; i < 12; i += 1) {
+        for (let i = 0; i < 16; i += 1) {
           await new Promise((r) => setTimeout(r, 450));
           if (await checkIsRealPythonServer(targetPort, 800)) {
             _activeScriptStudioPort = targetPort;
             _realPythonOnline = true;
+            syncIframeToRealPythonUrl(targetPort);
             return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
           }
         }
       }
 
-      const fallbackPort = !(await checkPortQuick(SCRIPT_STUDIO_PORT, 500)) ? SCRIPT_STUDIO_PORT : SCRIPT_STUDIO_ALT_PORT;
-      await startNodeFallbackServer(appDir, exeDir, fallbackPort);
-      if (await checkPortQuick(fallbackPort, 800)) {
-        _activeScriptStudioPort = fallbackPort;
-        return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, fallbackNode: true };
+      let fallbackPort = SCRIPT_STUDIO_PORT;
+      for (const p of CANDIDATE_STUDIO_PORTS) {
+        if (!(await checkPortQuick(p, 400))) {
+          fallbackPort = p;
+          break;
+        }
       }
-      if (await checkPortQuick(SCRIPT_STUDIO_PORT, 800)) {
-        _activeScriptStudioPort = SCRIPT_STUDIO_PORT;
-        return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, fallbackNode: true };
+      await startNodeFallbackServer(appDir, exeDir, fallbackPort);
+      for (const p of [fallbackPort, ...CANDIDATE_STUDIO_PORTS]) {
+        if (await checkPortQuick(p, 500)) {
+          _activeScriptStudioPort = p;
+          return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, fallbackNode: true };
+        }
       }
       return { online: false };
     } finally {

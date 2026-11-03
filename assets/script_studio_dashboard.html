@@ -1411,7 +1411,7 @@ async function addAndRunNow() {
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
   const r = await apiPost('/api/add_titles', {titles, custom_names, run_now: true, max_workers, thinking, niche, skip_title_rewrite});
   showMsg(r.message, !r.ok);
-  if (r.ok && titles.length > 0) {
+  if ((r.ok || r.added_count > 0) && titles.length > 0) {
     document.getElementById('titlesInput').value = '';
     document.getElementById('customNamesInput').value = '';
   }

@@ -143,12 +143,35 @@ def start_worker_command(args_list: list[str], mode_desc: str, max_workers: int 
     if is_worker_running():
         return False, f"Hệ thống đang chạy tiến trình ({ACTIVE_MODE}). Vui lòng chờ hoặc bấm Dừng trước khi chạy lệnh mới."
 
-    # Kiểm tra môi trường Antigravity & ChatGPT Desktop trước khi chạy
+    # Kiểm tra môi trường ChatGPT Web trước khi chạy; nếu trình duyệt chưa mở thì tự động mở ngay!
     env_check = check_environment_requirements()
     if not env_check.get("chatgpt", {}).get("ok", False):
-        err_msg = " | ".join(env_check.get("errors", [])) or "Chưa bật hoặc chưa cài đặt/đăng nhập ChatGPT Desktop!"
-        append_studio_log(f"❌ CHẶN KHỞI CHẠY DO THIẾU MÔI TRƯỜNG: {err_msg}")
-        return False, f"❌ LỖI MÔI TRƯỜNG: {err_msg}"
+        try:
+            from engine.chatgpt_web_client import (
+                ensure_all_initialized_browsers_open,
+                ensure_chrome_debug_browser_open,
+            )
+            ensure_all_initialized_browsers_open(run_hidden=True)
+            time.sleep(1.2)
+            env_check = check_environment_requirements()
+            if not env_check.get("chatgpt", {}).get("ok", False):
+                ensure_chrome_debug_browser_open(
+                    open_chatgpt_home=True,
+                    force_bring_to_front=True,
+                    run_hidden=False,
+                    acc_id="acc_1",
+                )
+                time.sleep(1.5)
+                env_check = check_environment_requirements()
+        except Exception:
+            pass
+    if not env_check.get("chatgpt", {}).get("ok", False):
+        err_msg = (
+            "🌐 Đã tự động mở cửa sổ Chrome (Acc #1 - Port 9222)! "
+            "Vui lòng đăng nhập tài khoản ChatGPT trên cửa sổ Chrome vừa hiện ra, sau đó bấm [▶️ Chạy tiếp Hàng đợi] hoặc [🎬 Viết Kịch Bản ➔ Làm Video Luôn]."
+        )
+        append_studio_log(f"⚠️ CHỜ ĐĂNG NHẬP CHATGPT WEB: {err_msg}")
+        return False, err_msg
 
     niche_key = _norm_niche(niche, default=SELECTED_NICHE)
     SELECTED_NICHE = niche_key
@@ -2383,7 +2406,7 @@ async function addAndRunNow() {
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
   const r = await apiPost('/api/add_titles', {titles, custom_names, run_now: true, max_workers, thinking, niche, skip_title_rewrite});
   showMsg(r.message, !r.ok);
-  if (r.ok && titles.length > 0) {
+  if ((r.ok || r.added_count > 0) && titles.length > 0) {
     document.getElementById('titlesInput').value = '';
     document.getElementById('customNamesInput').value = '';
   }
@@ -3332,6 +3355,8 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             SELECTED_NICHE = niche
             cfg = get_niche_config(niche)
             raw_lines = [str(t).strip() for t in body.get("titles", []) if str(t).strip()]
+            if not raw_lines and body.get("text"):
+                raw_lines = [str(t).strip() for t in str(body.get("text") or "").splitlines() if str(t).strip()]
             custom_names = [str(n).strip() for n in body.get("custom_names", [])]
             run_now = bool(body.get("run_now", False))
             max_workers = int(body.get("max_workers", 3))
@@ -3381,17 +3406,26 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                     max_workers=max_workers,
                     niche=niche,
                 )
-                self._send_json({"ok": ok, "message": f"[{niche.upper()}]{title_mode_tag} Đã thêm {len(added)} kịch bản{cmd_note}. {msg}"})
+                self._send_json({
+                    "ok": ok,
+                    "added_count": len(added),
+                    "message": f"[{niche.upper()}]{title_mode_tag} Đã thêm {len(added)} kịch bản{cmd_note}. {msg}",
+                })
             else:
                 if not added and user_commands:
                     self._send_json({
                         "ok": False,
+                        "added_count": 0,
                         "message": f"Bạn vừa nhập câu lệnh tiếng Việt (\"{', '.join(user_commands)}\") mà chưa có Tiêu đề Tiếng Anh/Tây Ban Nha nào mới. Hãy dán Tiêu đề hoặc bấm nút '▶️ Chạy tiếp Hàng đợi'!",
                     })
                 else:
                     named_list = [f"{it.get('custom_name') or it.get('project_id','')[:3]}_KB.txt" for it in added[:5]]
                     sample_str = f" (File xuất: {', '.join(named_list)}{'...' if len(added) > 5 else ''})" if named_list else ""
-                    self._send_json({"ok": True, "message": f"[{niche.upper()}]{title_mode_tag} Đã lưu {len(added)} kịch bản vào Hàng đợi{sample_str}{cmd_note}."})
+                    self._send_json({
+                        "ok": True,
+                        "added_count": len(added),
+                        "message": f"[{niche.upper()}]{title_mode_tag} Đã lưu {len(added)} kịch bản vào Hàng đợi{sample_str}{cmd_note}.",
+                    })
 
         elif self.path == "/api/run_queue":
             niche = _norm_niche(body.get("niche", SELECTED_NICHE))

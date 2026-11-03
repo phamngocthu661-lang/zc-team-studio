@@ -110,7 +110,10 @@ class ScriptVideoBridgeService {
     for (const exe of candidates) {
       try {
         if (!fs.existsSync(exe)) continue;
-        if (exe.includes('python_runtime') && !fs.existsSync(path.join(path.dirname(exe), 'python314.zip'))) {
+        const dir = path.dirname(exe);
+        const isPortable = fs.existsSync(path.join(dir, 'python314.zip')) && fs.existsSync(path.join(dir, '_socket.pyd'));
+        const isSys = fs.existsSync(path.join(dir, 'Lib', 'os.py'));
+        if (!isPortable && !isSys) {
           continue;
         }
         return exe;

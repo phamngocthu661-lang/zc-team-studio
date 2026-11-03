@@ -2940,20 +2940,20 @@ function renderScriptBridgeState(st) {
   const badge = $('scriptStudioServerBadge');
   if (badge) {
     if (st.scriptServerOnline) {
+      const portLabel = targetUrl.split(':').pop() || '8098';
       badge.style.background = '#065f46';
       badge.style.color = '#34d399';
-      badge.textContent = '🟢 Engine Kịch Bản: Đang hoạt động (8098)';
-      if (becameOnline) {
-        const iframe = $('scriptStudioIframe');
-        if (iframe) {
-          iframe.onload = () => {
-            try {
-              const curChan = $('topGlobalKeySelect')?.value || localStorage.getItem('zc_active_channel_key') || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
-              iframe.contentWindow?.postMessage({ type: 'ZC_SWITCH_CHANNEL_KEY', channel: curChan }, '*');
-            } catch {}
-          };
-          iframe.src = targetUrl + '/?embedded=1&t=' + Date.now();
-        }
+      badge.textContent = `🟢 Engine Kịch Bản: Đang hoạt động (${portLabel})`;
+      const iframe = $('scriptStudioIframe');
+      const curSrc = String(iframe?.getAttribute('src') || '');
+      if (iframe && (becameOnline || !curSrc.startsWith(targetUrl))) {
+        iframe.onload = () => {
+          try {
+            const curChan = $('topGlobalKeySelect')?.value || localStorage.getItem('zc_active_channel_key') || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+            iframe.contentWindow?.postMessage({ type: 'ZC_SWITCH_CHANNEL_KEY', channel: curChan }, '*');
+          } catch {}
+        };
+        iframe.src = targetUrl + '/?embedded=1&t=' + Date.now();
       }
     } else {
       badge.style.background = '#854d0e';

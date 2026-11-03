@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 106,
-  "released_at": "2026-11-03 21:30:00",
+  "build_number": 107,
+  "released_at": "2026-11-03 22:12:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản V1.0.0 (Build #106): Nâng cấp bảng [📋 Xem Cấu Hình & Folder] (Mục 3: Danh sách các Folder chứa dữ liệu) — Cho phép bấm [📁 Chọn Folder], nhập/dán đường dẫn, [💾 Lưu], [📂 Mở Folder] trực tiếp cho Folder Kho Stock, Folder Xuất Video Output (.mp4), Folder Ảnh/Green theo Voice, Folder Intro, Kho_Green và tất cả Folder TONG HOP liên kết (kèm tùy chọn áp dụng Stock & Output cho cả 15 Key)."
+  "changelog": "Phiên bản V1.0.0 (Build #107): Sửa triệt để lỗi báo 'Vui lòng nhập ít nhất 1 tiêu đề hợp lệ vào ô GIAO VIỆC' khi bấm [🎬 Viết Kịch Bản ➔ Làm Video Luôn] / [🚀 Lưu & Chạy Ngay] / [📥 Lưu Tiêu Đề & Mã]; khắc phục resolveBestPythonExe tự động tải đầy đủ python314.zip & _socket.pyd, quét dải cổng 8098..8103 tự chuyển sang Real Python Server và tự mở Chrome ChatGPT (Port 9222) khi bấm chạy."
 }

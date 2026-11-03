@@ -166,14 +166,22 @@ def _spawn_on_interactive_desktop(cmd_args: list[str], acc_cfg: dict = None) -> 
             f'--disable-backgrounding-occluded-windows --new-window "https://chatgpt.com/"\n'
         )
     try:
-        subprocess.run(
+        p = subprocess.Popen(cmd_args)
+        for _ in range(6):
+            time.sleep(0.25)
+            if is_cdp_browser_running(port=port):
+                return int(p.pid)
+    except Exception:
+        pass
+    try:
+        r_create = subprocess.run(
             [
                 "schtasks",
                 "/Create",
                 "/TN",
                 task_name,
                 "/TR",
-                bat_path,
+                f'"{bat_path}"',
                 "/SC",
                 "ONCE",
                 "/ST",
@@ -184,11 +192,11 @@ def _spawn_on_interactive_desktop(cmd_args: list[str], acc_cfg: dict = None) -> 
             capture_output=True,
             timeout=5,
         )
-        subprocess.run(["schtasks", "/Run", "/TN", task_name], capture_output=True, timeout=5)
+        if r_create.returncode == 0:
+            subprocess.run(["schtasks", "/Run", "/TN", task_name], capture_output=True, timeout=5)
         return 1
     except Exception:
-        p = subprocess.Popen(cmd_args)
-        return int(p.pid)
+        return 0
 
 
 def _set_single_port_window_visibility(port: int, visible: bool = False, offset_idx: int = 0) -> list[int]:
