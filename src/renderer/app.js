@@ -2946,8 +2946,10 @@ function renderScriptBridgeState(st) {
       badge.textContent = `🟢 Engine Kịch Bản: Đang hoạt động (${portLabel})`;
       const iframe = $('scriptStudioIframe');
       const curSrc = String(iframe?.getAttribute('src') || '');
-      if (iframe && !curSrc.startsWith(targetUrl)) {
+      const isVerified = iframe?.dataset?.verifiedLoaded === '1';
+      if (iframe && (!curSrc.startsWith(targetUrl) || !isVerified)) {
         const curChan = $('topGlobalKeySelect')?.value || localStorage.getItem('zc_active_channel_key') || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+        if (iframe.dataset) iframe.dataset.verifiedLoaded = '1';
         iframe.onload = () => {
           try {
             iframe.contentWindow?.postMessage({ type: 'ZC_SWITCH_CHANNEL_KEY', channel: curChan }, '*');

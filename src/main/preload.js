@@ -33,10 +33,12 @@ function syncIframeToRealPythonUrl(port) {
     const iframe = document.getElementById('scriptStudioIframe');
     if (iframe) {
       const curSrc = String(iframe.getAttribute('src') || '');
-      if (!curSrc.startsWith(targetBase)) {
+      const isVerified = iframe.dataset && iframe.dataset.verifiedLoaded === '1';
+      if (!curSrc.startsWith(targetBase) || !isVerified) {
         const curChan = document.getElementById('topGlobalKeySelect')?.value
           || (typeof localStorage !== 'undefined' && localStorage.getItem('zc_active_channel_key'))
           || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+        if (iframe.dataset) iframe.dataset.verifiedLoaded = '1';
         iframe.src = `${targetBase}/?embedded=1&channel=${encodeURIComponent(curChan)}&t=${Date.now()}`;
       }
     }
@@ -83,7 +85,7 @@ function checkIsRealPythonServer(port, timeoutMs = 1000) {
         res.on('end', () => {
           try {
             const data = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-            resolve(Boolean(data && data.engine === 'python_real' && Number(data.build_number || 0) >= 109));
+            resolve(Boolean(data && data.engine === 'python_real' && Number(data.build_number || 0) >= 110));
           } catch {
             resolve(false);
           }
@@ -575,7 +577,7 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
           }
           if (req.method === 'GET' && u.pathname === '/api/status') {
             const rawNiche = (u.searchParams.get('niche') || _nodeSelectedNiche || 'mafia').trim();
-            if (statusMap[rawNiche]) {
+            if (rawNiche) {
               _nodeSelectedNiche = rawNiche;
             }
             const baseSt = statusMap[_nodeSelectedNiche] || statusMap.mafia || Object.values(statusMap)[0] || {};
@@ -638,8 +640,9 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
             req.on('end', () => {
               let body = {};
               try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch {}
-              if (body.niche && statusMap[body.niche]) {
-                _nodeSelectedNiche = body.niche;
+              const reqNiche = String(body.niche || u.searchParams.get('niche') || '').trim();
+              if (reqNiche) {
+                _nodeSelectedNiche = reqNiche;
               }
               const curSt = statusMap[_nodeSelectedNiche] || statusMap.mafia;
 
@@ -701,11 +704,6 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
                   }
                 }
                 if (body.run_now) {
-                  checkPortQuick(9222, 400).then((port9222Up) => {
-                    if (!port9222Up) {
-                      launchChromeWebLoginNode(rootDir, 1);
-                    }
-                  }).catch(() => {});
                   triggerPipelineWorkerNode(appDir, exeDir, rootDir, _nodeSelectedNiche, body.max_workers || 3, body.thinking || 'medium');
                 }
                 // Tự động kích hoạt tải và bật Python thật ngầm nếu chưa bật
@@ -848,11 +846,6 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
               }
 
               if (u.pathname === '/api/run_queue' || u.pathname === '/api/run_single') {
-                checkPortQuick(9222, 400).then((port9222Up) => {
-                  if (!port9222Up) {
-                    launchChromeWebLoginNode(rootDir, 1);
-                  }
-                }).catch(() => {});
                 triggerPipelineWorkerNode(appDir, exeDir, rootDir, _nodeSelectedNiche, body.max_workers || 3, body.thinking || 'medium');
                 ensurePort8098FromPreload().catch(() => {});
                 const out = Buffer.from(JSON.stringify({
@@ -897,13 +890,17 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
 
 async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
   if (!forceRestart) {
-    for (const p of CANDIDATE_STUDIO_PORTS) {
-      if (await checkIsRealPythonServer(p, 650)) {
-        _activeScriptStudioPort = p;
-        _realPythonOnline = true;
-        syncIframeToRealPythonUrl(p);
-        return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
+    // Chờ tối đa ~3 giây nếu tiến trình Python Server của Main Process vừa mới được bật và đang khởi tạo
+    for (let waitIdx = 0; waitIdx < 6; waitIdx += 1) {
+      for (const p of CANDIDATE_STUDIO_PORTS) {
+        if (await checkIsRealPythonServer(p, 700)) {
+          _activeScriptStudioPort = p;
+          _realPythonOnline = true;
+          syncIframeToRealPythonUrl(p);
+          return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
+        }
       }
+      await new Promise((r) => setTimeout(r, 450));
     }
   }
   if (_preloadSpawnPromise) {
@@ -915,6 +912,17 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
       const exeDir = path.dirname(process.execPath);
       ensureCustomerFilesSynced(appDir, exeDir);
 
+      if (!forceRestart) {
+        for (const p of CANDIDATE_STUDIO_PORTS) {
+          if (await checkIsRealPythonServer(p, 750)) {
+            _activeScriptStudioPort = p;
+            _realPythonOnline = true;
+            syncIframeToRealPythonUrl(p);
+            return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
+          }
+        }
+      }
+
       const serverScript = resolveBestServerScript(appDir, exeDir);
       if (serverScript) {
         const rootDir = path.dirname(serverScript);
@@ -925,7 +933,7 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
           _nodeFallbackServer = null;
         }
 
-        // Dọn tiến trình mafia_dashboard_server.py bản cũ (nếu đang giữ cổng 8098) để luôn chạy bản mới nhất trên cổng 8098
+        // Chỉ dọn tiến trình mafia_dashboard_server.py bị treo nếu chưa có server thật nào phản hồi
         try {
           execFileSync('powershell.exe', [
             '-NoProfile', '-WindowStyle', 'Hidden', '-Command',

@@ -284,29 +284,24 @@ class ScriptVideoBridgeService {
       this.scriptServerProcess.stderr?.on('data', () => {});
       this.scriptServerSpawnedByUs = true;
       this.scriptServerProcess.on('exit', () => {
-        this.scriptServerOnline = false;
         this.scriptServerProcess = null;
-        this._emitBridgeState();
+        setTimeout(() => {
+          this.checkScriptServerHealth(900).then(() => {
+            this._emitBridgeState();
+          }).catch(() => {});
+        }, 600);
       });
     } catch (err) {
       return { online: false, error: err.message };
     }
 
-    for (let i = 0; i < 6; i += 1) {
-      await new Promise((r) => setTimeout(r, 450));
+    for (let i = 0; i < 16; i += 1) {
+      await new Promise((r) => setTimeout(r, 500));
       const ok = await this.checkScriptServerHealth(1000);
       if (ok) {
         this._emitBridgeState();
         return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`, spawned: true };
       }
-    }
-
-    // Dự phòng trực tiếp bằng Node.js HTTP Server ngay trong Electron nếu máy khách chưa có Python
-    const fallbackOk = await this._startNodeFallbackServer8098();
-    if (fallbackOk) {
-      this.scriptServerOnline = true;
-      this._emitBridgeState();
-      return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`, spawned: true, fallbackNode: true };
     }
 
     this._emitBridgeState();

@@ -546,53 +546,32 @@ def find_chatgpt_pipe() -> str:
 
 def check_environment_requirements() -> dict:
     """
-    Kiểm tra môi trường cho PHIÊN BẢN 2 (CHATGPT WEB MULTI-TAB STUDIO — PORT 8098):
-    1. Tài khoản & Ứng dụng Google Antigravity IDE (`~/.gemini/antigravity` + 10 Skills).
-    2. Trình duyệt ChatGPT Web (`https://chatgpt.com` qua Chrome CDP Port 9222 + Profile lưu vĩnh viễn tại `D:\\MAFIA_STUDIO_WEB\\BROWSER_PROFILE`).
+    Kiểm tra môi trường cho CHATGPT WEB MULTI-TAB STUDIO (PORT 8098):
+    1. Bộ 15 Kênh Skill AI Đóng Gói Sẵn (`engine/skills_bundle`, `skills_homeless`, `skills_mexico`, `skills_12_keys`) — Offline 100%, KHÔNG cần cài đặt Antigravity IDE trên máy khách.
+    2. Trình duyệt ChatGPT Web (`https://chatgpt.com` qua Chrome CDP Port 9222/9223/9224 + Profile lưu vĩnh viễn).
     """
     from engine.chatgpt_web_client import check_web_browser_status
 
-    home = os.path.expanduser("~")
-    agy_dir = os.path.join(home, ".gemini", "antigravity")
-    agy_skills_dir = os.path.join(home, ".gemini", "config", "skills")
-
-    required_skill_folders = [
-        "Viet_Lai_Tieu_De_Mafia_v1.2",
-        "Viet_Gian_Y_Nguoi_Hau_v1.1",
-        "Viet_Kich_Ban_Nguoi_Hau_v1.4",
-        "Kiem_Tra_Kich_Ban_v1.1",
-        "Viet_Seo_Nguoi_Hau_v1.0",
-        "Viet_Tieu_De_Homeless_v1.2",
-        "Viet_Gian_Y_Homeless_v2.4",
-        "Viet_Kich_Ban_Homeless_v2.0",
-        "Kiem_Tra_Kich_Ban_Homeless_v2.0",
-        "Viet_Seo_Homeless_v2.1",
-        "Titulos_Drama_Familiar_Mexico_v1.3",
-        "Canon_Guard_Drama_Familiar_Mexico_v1.3",
-        "Arquitectura_Drama_Familiar_Mexico_v1.3",
-        "Escritor_Drama_Familiar_Mexico_v1.3",
-        "Auditor_Forense_Guion_Familiar_Mexico_v1.3",
-        "Seo_Thumbnail_Trailer_Mexico_v1.3",
-        "Verificador_TTS_Drama_Familiar_Mexico_v1.3",
+    local_skill_checks = [
+        ("skills_mafia", SKILLS_ROOT),
+        ("skills_homeless", HOMELESS_SKILLS_ROOT),
+        ("skills_mexico", MEXICO_SKILLS_ROOT),
+        ("skills_12_keys", SKILLS_12_KEYS_ROOT),
     ]
-    missing_skills = [
-        sf for sf in required_skill_folders if not os.path.exists(os.path.join(agy_skills_dir, sf, "SKILL.md"))
-    ]
-    antigravity_installed = os.path.exists(agy_dir)
-    antigravity_ok = antigravity_installed and len(missing_skills) == 0
+    missing_skills = [name for name, spath in local_skill_checks if not os.path.exists(spath)]
+    antigravity_installed = True
+    antigravity_ok = len(missing_skills) == 0
 
     web_st = check_web_browser_status()
     chatgpt_ok = bool(web_st.get("browser_running") and web_st.get("logged_in"))
 
     errors = []
-    if not antigravity_installed:
-        errors.append("Chưa cài đặt hoặc chưa đăng nhập Google Antigravity IDE.")
-    elif missing_skills:
-        errors.append(f"Chưa đồng bộ {len(missing_skills)}/17 Skill vào Antigravity.")
+    if missing_skills:
+        errors.append(f"Thiếu {len(missing_skills)} file Skill đóng gói cục bộ.")
 
     if not web_st.get("browser_running"):
         errors.append(
-            "Trình duyệt ChatGPT Web (Port 9222) chưa mở. Hãy bấm nút '🔑 Mở Cửa Sổ Đăng Nhập ChatGPT Web (Lưu Vĩnh Viễn)' trên giao diện!"
+            "Trình duyệt ChatGPT Web (Port 9222) chưa mở. Hãy bấm nút '🔑 Đăng Nhập Acc #1' trên giao diện!"
         )
     elif not web_st.get("logged_in"):
         errors.append(
@@ -6783,7 +6762,7 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
             ensure_all_initialized_browsers_open(run_hidden=True)
         except Exception:
             pass
-        for _ in range(4):
+        for _ in range(6):
             time.sleep(1.5)
             acc_summary = check_all_web_accounts_status(force_refresh=True)
             if int(acc_summary.get("logged_in_count") or 0) > 0:

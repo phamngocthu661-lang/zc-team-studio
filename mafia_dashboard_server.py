@@ -2947,10 +2947,10 @@ function renderEnvCheck(env) {
 
   if (env.antigravity && env.antigravity.ok) {
     agyPill.className = 'env-pill ok';
-    agyPill.innerText = '✅ Antigravity IDE & 17 Skill (Mafia + Homeless + Mexico Bà Cô): SẴN SÀNG';
+    agyPill.innerText = '✅ Bộ 15 Kênh Skill AI Đóng Gói Sẵn (Offline 100% — Không cần Antigravity): SẴN SÀNG';
   } else {
     agyPill.className = 'env-pill err';
-    agyPill.innerText = '❌ Antigravity IDE / Skill: THIẾU (Bấm Đồng bộ)';
+    agyPill.innerText = '❌ Bộ Skill AI Nội Bộ: THIẾU (Bấm Đồng bộ)';
   }
 
   const webSt = (env.chatgpt && env.chatgpt.web_status) ? env.chatgpt.web_status : {};
@@ -4176,7 +4176,7 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             self._send_json({
                 "ok": True,
                 "engine": "python_real",
-                "build_number": 109,
+                "build_number": 110,
                 "studio_root": STUDIO_ROOT,
             })
         else:

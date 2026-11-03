@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 109,
-  "released_at": "2026-11-03 23:52:00",
+  "build_number": 110,
+  "released_at": "2026-11-04 05:00:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản V1.0.0 (Build #109): Sửa triệt để lỗi không xóa được tiêu đề trong Electron (gỡ bỏ confirm/prompt bị chặn trong iframe, tự dừng Worker trước khi xóa để không tạo lại STATE.json, thêm nút [🗑️ Xóa Tất Cả Tiêu Đề] & [🧹 Xóa Ô Nhập]) và bổ sung nút [🔄 Cập Nhật Tiêu Đề] trên thanh công cụ + trên từng dòng kịch bản (hỗ trợ cả nạp danh sách tiêu đề lên 2 ô nhập để sửa hàng loạt và mở bảng cập nhật từng tiêu đề/mã)."
+  "changelog": "Phiên bản V1.0.0 (Build #110): Khắc phục triệt để lỗi máy khách hàng bấm Chạy chỉ mở Chrome lên rồi đứng im (sửa cơ chế dán/gõ vào .ProseMirror khi cửa sổ Chrome chạy ngầm hoặc mất focus, chặn báo gửi ảo khi ô nhập rỗng, tự động khởi động lại Chrome kèm cổng CDP 9222 nếu bị khóa profile, sửa xung đột khởi động giữa Main Process và Preload khiến Engine Kịch Bản kẹt 'Đang khởi động...'), và loại bỏ hoàn toàn kiểm tra Antigravity IDE (chạy 100% bằng bộ 15 Kênh Skill đóng gói sẵn)."
 }

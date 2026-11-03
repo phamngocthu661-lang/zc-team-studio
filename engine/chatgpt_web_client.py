@@ -549,7 +549,7 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
     return {"closed_count": closed_cnt, "recycled_count": recycled_cnt, "details": details}
 
 
-def check_single_account_status(acc_cfg: dict) -> dict:
+def check_single_account_status(acc_cfg: dict, force_refresh: bool = False) -> dict:
     """
     Kiểm tra trạng thái trình duyệt Chrome và phiên đăng nhập của 1 tài khoản (`Acc #1`, `Acc #2`, hoặc `Acc #3`).
     Hỗ trợ cơ chế Non-Blocking Cache (`_LAST_VERIFIED_LOGIN_BY_PORT`) để khi tài khoản đang bận chạy 3 luồng kịch bản,
@@ -665,7 +665,7 @@ def check_single_account_status(acc_cfg: dict) -> dict:
                 "active_projects": active_projs,
                 "message": f"✅ {label} ({email or 'Đã lưu phiên'}): Đang gánh {len(active_projs)}/{acc_cfg['max_threads']} luồng ({cg_tabs_cnt} tab mở)",
             }
-        if cached_login and not cached_login.get("logged_in") and (time.time() - cached_login.get("ts", 0)) < 15.0:
+        if not force_refresh and cached_login and not cached_login.get("logged_in") and (time.time() - cached_login.get("ts", 0)) < 6.0:
             return {
                 "acc_id": acc_id,
                 "index": acc_cfg["index"],
@@ -684,9 +684,56 @@ def check_single_account_status(acc_cfg: dict) -> dict:
                 "active_projects": active_projs,
                 "message": f"⚠️ {label} (Port {port}): Cửa sổ Chrome đang mở nhưng CHƯA ĐĂNG NHẬP.",
             }
-
-        ws_url = cg_tabs[0].get("webSocketDebuggerUrl")
-        if not ws_url:
+        js_check = """
+        (async () => {
+            try {
+                const ctl = new AbortController();
+                const timer = setTimeout(() => ctl.abort(), 1100);
+                const r = await fetch('/api/auth/session', { credentials: 'include', signal: ctl.signal });
+                clearTimeout(timer);
+                if (r.ok) {
+                    const d = await r.json();
+                    const tok = (d && d.accessToken) ? d.accessToken : '';
+                    if (tok) window.__studioAccessToken = tok;
+                    const u = (d && d.user) ? d.user : {};
+                    if (tok || u.email || u.id) {
+                        return JSON.stringify({
+                            logged_in: true,
+                            email: u.email || u.name || '',
+                            plan: (d.account && d.account.planType) || ''
+                        });
+                    }
+                }
+            } catch (e) {}
+            try {
+                const hasComposer = Boolean(
+                    document.querySelector('#prompt-textarea')
+                    || document.querySelector('.ProseMirror[contenteditable="true"]')
+                    || document.querySelector('[role="textbox"][contenteditable="true"]')
+                );
+                const hasLoginBtn = Boolean(
+                    document.querySelector('[data-testid="login-button"]')
+                    || document.querySelector('[data-testid="welcome-login-button"]')
+                    || Array.from(document.querySelectorAll('button, a')).some(el => {
+                        const tx = (el.innerText || '').trim().toLowerCase();
+                        return tx === 'log in' || tx === 'đăng nhập' || tx === 'sign up' || tx === 'đăng ký';
+                    })
+                );
+                const hasProfileOrConv = Boolean(
+                    document.querySelector('[data-testid="profile-button"]')
+                    || document.querySelector('[aria-label="Open Profile Menu"]')
+                    || document.querySelector('nav a[href*="/c/"]')
+                );
+                if ((hasComposer && !hasLoginBtn) || hasProfileOrConv) {
+                    return JSON.stringify({ logged_in: true, email: '', plan: '' });
+                }
+            } catch (e2) {}
+            return JSON.stringify({ logged_in: false });
+        })()
+        """
+        raw_val = None
+        candidate_ws_urls = [t.get("webSocketDebuggerUrl") for t in cg_tabs[:1] if t.get("webSocketDebuggerUrl")]
+        if not candidate_ws_urls:
             is_logged = bool(has_active_conv_url or (cached_login and cached_login.get("logged_in")))
             return {
                 "acc_id": acc_id,
@@ -706,51 +753,39 @@ def check_single_account_status(acc_cfg: dict) -> dict:
                 "active_projects": active_projs,
                 "message": f"⏳ {label} (Port {port}): Đang kết nối tới tab ChatGPT Web...",
             }
-        js_check = """
-        (async () => {
-            try {
-                const r = await fetch('/api/auth/session', { credentials: 'include' });
-                if (!r.ok) return JSON.stringify({ logged_in: false });
-                const d = await r.json();
-                const tok = (d && d.accessToken) ? d.accessToken : '';
-                if (tok) window.__studioAccessToken = tok;
-                const u = (d && d.user) ? d.user : {};
-                return JSON.stringify({
-                    logged_in: Boolean(tok),
-                    email: u.email || u.name || '',
-                    plan: (d.account && d.account.planType) || ''
-                });
-            } catch (e) {
-                return JSON.stringify({ logged_in: false, err: String(e) });
-            }
-        })()
-        """
-        ws = websocket.create_connection(ws_url, timeout=1.5)
-        try:
-            ws.send(
-                json.dumps(
-                    {
-                        "id": 1,
-                        "method": "Runtime.evaluate",
-                        "params": {
-                            "expression": js_check,
-                            "awaitPromise": True,
-                            "returnByValue": True,
-                        },
-                    }
-                )
-            )
-            raw_val = None
-            while True:
-                msg = json.loads(ws.recv())
-                if msg.get("id") == 1:
-                    raw_val = ((msg.get("result") or {}).get("result") or {}).get("value")
-                    break
-        finally:
+
+        for ws_url in candidate_ws_urls:
+            ws = None
             try:
-                ws.close()
+                ws = websocket.create_connection(ws_url, timeout=1.5)
+                ws.send(
+                    json.dumps(
+                        {
+                            "id": 1,
+                            "method": "Runtime.evaluate",
+                            "params": {
+                                "expression": js_check,
+                                "awaitPromise": True,
+                                "returnByValue": True,
+                            },
+                        }
+                    )
+                )
+                while True:
+                    msg = json.loads(ws.recv())
+                    if msg.get("id") == 1:
+                        raw_val = ((msg.get("result") or {}).get("result") or {}).get("value")
+                        break
+                if raw_val:
+                    break
             except Exception:
-                pass
+                continue
+            finally:
+                if ws is not None:
+                    try:
+                        ws.close()
+                    except Exception:
+                        pass
 
         info = json.loads(raw_val) if isinstance(raw_val, str) and raw_val.strip().startswith("{") else {}
         logged_in = bool(info.get("logged_in") or has_active_conv_url)
@@ -881,27 +916,42 @@ def ensure_chrome_debug_browser_open(
     ]
     if not is_cdp_browser_running(port=port):
         _spawn_on_interactive_desktop(base_args, acc_cfg=cfg)
-        for _ in range(20):
+        for _ in range(12):
             time.sleep(0.5)
             if is_cdp_browser_running(port=port):
                 break
+        # Nếu vẫn chưa mở được cổng CDP (do có tiến trình Chrome cũ không bật --remote-debugging-port đang khóa profile_dir),
+        # tự động đóng tiến trình Chrome đang giữ profile_dir đó và khởi chạy lại kèm --remote-debugging-port!
+        if not is_cdp_browser_running(port=port):
+            try:
+                prof_escaped = profile_dir.replace("'", "''")
+                subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-WindowStyle",
+                        "Hidden",
+                        "-Command",
+                        f"Get-CimInstance Win32_Process | Where-Object {{ ($_.Name -match 'chrome|msedge') -and ($_.CommandLine -like '*{prof_escaped}*') }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}",
+                    ],
+                    capture_output=True,
+                    timeout=5,
+                    creationflags=0x08000000 if os.name == "nt" else 0,
+                )
+                time.sleep(0.8)
+            except Exception:
+                pass
+            _spawn_on_interactive_desktop(base_args, acc_cfg=cfg)
+            for _ in range(16):
+                time.sleep(0.5)
+                if is_cdp_browser_running(port=port):
+                    break
         if run_hidden and not force_bring_to_front:
             time.sleep(1.2)
             st = check_single_account_status(cfg)
             if st.get("logged_in"):
                 _set_single_port_window_visibility(port, visible=False, offset_idx=cfg["index"] - 1)
     elif force_bring_to_front:
-        _set_single_port_window_visibility(port, visible=True, offset_idx=cfg["index"] - 1)
-        _spawn_on_interactive_desktop(
-            [
-                exe_path,
-                f"--user-data-dir={profile_dir}",
-                "--new-window",
-                "https://chatgpt.com/",
-            ],
-            acc_cfg=cfg,
-        )
-        time.sleep(1.0)
         _set_single_port_window_visibility(port, visible=True, offset_idx=cfg["index"] - 1)
 
     if open_chatgpt_home and is_cdp_browser_running(port=port):
@@ -974,7 +1024,7 @@ def check_all_web_accounts_status(force_refresh: bool = False) -> dict:
 
     accounts_status = []
     for cfg in WEB_ACCOUNTS_CONFIG:
-        accounts_status.append(check_single_account_status(cfg))
+        accounts_status.append(check_single_account_status(cfg, force_refresh=force_refresh))
 
     logged_in_accs = [a for a in accounts_status if a.get("logged_in")]
     running_accs = [a for a in accounts_status if a.get("browser_running")]
@@ -1415,9 +1465,15 @@ class ChatGPTWebMultiTabClient:
             used_tab_ids = set(acc_tab_map.values()) | acc_reserved | acc_busy
             for t in page_tabs:
                 u = str(t.get("url", "")).rstrip("/")
+                is_home_url = (
+                    u.startswith("https://chatgpt.com")
+                    and "/c/" not in u
+                    and "/auth/" not in u
+                    and "/g/" not in u
+                )
                 if (
                     t.get("id") not in used_tab_ids
-                    and u in ("https://chatgpt.com", "https://chatgpt.com/?model=auto")
+                    and is_home_url
                     and t.get("webSocketDebuggerUrl")
                 ):
                     acc_reserved.add(t["id"])
@@ -1504,10 +1560,24 @@ class ChatGPTWebMultiTabClient:
                 await new Promise(r => setTimeout(r, 500));
             }}
 
+            function focusAndSelectComposer(box) {{
+                if (!box) return;
+                try {{
+                    box.focus();
+                    const sel = window.getSelection();
+                    if (sel) {{
+                        const range = document.createRange();
+                        range.selectNodeContents(box);
+                        range.collapse(false);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }}
+                }} catch (e) {{}}
+            }}
+
             // Đảm bảo nút chọn mức độ suy nghĩ (Thinking effort / Select ChatGPT model) luôn khóa chuẩn ở Medium
             try {{
-                const modelBtn = document.querySelector('button[aria-label="Select ChatGPT model"]')
-                    || document.querySelector('form button[aria-haspopup="menu"]');
+                const modelBtn = document.querySelector('button[aria-label="Select ChatGPT model"]');
                 if (modelBtn && !(modelBtn.innerText || '').toLowerCase().includes('medium')) {{
                     modelBtn.click();
                     await new Promise(r => setTimeout(r, 250));
@@ -1517,6 +1587,7 @@ class ChatGPTWebMultiTabClient:
                         medItem.click();
                         await new Promise(r => setTimeout(r, 200));
                     }} else {{
+                        document.dispatchEvent(new KeyboardEvent('keydown', {{ key: 'Escape', code: 'Escape', bubbles: true }}));
                         document.body.click();
                     }}
                 }}
@@ -1526,21 +1597,31 @@ class ChatGPTWebMultiTabClient:
             Array.from(document.querySelectorAll('form button')).filter(
                 b => (b.getAttribute('aria-label') || '').includes('Remove pasted text')
             ).forEach(b => b.click());
-            el.focus();
+            focusAndSelectComposer(el);
             if ((el.innerText || '').trim().length > 0) {{
-                document.execCommand('selectAll', false, null);
-                document.execCommand('delete', false, null);
+                try {{
+                    const sel = window.getSelection();
+                    if (sel) {{
+                        const range = document.createRange();
+                        range.selectNodeContents(el);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }}
+                    document.execCommand('delete', false, null);
+                }} catch (e) {{}}
                 await new Promise(r => setTimeout(r, 120));
             }}
+
+            const prevUrlPath = window.location.pathname;
 
             if (el.tagName === 'TEXTAREA') {{
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
                 nativeSetter.call(el, promptText);
                 el.dispatchEvent(new Event('input', {{ bubbles: true }}));
             }} else {{
-                // Nếu prompt <= 12.000 ký tự: chia tối đa 4 cụm dán inline (< 0.15s).
-                // Nếu prompt > 12.000 ký tự (như Bước 4A): dán trực tiếp 1 lần phần thân + 1 lần dòng tiêu đề đầu để gửi tức thì trong 0.1s!
-                el.focus();
+                // Nếu prompt <= 12.000 ký tự: chia cụm dán inline.
+                // Nếu prompt > 12.000 ký tự (như Bước 4A): dán trực tiếp 1 lần phần thân + 1 lần dòng tiêu đề đầu.
+                focusAndSelectComposer(el);
                 if (promptText.length > 12000) {{
                     const headLine = promptText.slice(0, 1200) + '\\n\\n[xem toàn bộ nội dung đính kèm bên dưới]';
                     const dtHead = new DataTransfer();
@@ -1572,11 +1653,45 @@ class ChatGPTWebMultiTabClient:
                         await new Promise(r => setTimeout(r, 15));
                     }}
                 }}
+
+                // Kiểm tra xem chữ/chip đính kèm đã thực sự vào ô nhập chưa (tránh trường hợp cửa sổ Chrome chạy ngầm mất focus khiến paste bị bỏ qua)
+                await new Promise(r => setTimeout(r, 90));
+                let checkBox = findComposerBox() || el;
+                let insertedLen = (checkBox.innerText || '').trim().length;
+                let hasAttachNow = Array.from(document.querySelectorAll('form button')).some(
+                    b => (b.getAttribute('aria-label') || '').includes('Remove pasted text')
+                );
+                if (insertedLen < 3 && !hasAttachNow) {{
+                    focusAndSelectComposer(checkBox);
+                    try {{
+                        const stepSize = 4500;
+                        for (let pos = 0; pos < promptText.length; pos += stepSize) {{
+                            document.execCommand('insertText', false, promptText.slice(pos, pos + stepSize));
+                            await new Promise(r => setTimeout(r, 15));
+                        }}
+                    }} catch (e) {{}}
+                    await new Promise(r => setTimeout(r, 90));
+                    checkBox = findComposerBox() || el;
+                    insertedLen = (checkBox.innerText || '').trim().length;
+                }}
+                if (insertedLen < 3 && !hasAttachNow) {{
+                    try {{
+                        focusAndSelectComposer(checkBox);
+                        checkBox.innerHTML = '';
+                        const pNode = document.createElement('p');
+                        pNode.textContent = promptText;
+                        checkBox.appendChild(pNode);
+                        checkBox.dispatchEvent(new InputEvent('beforeinput', {{ bubbles: true, cancelable: true, inputType: 'insertText', data: promptText }}));
+                        checkBox.dispatchEvent(new InputEvent('input', {{ bubbles: true, inputType: 'insertText', data: promptText }}));
+                    }} catch (e) {{}}
+                    await new Promise(r => setTimeout(r, 100));
+                }}
             }}
 
-            // Chờ nút Send kích hoạt và bấm lặp lại cho tới khi ô nhập thực sự gửi đi (ô trống & hết chip đính kèm hoặc hiện nút Stop)
+            // Chờ nút Send kích hoạt và bấm lặp lại cho tới khi ô nhập thực sự gửi đi (ô trống & hết chip đính kèm hoặc hiện nút Stop SAU KHI đã bấm Send)
             let sentConfirmed = false;
-            for (let s = 0; s < 20; s++) {{
+            let clickedSendOnce = false;
+            for (let s = 0; s < 28; s++) {{
                 await new Promise(r => setTimeout(r, 350));
                 const stopNow = findStopButton();
                 const curBox = findComposerBox();
@@ -1584,14 +1699,17 @@ class ChatGPTWebMultiTabClient:
                 const hasAttachment = Array.from(document.querySelectorAll('form button')).some(
                     b => (b.getAttribute('aria-label') || '').includes('Remove pasted text')
                 );
-                if (stopNow || (s > 0 && curTextLen === 0 && !hasAttachment)) {{
+                const urlChangedToConv = (window.location.pathname !== prevUrlPath) && window.location.pathname.includes('/c/');
+                if (stopNow || urlChangedToConv || (clickedSendOnce && curTextLen === 0 && !hasAttachment)) {{
                     sentConfirmed = true;
                     break;
                 }}
                 const sendBtn = findSendButton();
                 if (sendBtn && !sendBtn.disabled) {{
                     sendBtn.click();
-                }} else if (s >= 6) {{
+                    clickedSendOnce = true;
+                }} else if (s >= 4 && (curTextLen > 0 || hasAttachment)) {{
+                    if (curBox) focusAndSelectComposer(curBox);
                     const enterEvt = new KeyboardEvent('keydown', {{
                         key: 'Enter',
                         code: 'Enter',
@@ -1600,11 +1718,12 @@ class ChatGPTWebMultiTabClient:
                         bubbles: true,
                         cancelable: true
                     }});
-                    el.dispatchEvent(enterEvt);
+                    (curBox || el).dispatchEvent(enterEvt);
+                    clickedSendOnce = true;
                 }}
             }}
             if (!sentConfirmed) {{
-                return JSON.stringify({{ error: 'Nút Send chưa gửi được tin nhắn đi sau 20 lần thử, sẽ tự động thử lại!' }});
+                return JSON.stringify({{ error: 'Nút Send chưa gửi được tin nhắn đi sau 28 lần thử, sẽ tự động thử lại!' }});
             }}
 
             // Chờ URL cập nhật sang /c/<uuid> (nếu là đoạn chat mới)
