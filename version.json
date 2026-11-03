@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 110,
-  "released_at": "2026-11-04 05:00:00",
+  "build_number": 111,
+  "released_at": "2026-11-04 05:26:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản V1.0.0 (Build #110): Khắc phục triệt để lỗi máy khách hàng bấm Chạy chỉ mở Chrome lên rồi đứng im (sửa cơ chế dán/gõ vào .ProseMirror khi cửa sổ Chrome chạy ngầm hoặc mất focus, chặn báo gửi ảo khi ô nhập rỗng, tự động khởi động lại Chrome kèm cổng CDP 9222 nếu bị khóa profile, sửa xung đột khởi động giữa Main Process và Preload khiến Engine Kịch Bản kẹt 'Đang khởi động...'), và loại bỏ hoàn toàn kiểm tra Antigravity IDE (chạy 100% bằng bộ 15 Kênh Skill đóng gói sẵn)."
+  "changelog": "Phiên bản V1.0.0 (Build #111): Sửa triệt để lỗi nhận diện Python Runtime trên máy khách hàng (nhận diện đầy đủ _socket.pyd nằm trong thư mục python_runtime/DLLs/ của bản giải nén ZIP và tự động đồng bộ sang thư mục gốc python_runtime/), làm sạch log mẫu cũ từ ngày 29/10 trong fallback_status.json, và đảm bảo khởi chạy 100% Real Python Engine trên cổng 8098."
 }

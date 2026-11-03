@@ -127,8 +127,9 @@ def _migrate_backlog_and_projects_if_split():
 
 _migrate_backlog_and_projects_if_split()
 
-if ENGINE_DIR not in sys.path:
-    sys.path.insert(0, ENGINE_DIR)
+for _p in (ENGINE_DIR, _CODE_ROOT, STUDIO_ROOT):
+    if _p and _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from mafia_chatgpt_pipeline import (
     add_titles_to_backlog,
@@ -4176,7 +4177,7 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             self._send_json({
                 "ok": True,
                 "engine": "python_real",
-                "build_number": 110,
+                "build_number": 111,
                 "studio_root": STUDIO_ROOT,
             })
         else:

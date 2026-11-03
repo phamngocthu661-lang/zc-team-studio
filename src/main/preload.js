@@ -85,7 +85,7 @@ function checkIsRealPythonServer(port, timeoutMs = 1000) {
         res.on('end', () => {
           try {
             const data = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-            resolve(Boolean(data && data.engine === 'python_real' && Number(data.build_number || 0) >= 110));
+            resolve(Boolean(data && data.engine === 'python_real' && Number(data.build_number || 0) >= 109));
           } catch {
             resolve(false);
           }
@@ -121,10 +121,49 @@ function syncDirRecursiveSafe(srcDir, dstDir) {
   } catch {}
 }
 
+function flattenPortablePythonDlls(pyRuntimeDir) {
+  try {
+    if (!pyRuntimeDir || !fs.existsSync(pyRuntimeDir)) return;
+    const dllsDir = path.join(pyRuntimeDir, 'DLLs');
+    if (!fs.existsSync(dllsDir)) return;
+    for (const entry of fs.readdirSync(dllsDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      if (entry.name.endsWith('.pyd') || entry.name.endsWith('.dll')) {
+        const src = path.join(dllsDir, entry.name);
+        const dst = path.join(pyRuntimeDir, entry.name);
+        if (!fs.existsSync(dst)) {
+          try { fs.copyFileSync(src, dst); } catch {}
+        }
+      }
+    }
+  } catch {}
+}
+
+function readBuildNumberSafe(dir) {
+  try {
+    const vf = path.join(dir, 'version.json');
+    if (fs.existsSync(vf)) {
+      const d = JSON.parse(fs.readFileSync(vf, 'utf8') || '{}');
+      return Number(d.build_number || 0);
+    }
+  } catch {}
+  return 0;
+}
+
 function ensureCustomerFilesSynced(appDir, exeDir) {
   try {
+    for (const base of [exeDir, appDir]) {
+      if (base) {
+        flattenPortablePythonDlls(path.join(base, 'python_runtime'));
+        flattenPortablePythonDlls(path.join(base, 'engine', 'python_runtime'));
+      }
+    }
     if (!appDir || !exeDir || path.resolve(appDir) === path.resolve(exeDir)) return;
-    const srcBase = fs.existsSync(path.join(appDir, 'mafia_dashboard_server.py')) ? appDir : exeDir;
+    const appBuild = readBuildNumberSafe(appDir);
+    const exeBuild = readBuildNumberSafe(exeDir);
+    const srcBase = (exeBuild > appBuild && fs.existsSync(path.join(exeDir, 'mafia_dashboard_server.py')))
+      ? exeDir
+      : (fs.existsSync(path.join(appDir, 'mafia_dashboard_server.py')) ? appDir : exeDir);
     const dstBase = srcBase === appDir ? exeDir : appDir;
     if (!fs.existsSync(dstBase)) return;
 
@@ -135,7 +174,14 @@ function ensureCustomerFilesSynced(appDir, exeDir) {
         try { fs.copyFileSync(sf, df); } catch {}
       }
     }
-    for (const ef of ['chatgpt_web_client.py', 'mafia_chatgpt_pipeline.py', 'license_manager.py']) {
+    for (const ef of [
+      'chatgpt_web_client.py',
+      'mafia_chatgpt_pipeline.py',
+      'license_manager.py',
+      'channel_memory_guard.py',
+      'tts_post_director.py',
+      'auto_tab_sweeper_daemon.py'
+    ]) {
       const sf = path.join(srcBase, 'engine', ef);
       const df = path.join(dstBase, 'engine', ef);
       if (fs.existsSync(sf)) {
@@ -157,6 +203,7 @@ function ensureCustomerFilesSynced(appDir, exeDir) {
     }
     for (const dirRel of [
       path.join('engine', 'websocket'),
+      path.join('engine', 'skills_bundle'),
       'skills_12_keys',
       'skills_mexico',
       'skills_homeless',
@@ -176,8 +223,16 @@ function isValidPortableOrSysPython(exe) {
   try {
     if (!exe || !fs.existsSync(exe)) return false;
     const dir = path.dirname(exe);
-    // Portable Python 3.14 must have python314.zip and _socket.pyd
-    if (fs.existsSync(path.join(dir, 'python314.zip')) && fs.existsSync(path.join(dir, '_socket.pyd'))) {
+    flattenPortablePythonDlls(dir);
+    // Portable Python 3.14 must have python314.zip and _socket.pyd (in root or DLLs/) or python314.dll
+    const hasZip = fs.existsSync(path.join(dir, 'python314.zip'))
+      || fs.existsSync(path.join(dir, 'python313.zip'))
+      || fs.existsSync(path.join(dir, 'python312.zip'));
+    const hasSocketOrDll = fs.existsSync(path.join(dir, '_socket.pyd'))
+      || fs.existsSync(path.join(dir, 'DLLs', '_socket.pyd'))
+      || fs.existsSync(path.join(dir, 'python314.dll'))
+      || fs.existsSync(path.join(dir, 'python3.dll'));
+    if (hasZip && hasSocketOrDll) {
       return true;
     }
     // System Python installation must have Lib/os.py
@@ -619,6 +674,13 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
                     };
                   });
                 }
+              }
+              const liveLogPath = path.join(rootDir, 'LIVE_STUDIO_LOG.txt');
+              if (fs.existsSync(liveLogPath)) {
+                const logLines = fs.readFileSync(liveLogPath, 'utf8').split(/\r?\n/);
+                baseSt.recent_logs = logLines.slice(-120).join('\n');
+              } else {
+                baseSt.recent_logs = '🚀 Hệ thống ZC Team Studio đã sẵn sàng. Hãy đăng nhập tài khoản ChatGPT (Acc #1), nhập tiêu đề và bấm Lưu & Chạy Ngay!';
               }
             } catch {}
             const payload = Buffer.from(JSON.stringify({

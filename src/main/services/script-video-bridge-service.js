@@ -111,7 +111,27 @@ class ScriptVideoBridgeService {
       try {
         if (!fs.existsSync(exe)) continue;
         const dir = path.dirname(exe);
-        const isPortable = fs.existsSync(path.join(dir, 'python314.zip')) && fs.existsSync(path.join(dir, '_socket.pyd'));
+        const dllsDir = path.join(dir, 'DLLs');
+        if (fs.existsSync(dllsDir)) {
+          try {
+            for (const entry of fs.readdirSync(dllsDir, { withFileTypes: true })) {
+              if (entry.isFile() && (entry.name.endsWith('.pyd') || entry.name.endsWith('.dll'))) {
+                const dst = path.join(dir, entry.name);
+                if (!fs.existsSync(dst)) {
+                  try { fs.copyFileSync(path.join(dllsDir, entry.name), dst); } catch {}
+                }
+              }
+            }
+          } catch {}
+        }
+        const hasZip = fs.existsSync(path.join(dir, 'python314.zip'))
+          || fs.existsSync(path.join(dir, 'python313.zip'))
+          || fs.existsSync(path.join(dir, 'python312.zip'));
+        const hasSocketOrDll = fs.existsSync(path.join(dir, '_socket.pyd'))
+          || fs.existsSync(path.join(dir, 'DLLs', '_socket.pyd'))
+          || fs.existsSync(path.join(dir, 'python314.dll'))
+          || fs.existsSync(path.join(dir, 'python3.dll'));
+        const isPortable = hasZip && hasSocketOrDll;
         const isSys = fs.existsSync(path.join(dir, 'Lib', 'os.py'));
         if (!isPortable && !isSys) {
           continue;
@@ -200,21 +220,44 @@ class ScriptVideoBridgeService {
 
   async checkScriptServerHealth(timeoutMs = 2500) {
     return new Promise((resolve) => {
-      const req = http.get(`http://127.0.0.1:${SCRIPT_STUDIO_PORT}/`, { timeout: timeoutMs }, (res) => {
-        res.resume();
-        const ok = res.statusCode >= 200 && res.statusCode < 400;
-        this.scriptServerOnline = ok;
-        resolve(ok);
-      });
-      req.on('error', () => {
+      try {
+        const req = http.request({
+          hostname: '127.0.0.1',
+          port: SCRIPT_STUDIO_PORT,
+          path: '/api/is_real_python_server',
+          method: 'POST',
+          timeout: timeoutMs,
+          headers: { 'Content-Type': 'application/json', 'Content-Length': 2 }
+        }, (res) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => {
+            try {
+              const data = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+              const ok = Boolean(data && data.engine === 'python_real');
+              this.scriptServerOnline = ok;
+              resolve(ok);
+            } catch {
+              this.scriptServerOnline = false;
+              resolve(false);
+            }
+          });
+        });
+        req.on('error', () => {
+          this.scriptServerOnline = false;
+          resolve(false);
+        });
+        req.on('timeout', () => {
+          try { req.destroy(); } catch {}
+          this.scriptServerOnline = false;
+          resolve(false);
+        });
+        req.write('{}');
+        req.end();
+      } catch {
         this.scriptServerOnline = false;
         resolve(false);
-      });
-      req.on('timeout', () => {
-        req.destroy();
-        this.scriptServerOnline = false;
-        resolve(false);
-      });
+      }
     });
   }
 
