@@ -215,6 +215,8 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
    - Khi sửa code hoặc nâng cấp tính năng trên máy của bạn, hệ thống **chỉ lưu cục bộ trên máy của bạn** (không tự ý đẩy lên GitHub).
    - **Chỉ khi nào bạn nhắn yêu cầu `"cập nhật lên github"`** (hoặc bạn chạy [`DAY_CAP_NHAT_LEN_GITHUB.bat`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/DAY_CAP_NHAT_LEN_GITHUB.bat) / [`push_update_github.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/push_update_github.py)), hệ thống mới tự động tăng số phiên bản (`V1.0.1`, `V1.0.2`...) và đẩy lên GitHub để các máy khách hiện nút cập nhật.
 
-4. **Gói File `.ZIP` Bàn Giao Cho Khách Hàng (`V1.0.0`):**
+4. **Gói File `.ZIP` Bàn Giao Cho Khách Hàng (`V1.0.0` · `Build #101` — Đã Tích Hợp Sẵn `python_runtime` Cho Máy Khách Không Cài Python):**
    - Đường dẫn file ZIP: [`D:\ZC_TEAM\TOOL_ZC_TEAM\ZC_TEAM_Studio_V1.0.0_Khach_Hang.zip`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/ZC_TEAM_Studio_V1.0.0_Khach_Hang.zip)
-   - Đã tích hợp sẵn toàn bộ Runtime `Video Batch Studio.exe`, `CHAY_UNG_DUNG_ZC_TEAM.bat`, `HUONG_DAN_KHACH_HANG.txt`, `FFmpeg/FFprobe`, `12 Key & 60 Skill`, `12 Giọng Clone Kho_Voice`, `Kho_Green`, `Engine 9 Bàn AI` và bộ tự động cập nhật OTA từ GitHub (đã loại bỏ `license.key` của máy chủ và toàn bộ khóa bí mật Admin).
+   - **Khắc phục triệt để lỗi máy khách không hiện 9 Agent (`🟠 Engine Kịch Bản: Đang khởi động...`):**
+     - Đã đóng gói kèm **Portable Python 3.14 (`python_runtime\python.exe` + `python314.zip` + `engine/websocket`)** ngay trong ứng dụng và đẩy lên GitHub (`V1.0.0 · Build #101`).
+     - Máy khách đang mở bản cũ chỉ cần bấm **`🔄 KIỂM TRA CẬP NHẬT` ➔ `🚀 Cập Nhật Ngay`** là ứng dụng tự tải `python_runtime` về, tự bật cổng `8098` và hiện ngay đầy đủ **9 Bàn AI Agent**.

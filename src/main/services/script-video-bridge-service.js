@@ -87,9 +87,13 @@ class ScriptVideoBridgeService {
     const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
     const candidates = [
       preferredRoot ? path.join(preferredRoot, 'python_runtime', 'python.exe') : null,
+      preferredRoot ? path.join(preferredRoot, 'engine', 'python_runtime', 'python.exe') : null,
       path.join(exeDir, 'python_runtime', 'python.exe'),
+      path.join(exeDir, 'engine', 'python_runtime', 'python.exe'),
       path.join(exeDir, 'resources', 'app', 'python_runtime', 'python.exe'),
+      path.join(exeDir, 'resources', 'app', 'engine', 'python_runtime', 'python.exe'),
       path.join(appDir, 'python_runtime', 'python.exe'),
+      path.join(appDir, 'engine', 'python_runtime', 'python.exe'),
       path.join(path.resolve(appDir, '..', '..'), 'python_runtime', 'python.exe'),
       'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\python_runtime\\python.exe',
       path.join(localAppData, 'Programs', 'Python', 'Python314', 'python.exe'),
