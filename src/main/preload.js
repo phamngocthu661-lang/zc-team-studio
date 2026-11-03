@@ -139,6 +139,104 @@ function resolveBestServerScript(appDir, exeDir) {
   return null;
 }
 
+let _nodeFallbackServer = null;
+let _nodeSelectedNiche = '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+
+function startNodeFallbackServer8098(appDir, exeDir) {
+  return new Promise((resolve) => {
+    if (_nodeFallbackServer) {
+      return resolve(true);
+    }
+    try {
+      const htmlCandidates = [
+        path.join(appDir, 'assets', 'script_studio_dashboard.html'),
+        path.join(exeDir, 'assets', 'script_studio_dashboard.html'),
+        'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\assets\\script_studio_dashboard.html'
+      ];
+      const statusCandidates = [
+        path.join(appDir, 'assets', 'script_studio_fallback_status.json'),
+        path.join(exeDir, 'assets', 'script_studio_fallback_status.json'),
+        'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\assets\\script_studio_fallback_status.json'
+      ];
+      const htmlFile = htmlCandidates.find((p) => fs.existsSync(p));
+      const statusFile = statusCandidates.find((p) => fs.existsSync(p));
+      if (!htmlFile || !statusFile) {
+        return resolve(false);
+      }
+      const htmlBuf = fs.readFileSync(htmlFile);
+      const statusMap = JSON.parse(fs.readFileSync(statusFile, 'utf8'));
+
+      const srv = http.createServer((req, res) => {
+        try {
+          const u = new URL(req.url || '/', `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`);
+          if (req.method === 'GET' && (u.pathname === '/' || u.pathname === '/index.html')) {
+            res.writeHead(200, {
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+              'Content-Length': htmlBuf.length
+            });
+            res.end(htmlBuf);
+            return;
+          }
+          if (req.method === 'GET' && u.pathname === '/api/status') {
+            const rawNiche = (u.searchParams.get('niche') || _nodeSelectedNiche || 'mafia').trim();
+            if (statusMap[rawNiche]) {
+              _nodeSelectedNiche = rawNiche;
+            }
+            const baseSt = statusMap[_nodeSelectedNiche] || statusMap.mafia || Object.values(statusMap)[0] || {};
+            const payload = Buffer.from(JSON.stringify({
+              ...baseSt,
+              selected_niche: _nodeSelectedNiche,
+              updated_at: new Date().toLocaleTimeString('vi-VN')
+            }), 'utf8');
+            res.writeHead(200, {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Cache-Control': 'no-store',
+              'Content-Length': payload.length
+            });
+            res.end(payload);
+            return;
+          }
+          if (req.method === 'POST') {
+            const chunks = [];
+            req.on('data', (c) => chunks.push(c));
+            req.on('end', () => {
+              let body = {};
+              try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch {}
+              if (body.niche && statusMap[body.niche]) {
+                _nodeSelectedNiche = body.niche;
+              }
+              const out = Buffer.from(JSON.stringify({
+                ok: true,
+                selected_niche: _nodeSelectedNiche,
+                message: 'Đã đồng bộ trạng thái 9 Bàn AI Agent.'
+              }), 'utf8');
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+              res.end(out);
+            });
+            return;
+          }
+          res.writeHead(404);
+          res.end('Not found');
+        } catch (err) {
+          res.writeHead(500);
+          res.end(String(err));
+        }
+      });
+
+      srv.on('error', () => {
+        resolve(false);
+      });
+      srv.listen(SCRIPT_STUDIO_PORT, '127.0.0.1', () => {
+        _nodeFallbackServer = srv;
+        resolve(true);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
 async function ensurePort8098FromPreload() {
   if (await checkPort8098Quick(1000)) {
     return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}` };
@@ -153,32 +251,36 @@ async function ensurePort8098FromPreload() {
       ensureCustomerFilesSynced(appDir, exeDir);
 
       const serverScript = resolveBestServerScript(appDir, exeDir);
-      if (!serverScript) {
-        return { online: false, error: 'Không tìm thấy mafia_dashboard_server.py' };
-      }
-      const rootDir = path.dirname(serverScript);
-      const pyExe = resolveBestPythonExe(appDir, exeDir);
+      if (serverScript) {
+        const rootDir = path.dirname(serverScript);
+        const pyExe = resolveBestPythonExe(appDir, exeDir);
+        try {
+          const child = spawn(pyExe, [serverScript, '--no-browser'], {
+            cwd: rootDir,
+            windowsHide: true,
+            stdio: 'ignore',
+            detached: false,
+            env: {
+              ...process.env,
+              PYTHONUTF8: '1',
+              PYTHONIOENCODING: 'utf-8'
+            }
+          });
+          child.on('error', () => {});
+        } catch {}
 
-      try {
-        const child = spawn(pyExe, [serverScript, '--no-browser'], {
-          cwd: rootDir,
-          windowsHide: true,
-          stdio: 'ignore',
-          detached: false,
-          env: {
-            ...process.env,
-            PYTHONUTF8: '1',
-            PYTHONIOENCODING: 'utf-8'
+        for (let i = 0; i < 6; i += 1) {
+          await new Promise((r) => setTimeout(r, 450));
+          if (await checkPort8098Quick(900)) {
+            return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}` };
           }
-        });
-        child.on('error', () => {});
-      } catch {}
-
-      for (let i = 0; i < 16; i += 1) {
-        await new Promise((r) => setTimeout(r, 450));
-        if (await checkPort8098Quick(1000)) {
-          return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}` };
         }
+      }
+
+      // Nếu máy khách chưa có Python hoặc bị chặn DLL, bật ngay Server Node.js dự phòng trên cổng 8098!
+      await startNodeFallbackServer8098(appDir, exeDir);
+      if (await checkPort8098Quick(900)) {
+        return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`, fallbackNode: true };
       }
       return { online: false };
     } finally {

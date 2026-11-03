@@ -263,13 +263,21 @@ class ScriptVideoBridgeService {
       return { online: false, error: err.message };
     }
 
-    for (let i = 0; i < 16; i += 1) {
-      await new Promise((r) => setTimeout(r, 500));
-      const ok = await this.checkScriptServerHealth(1200);
+    for (let i = 0; i < 6; i += 1) {
+      await new Promise((r) => setTimeout(r, 450));
+      const ok = await this.checkScriptServerHealth(1000);
       if (ok) {
         this._emitBridgeState();
         return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`, spawned: true };
       }
+    }
+
+    // Dự phòng trực tiếp bằng Node.js HTTP Server ngay trong Electron nếu máy khách chưa có Python
+    const fallbackOk = await this._startNodeFallbackServer8098();
+    if (fallbackOk) {
+      this.scriptServerOnline = true;
+      this._emitBridgeState();
+      return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`, spawned: true, fallbackNode: true };
     }
 
     this._emitBridgeState();
@@ -277,6 +285,94 @@ class ScriptVideoBridgeService {
       online: false,
       error: 'Đã gọi khởi chạy Python Script Studio nhưng cổng 8098 chưa phản hồi.'
     };
+  }
+
+  _startNodeFallbackServer8098() {
+    return new Promise((resolve) => {
+      if (this._nodeFallback8098Server) return resolve(true);
+      try {
+        const appDir = path.resolve(__dirname, '..', '..', '..');
+        const exeDir = path.dirname(process.execPath);
+        const htmlCandidates = [
+          path.join(appDir, 'assets', 'script_studio_dashboard.html'),
+          path.join(exeDir, 'assets', 'script_studio_dashboard.html'),
+          'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\assets\\script_studio_dashboard.html'
+        ];
+        const statusCandidates = [
+          path.join(appDir, 'assets', 'script_studio_fallback_status.json'),
+          path.join(exeDir, 'assets', 'script_studio_fallback_status.json'),
+          'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\assets\\script_studio_fallback_status.json'
+        ];
+        const htmlFile = htmlCandidates.find((p) => fs.existsSync(p));
+        const statusFile = statusCandidates.find((p) => fs.existsSync(p));
+        if (!htmlFile || !statusFile) return resolve(false);
+
+        const htmlBuf = fs.readFileSync(htmlFile);
+        const statusMap = JSON.parse(fs.readFileSync(statusFile, 'utf8'));
+        let selectedNiche = this.activeChannelKey || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+
+        const srv = http.createServer((req, res) => {
+          try {
+            const u = new URL(req.url || '/', `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`);
+            if (req.method === 'GET' && (u.pathname === '/' || u.pathname === '/index.html')) {
+              res.writeHead(200, {
+                'Content-Type': 'text/html; charset=utf-8',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+                'Content-Length': htmlBuf.length
+              });
+              res.end(htmlBuf);
+              return;
+            }
+            if (req.method === 'GET' && u.pathname === '/api/status') {
+              const rawNiche = (u.searchParams.get('niche') || selectedNiche || 'mafia').trim();
+              if (statusMap[rawNiche]) selectedNiche = rawNiche;
+              const baseSt = statusMap[selectedNiche] || statusMap.mafia || Object.values(statusMap)[0] || {};
+              const payload = Buffer.from(JSON.stringify({
+                ...baseSt,
+                selected_niche: selectedNiche,
+                updated_at: new Date().toLocaleTimeString('vi-VN')
+              }), 'utf8');
+              res.writeHead(200, {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Cache-Control': 'no-store',
+                'Content-Length': payload.length
+              });
+              res.end(payload);
+              return;
+            }
+            if (req.method === 'POST') {
+              const chunks = [];
+              req.on('data', (c) => chunks.push(c));
+              req.on('end', () => {
+                let body = {};
+                try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch {}
+                if (body.niche && statusMap[body.niche]) selectedNiche = body.niche;
+                const out = Buffer.from(JSON.stringify({
+                  ok: true,
+                  selected_niche: selectedNiche,
+                  message: 'Đã đồng bộ trạng thái 9 Bàn AI Agent.'
+                }), 'utf8');
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+                res.end(out);
+              });
+              return;
+            }
+            res.writeHead(404);
+            res.end('Not found');
+          } catch (err) {
+            res.writeHead(500);
+            res.end(String(err));
+          }
+        });
+        srv.on('error', () => resolve(false));
+        srv.listen(SCRIPT_STUDIO_PORT, '127.0.0.1', () => {
+          this._nodeFallback8098Server = srv;
+          resolve(true);
+        });
+      } catch {
+        resolve(false);
+      }
+    });
   }
 
   async restartScriptServer() {

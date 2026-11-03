@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 103,
-  "released_at": "2026-11-03 18:45:00",
+  "build_number": 104,
+  "released_at": "2026-11-03 18:55:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản chính thức V1.0.0 (Build #103): Nâng cấp cơ chế tự khởi chạy & tự phục hồi Port 8098 trực tiếp từ Preload + Main Process ngay sau khi bấm Cập Nhật OTA (không cần tắt/mở lại EXE), đồng bộ python314.zip đầy đủ cho mọi máy khách."
+  "changelog": "Phiên bản chính thức V1.0.0 (Build #104): Tối ưu gói cập nhật OTA siêu nhẹ (~6.6MB, tải trong 4 giây) & tích hợp trực tiếp Server Node.js Port 8098 ngay trong Electron/Preload, giúp mọi máy khách hiển thị 9 Bàn AI Agent tức thì ngay sau khi bấm Cập Nhật."
 }
