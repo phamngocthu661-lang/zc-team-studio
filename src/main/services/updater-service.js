@@ -245,6 +245,12 @@ class UpdaterService {
       const latestBuild = Number(remoteInfo.build_number || DEFAULT_BUILD_NUMBER);
       const hasUpdate = this.compareVersions(latestVersion, latestBuild, localInfo.version, localInfo.build_number) > 0;
 
+      const rawChangelog = remoteInfo.changelog || localInfo.changelog || '';
+      const changelogList = Array.isArray(rawChangelog)
+        ? rawChangelog
+        : String(rawChangelog).split(/\r?\n/).map((s) => s.replace(/^[•\-*]\s*/, '').trim()).filter(Boolean);
+      const releaseDateStr = String(remoteInfo.released_at || remoteInfo.release_date || localInfo.released_at || '').trim();
+
       const result = {
         ok: true,
         checked: true,
@@ -253,8 +259,11 @@ class UpdaterService {
         currentBuild: localInfo.build_number,
         latestVersion,
         latestBuild,
-        releasedAt: String(remoteInfo.released_at || '').trim(),
-        changelog: String(remoteInfo.changelog || '').trim(),
+        remoteVersion: latestVersion,
+        remoteBuild: latestBuild,
+        releasedAt: releaseDateStr,
+        releaseDate: releaseDateStr,
+        changelog: changelogList,
         repo,
         branch,
         checkedAt: new Date().toISOString()
@@ -465,6 +474,7 @@ class UpdaterService {
 
       return {
         ok: true,
+        status: 'success',
         oldVersion,
         newVersion: newInfo.version,
         buildNumber: newInfo.build_number,
@@ -475,7 +485,9 @@ class UpdaterService {
     } catch (err) {
       return {
         ok: false,
-        error: err.message || String(err)
+        status: 'error',
+        error: err.message || String(err),
+        message: err.message || String(err)
       };
     } finally {
       this._isUpdating = false;
