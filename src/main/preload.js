@@ -1,5 +1,10 @@
 'use strict';
 
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const http = require('node:http');
+const { spawn } = require('node:child_process');
 const { contextBridge, ipcRenderer } = require('electron');
 const { subtitleStyle, subtitleEffectiveFontSize, subtitlePreviewBox, subtitleLineHeight, subtitleFitFontSize } = require('../shared/subtitle-preview');
 const {
@@ -10,6 +15,183 @@ const {
   subtitleFrame,
   resolveFrameState
 } = require('../shared/render-core');
+
+const SCRIPT_STUDIO_PORT = 8098;
+let _preloadSpawnPromise = null;
+
+function checkPort8098Quick(timeoutMs = 1200) {
+  return new Promise((resolve) => {
+    try {
+      const req = http.get(`http://127.0.0.1:${SCRIPT_STUDIO_PORT}/`, { timeout: timeoutMs }, (res) => {
+        res.resume();
+        resolve(res.statusCode >= 200 && res.statusCode < 400);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => {
+        try { req.destroy(); } catch {}
+        resolve(false);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+function syncDirRecursiveSafe(srcDir, dstDir) {
+  try {
+    if (!fs.existsSync(srcDir)) return;
+    fs.mkdirSync(dstDir, { recursive: true });
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+      if (entry.name === '__pycache__' || entry.name === '.git' || entry.name.endsWith('.pyc')) continue;
+      const s = path.join(srcDir, entry.name);
+      const d = path.join(dstDir, entry.name);
+      if (entry.isDirectory()) {
+        syncDirRecursiveSafe(s, d);
+      } else {
+        fs.copyFileSync(s, d);
+      }
+    }
+  } catch {}
+}
+
+function ensureCustomerFilesSynced(appDir, exeDir) {
+  try {
+    if (!appDir || !exeDir || path.resolve(appDir) === path.resolve(exeDir)) return;
+    const srcBase = fs.existsSync(path.join(appDir, 'engine', 'websocket')) ? appDir : (
+      fs.existsSync(path.join(exeDir, 'engine', 'websocket')) ? exeDir : appDir
+    );
+    const dstBase = srcBase === appDir ? exeDir : appDir;
+    if (!fs.existsSync(dstBase)) return;
+
+    for (const f of ['mafia_dashboard_server.py', 'organize_12_keys_skills.py', 'version.json']) {
+      const sf = path.join(srcBase, f);
+      const df = path.join(dstBase, f);
+      if (fs.existsSync(sf)) {
+        try { fs.copyFileSync(sf, df); } catch {}
+      }
+    }
+    for (const ef of ['chatgpt_web_client.py', 'mafia_chatgpt_pipeline.py', 'license_manager.py']) {
+      const sf = path.join(srcBase, 'engine', ef);
+      const df = path.join(dstBase, 'engine', ef);
+      if (fs.existsSync(sf)) {
+        try {
+          fs.mkdirSync(path.dirname(df), { recursive: true });
+          fs.copyFileSync(sf, df);
+        } catch {}
+      }
+    }
+    const wsSrc = path.join(srcBase, 'engine', 'websocket');
+    const wsDst = path.join(dstBase, 'engine', 'websocket');
+    if (fs.existsSync(wsSrc) && !fs.existsSync(wsDst)) {
+      syncDirRecursiveSafe(wsSrc, wsDst);
+    }
+  } catch {}
+}
+
+function resolveBestPythonExe(appDir, exeDir) {
+  const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+  const portableCandidates = [
+    path.join(appDir, 'python_runtime', 'python.exe'),
+    path.join(appDir, 'engine', 'python_runtime', 'python.exe'),
+    path.join(exeDir, 'python_runtime', 'python.exe'),
+    path.join(exeDir, 'engine', 'python_runtime', 'python.exe'),
+    'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\python_runtime\\python.exe',
+    'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\engine\\python_runtime\\python.exe'
+  ];
+  for (const exe of portableCandidates) {
+    try {
+      if (fs.existsSync(exe) && fs.existsSync(path.join(path.dirname(exe), 'python314.zip'))) {
+        return exe;
+      }
+    } catch {}
+  }
+  const sysCandidates = [
+    ...portableCandidates,
+    path.join(localAppData, 'Programs', 'Python', 'Python314', 'python.exe'),
+    path.join(localAppData, 'Programs', 'Python', 'Python313', 'python.exe'),
+    path.join(localAppData, 'Programs', 'Python', 'Python312', 'python.exe'),
+    path.join(localAppData, 'Programs', 'Python', 'Python311', 'python.exe'),
+    'C:\\Python314\\python.exe',
+    'C:\\Python313\\python.exe',
+    'C:\\Python312\\python.exe'
+  ];
+  for (const exe of sysCandidates) {
+    try {
+      if (fs.existsSync(exe)) return exe;
+    } catch {}
+  }
+  return 'python';
+}
+
+function resolveBestServerScript(appDir, exeDir) {
+  const candidates = [
+    fs.existsSync(path.join(exeDir, 'engine', 'websocket')) ? path.join(exeDir, 'mafia_dashboard_server.py') : null,
+    fs.existsSync(path.join(appDir, 'engine', 'websocket')) ? path.join(appDir, 'mafia_dashboard_server.py') : null,
+    path.join(exeDir, 'mafia_dashboard_server.py'),
+    path.join(appDir, 'mafia_dashboard_server.py'),
+    'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\mafia_dashboard_server.py'
+  ].filter(Boolean);
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch {}
+  }
+  return null;
+}
+
+async function ensurePort8098FromPreload() {
+  if (await checkPort8098Quick(1000)) {
+    return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}` };
+  }
+  if (_preloadSpawnPromise) {
+    return _preloadSpawnPromise;
+  }
+  _preloadSpawnPromise = (async () => {
+    try {
+      const appDir = path.resolve(__dirname, '..', '..');
+      const exeDir = path.dirname(process.execPath);
+      ensureCustomerFilesSynced(appDir, exeDir);
+
+      const serverScript = resolveBestServerScript(appDir, exeDir);
+      if (!serverScript) {
+        return { online: false, error: 'Không tìm thấy mafia_dashboard_server.py' };
+      }
+      const rootDir = path.dirname(serverScript);
+      const pyExe = resolveBestPythonExe(appDir, exeDir);
+
+      try {
+        const child = spawn(pyExe, [serverScript, '--no-browser'], {
+          cwd: rootDir,
+          windowsHide: true,
+          stdio: 'ignore',
+          detached: false,
+          env: {
+            ...process.env,
+            PYTHONUTF8: '1',
+            PYTHONIOENCODING: 'utf-8'
+          }
+        });
+        child.on('error', () => {});
+      } catch {}
+
+      for (let i = 0; i < 16; i += 1) {
+        await new Promise((r) => setTimeout(r, 450));
+        if (await checkPort8098Quick(1000)) {
+          return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}` };
+        }
+      }
+      return { online: false };
+    } finally {
+      _preloadSpawnPromise = null;
+    }
+  })();
+  return _preloadSpawnPromise;
+}
+
+// Tự động kích hoạt kiểm tra & bật Port 8098 ngay khi preload nạp (kể cả sau khi OTA reload)
+setTimeout(() => {
+  ensurePort8098FromPreload().catch(() => {});
+}, 300);
 
 const sub = (channel, fn) => {
   const listener = (_event, payload) => fn(payload);
@@ -145,15 +327,44 @@ contextBridge.exposeInMainWorld('vbs', {
   },
 
   scriptBridge: {
-    status: () => ipcRenderer.invoke('scriptBridge:status'),
-    ensureScriptServer: () => ipcRenderer.invoke('scriptBridge:ensureScriptServer'),
-    restartScriptServer: () => ipcRenderer.invoke('scriptBridge:restartScriptServer'),
+    status: async () => {
+      const st = (await ipcRenderer.invoke('scriptBridge:status').catch(() => ({}))) || {};
+      if (!st.scriptServerOnline) {
+        const up = await checkPort8098Quick(900);
+        if (up) {
+          st.scriptServerOnline = true;
+          st.scriptServerUrl = `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`;
+        } else {
+          ensurePort8098FromPreload().catch(() => {});
+        }
+      }
+      return st;
+    },
+    ensureScriptServer: async () => {
+      const res = await ipcRenderer.invoke('scriptBridge:ensureScriptServer').catch(() => ({ online: false }));
+      if (res && res.online) return res;
+      return ensurePort8098FromPreload();
+    },
+    restartScriptServer: async () => {
+      const res = await ipcRenderer.invoke('scriptBridge:restartScriptServer').catch(() => ({ online: false }));
+      if (res && res.online) return res;
+      return ensurePort8098FromPreload();
+    },
     saveSettings: (partial) => ipcRenderer.invoke('scriptBridge:saveSettings', partial),
     lockConfig: (config) => ipcRenderer.invoke('scriptBridge:lockConfig', config),
     enqueueScript: (payload) => ipcRenderer.invoke('scriptBridge:enqueueScript', payload),
     enqueueFolder: (folderPath) => ipcRenderer.invoke('scriptBridge:enqueueFolder', folderPath),
     clearQueue: () => ipcRenderer.invoke('scriptBridge:clearQueue'),
-    onState: (fn) => sub('scriptBridge:state', fn),
+    onState: (fn) => sub('scriptBridge:state', async (st) => {
+      if (st && !st.scriptServerOnline) {
+        const up = await checkPort8098Quick(700);
+        if (up) {
+          st.scriptServerOnline = true;
+          st.scriptServerUrl = `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`;
+        }
+      }
+      fn(st);
+    }),
     onLog: (fn) => sub('scriptBridge:log', fn),
     onRequestSyncBatchConfig: (fn) => sub('scriptBridge:requestSyncBatchConfig', fn)
   },

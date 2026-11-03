@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 102,
-  "released_at": "2026-11-03 18:31:00",
+  "build_number": 103,
+  "released_at": "2026-11-03 18:45:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản chính thức V1.0.0 (Build #102): Tích hợp sẵn Portable Python 3.14 (python_runtime & engine/python_runtime) kèm thư viện websocket độc lập ngay trong ứng dụng, giúp máy khách không cần cài đặt Python vẫn tự động khởi chạy tức thì Engine Kịch Bản 9 Bàn AI Agent (Port 8098) ở mọi ổ đĩa."
+  "changelog": "Phiên bản chính thức V1.0.0 (Build #103): Nâng cấp cơ chế tự khởi chạy & tự phục hồi Port 8098 trực tiếp từ Preload + Main Process ngay sau khi bấm Cập Nhật OTA (không cần tắt/mở lại EXE), đồng bộ python314.zip đầy đủ cho mọi máy khách."
 }

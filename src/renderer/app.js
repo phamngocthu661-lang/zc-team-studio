@@ -2854,9 +2854,10 @@ function renderScriptBridgeState(st) {
           _autoEnsureServerTimer = null;
           try {
             const res = await api.scriptBridge?.ensureScriptServer?.();
-            if (res?.online) {
-              const nextSt = await api.scriptBridge?.status?.();
-              if (nextSt) renderScriptBridgeState(nextSt);
+            const nextSt = await api.scriptBridge?.status?.();
+            if (nextSt) {
+              if (res?.online) nextSt.scriptServerOnline = true;
+              renderScriptBridgeState(nextSt);
             }
           } catch {}
         }, 2000);

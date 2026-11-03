@@ -109,7 +109,11 @@ class ScriptVideoBridgeService {
     ].filter(Boolean);
     for (const exe of candidates) {
       try {
-        if (fs.existsSync(exe)) return exe;
+        if (!fs.existsSync(exe)) continue;
+        if (exe.includes('python_runtime') && !fs.existsSync(path.join(path.dirname(exe), 'python314.zip'))) {
+          continue;
+        }
+        return exe;
       } catch {}
     }
     return 'python';
@@ -132,6 +136,16 @@ class ScriptVideoBridgeService {
   }
 
   _detectScriptStudioRoot() {
+    for (const candidate of DEFAULT_SCRIPT_STUDIO_DIRS) {
+      try {
+        if (
+          fs.existsSync(path.join(candidate, 'mafia_dashboard_server.py')) &&
+          fs.existsSync(path.join(candidate, 'engine', 'websocket'))
+        ) {
+          return candidate;
+        }
+      } catch {}
+    }
     for (const candidate of DEFAULT_SCRIPT_STUDIO_DIRS) {
       try {
         if (fs.existsSync(path.join(candidate, 'mafia_dashboard_server.py'))) {

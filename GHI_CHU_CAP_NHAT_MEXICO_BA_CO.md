@@ -215,8 +215,8 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
    - Khi sửa code hoặc nâng cấp tính năng trên máy của bạn, hệ thống **chỉ lưu cục bộ trên máy của bạn** (không tự ý đẩy lên GitHub).
    - **Chỉ khi nào bạn nhắn yêu cầu `"cập nhật lên github"`** (hoặc bạn chạy [`DAY_CAP_NHAT_LEN_GITHUB.bat`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/DAY_CAP_NHAT_LEN_GITHUB.bat) / [`push_update_github.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/push_update_github.py)), hệ thống mới tự động tăng số phiên bản (`V1.0.1`, `V1.0.2`...) và đẩy lên GitHub để các máy khách hiện nút cập nhật.
 
-4. **Gói File `.ZIP` Bàn Giao Cho Khách Hàng (`V1.0.0` · `Build #101` — Đã Tích Hợp Sẵn `python_runtime` Cho Máy Khách Không Cài Python):**
+4. **Gói File `.ZIP` Bàn Giao Cho Khách Hàng (`V1.0.0` · `Build #103` — Đã Tích Hợp Sẵn `python_runtime` & Cơ Chế Tự Phục Hồi Port 8098 Từ Preload):**
    - Đường dẫn file ZIP: [`D:\ZC_TEAM\TOOL_ZC_TEAM\ZC_TEAM_Studio_V1.0.0_Khach_Hang.zip`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/ZC_TEAM_Studio_V1.0.0_Khach_Hang.zip)
    - **Khắc phục triệt để lỗi máy khách không hiện 9 Agent (`🟠 Engine Kịch Bản: Đang khởi động...`):**
-     - Đã đóng gói kèm **Portable Python 3.14 (`python_runtime\python.exe` + `python314.zip` + `engine/websocket`)** ngay trong ứng dụng và đẩy lên GitHub (`V1.0.0 · Build #101`).
-     - Máy khách đang mở bản cũ chỉ cần bấm **`🔄 KIỂM TRA CẬP NHẬT` ➔ `🚀 Cập Nhật Ngay`** là ứng dụng tự tải `python_runtime` về, tự bật cổng `8098` và hiện ngay đầy đủ **9 Bàn AI Agent**.
+     - Đã đóng gói kèm **Portable Python 3.14 (`python_runtime\python.exe` + `engine\python_runtime\python314.zip` + `engine/websocket`)** ngay trong ứng dụng và đẩy lên GitHub (`V1.0.0 · Build #103`).
+     - Tích hợp cơ chế tự khởi chạy & tự đồng bộ file trực tiếp trong [`src/main/preload.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/preload.js) và [`src/main/services/updater-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/updater-service.js) để ngay sau khi khách bấm **`🚀 Cập Nhật Ngay`** và giao diện tự reload (`window.location.reload()`), hệ thống tự động gọi `python_runtime\python.exe` bật ngay cổng `8098` và nạp 9 Bàn AI Agent mà không cần tắt/mở lại file `.exe`.

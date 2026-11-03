@@ -476,10 +476,27 @@ class UpdaterService {
       }
 
       emitProgress(92, 'Đang khởi động lại Engine Kịch Bản (Port 8098) và làm mới giao diện...');
-      if (this.scriptBridgeService && typeof this.scriptBridgeService.restartScriptServer === 'function') {
+      if (this.scriptBridgeService) {
         try {
-          await this.scriptBridgeService.restartScriptServer();
+          const freshPath = require.resolve('./script-video-bridge-service');
+          delete require.cache[freshPath];
+          const { ScriptVideoBridgeService: FreshBridgeClass } = require('./script-video-bridge-service');
+          if (FreshBridgeClass && FreshBridgeClass.prototype) {
+            for (const fnName of ['_resolvePythonExecutable', '_detectScriptStudioRoot', 'ensureScriptServerRunning', 'restartScriptServer']) {
+              if (typeof FreshBridgeClass.prototype[fnName] === 'function') {
+                this.scriptBridgeService[fnName] = FreshBridgeClass.prototype[fnName].bind(this.scriptBridgeService);
+              }
+            }
+          }
+          if (this.scriptBridgeService.settings) {
+            this.scriptBridgeService.settings.scriptStudioRoot = this.scriptBridgeService._detectScriptStudioRoot();
+          }
         } catch {}
+        if (typeof this.scriptBridgeService.restartScriptServer === 'function') {
+          try {
+            await this.scriptBridgeService.restartScriptServer();
+          } catch {}
+        }
       }
 
       this._lastCheckResult = null;
