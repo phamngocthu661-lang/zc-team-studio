@@ -1,0 +1,29 @@
+{
+  "schema": "MXF_EDITORIAL_EVIDENCE_V1_1",
+  "script_sha256": "REPLACE_WITH_ACTUAL_CURRENT_SCRIPT_SHA256",
+  "scenes": [
+    {
+      "scene_id": "S01",
+      "part": 1,
+      "start_byte": 9,
+      "end_byte": 5000,
+      "anchor_quote": "REPLACE_WITH_LITERAL_12_PLUS_CHARACTER_SPAN_FROM_THIS_SCENE",
+      "story_date": "2026-09-10",
+      "time_of_day": "morning",
+      "flashback_explicitly_signaled": false,
+      "causal_change": "WRITE_ACTUAL_CONSEQUENTIAL_ACTION_OR_CHANGE_FROM_SCENE",
+      "known_to_narrator_after": ["F01"]
+    }
+  ],
+  "knowledge_facts": [
+    {"fact_id":"F01","character":"Teresa","first_known_scene_id":"S01","source":"REPLACE_WITH_ACTUAL_SOURCE_OF_FACT"}
+  ],
+  "revelations": [
+    {"fact_id":"F01","scene_id":"S01","character":"Teresa","perceived_as_new_by_character":true}
+  ],
+  "orthography_review": {"es_mx_full_pass":false,"notes":"Replace with reviewer observations and specific examples"},
+  "story_retention_review": {"non_repetitive_revelations_pass":false,"notes":"Replace with repeated-motif and part-transition observations"},
+  "patch_reviews": [
+    {"issue_id":"P01","before_quote":"REAL_QUOTE_WITHIN_3000_BYTES_BEFORE","after_quote":"REAL_QUOTE_WITHIN_3000_BYTES_AFTER","timeline_consistent":false,"knowledge_consistent":false,"adjacent_scenes_checked":false,"spelling_consistent":false}
+  ]
+}

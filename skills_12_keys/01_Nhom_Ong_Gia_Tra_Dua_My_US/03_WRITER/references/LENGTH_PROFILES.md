@@ -1,0 +1,4 @@
+# LENGTH PROFILES & COMPATIBILITY
+`LONG_V12` (default, code verified) = 70,000–80,000 body characters (74,000–78,000 target), 7 Parts, 3 stage files A/B/C. This is the compatible legacy Homeless V12 hard gate.
+`COMPETITOR_CUT` (code verified only if explicit `LENGTH_PROFILE: COMPETITOR_CUT` is locked in saved outline) = 30,000–45,000 body characters (34,000–40,000 target), 7 Parts, 3 stage files A/B/C. Reflects 46 supplied transcripts, 27–40 minute typical leaderboard videos. Does not alter step structure or proof identity; only per-profile length requirement. Duration depends on spoken words and TTS rate, not characters alone.
+All scripts must read exact outline to derive profile. Once Stage A starts, do NOT switch profile. All hard gates use the same locked profile and source identity. Default to LONG_V12 when `LENGTH_PROFILE` is omitted; a deliberate `COMPETITOR_CUT` must be explicit at Step2.

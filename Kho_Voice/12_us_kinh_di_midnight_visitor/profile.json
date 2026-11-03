@@ -1,0 +1,15 @@
+{
+  "id": "12_us_kinh_di_midnight_visitor",
+  "name": "12. Midnight Visitor — Kinh Dị Đêm Khuya US",
+  "language": "en",
+  "description": "[Key: 12_Kinh_Di_Dem_Khuya_My_US] Người kể chuyện đêm khuya rùng rợn (Midnight Visitor) — Trầm tối, thì thào, ma mị, hồi hộp rùng rợn, tạo không khí đêm khuya",
+  "personality": "Người kể chuyện đêm khuya rùng rợn (Midnight Visitor). Trầm tối, thì thào, ma mị, hồi hộp rùng rợn, tạo không khí đêm khuya",
+  "refText": "Most tired in that specific way where your eyelids get heavy at red lights and your head starts to dip and snap back up. I kept the windows cracked to let the cold air keep me sharp.",
+  "channelKey": "12_Kinh_Di_Dem_Khuya_My_US",
+  "speed": 0.95,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "ec1a9487",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "09_mx_tieu_su_tras_el_aplauso",
+  "name": "09. Tras el Aplauso — Tiểu Sử Sao Mexico",
+  "language": "es",
+  "description": "[Key: 09_Tieu_Su_Goc_Khuat_Sao_Mexico] Phóng viên / Người dẫn chuyện tài liệu điều tra showbiz Latinh — Bí ẩn, lôi cuốn, nhấn nhá chuẩn đài truyền hình tài liệu, lôi cuốn tò mò",
+  "personality": "Phóng viên / Người dẫn chuyện tài liệu điều tra showbiz Latinh. Bí ẩn, lôi cuốn, nhấn nhá chuẩn đài truyền hình tài liệu, lôi cuốn tò mò",
+  "refText": "Por último descubriremos si la trágica despedida del ídolo, fue el resultado de una lealtad ciega a convicciones que desafiaron la realidad de una crisis sanitaria global.",
+  "channelKey": "09_Tieu_Su_Goc_Khuat_Sao_Mexico",
+  "speed": 1.0,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "4f0801eb",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

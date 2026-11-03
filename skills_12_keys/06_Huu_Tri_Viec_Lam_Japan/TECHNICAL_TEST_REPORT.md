@@ -1,0 +1,2 @@
+# V1.1 test report
+Previous V1.0 tests 17/17 passed (as observed independently during audit). V1.1 adds tests for wrong review_id, missing review_id, length-bypass via QA_FINAL, diagnostics != real QA, and false stated narrator count. Re-run `python -m unittest discover -s tests -v` after extracting this ZIP for authoritative machine output. These tests are guards, **not proof of editorial quality or native-Japanese proofreading**.

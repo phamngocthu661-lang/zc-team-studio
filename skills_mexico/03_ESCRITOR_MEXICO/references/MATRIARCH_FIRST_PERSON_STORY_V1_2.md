@@ -1,0 +1,11 @@
+# WRITER V1.2 — FIRST-PERSON MEXICAN MOTHER DRAMA / HARD CONTINUITY
+
+**VOICE:** the older mother/grandmother narrates in believable first-person Mexican Spanish (Yo / me / mi), retaining one life history, income, competence, emotional register and regional diction. Direct dialogue from other characters is permitted but narrator never becomes a third-person outsider voice. Do not open with a male millionaire, a child, or an unrelated worker as the central lens.
+
+**TITLE-LED WRITING:** Before each A/B/C stage read `NICHE_CANON_LOCK`, `PROMISE_OWNERSHIP_MAP` and the concrete title tail, with precise kinship. P1 title's wound in first 200 body codepoints, clear perpetrator and quote, observable next beat. P6 dramatizes exactly named family request / signature / refusal / consequence, NOT a phone-call shortcut; P7 shows why the mother's decision changes lives. Her decision must be materially and emotionally costly; she is not simply rescued.
+
+**EVERY 5–8 SCENES:** Build active contradiction not repetitious outrage. Each scene: protagonist's goal → family member's comprehensible counteraction → new state of power, knowledge or relationship → cost. At least 2 scenes deepen the relative beyond a caricature; avoid making the older mother invariably right. Give her quiet productive life (tamales, sewing, market, home or caregiving) as personality, not poverty spectacle. Mexican details must be functional, not tourist stereotypes.
+
+**BRIDGE A/B/C:** record each Part's `RELATIONSHIP_STATE, MOTHER_DECISION, FINANCIAL/LEGAL_STATE, NEW_EVIDENCE, OPEN_LOOPS, P6_PROMISE_PROGRESS`; reread previous files in full, never fake memories. Before completing C, test 'remove rescuer; does grandmother's choice still drive conclusion?', 'is document legitimate and shown before climax?', and 'are consequences proportionate and specific?'.
+
+**STRICT SCOPE:** Seven Parts, exact 70k–80k Unicode body chars after removing only `[PART N]` headings, preferred 74k–78k; three explicit calls A/B/C and hash verification. This is not a 30–45-minute contract; don't invent runtime. No changes whatsoever to segment CLI, parser, byte patching, user-title lock or handoff protocol. If output is truncated, treat segment as INCOMPLETE, do not assert full script or READY.

@@ -1,0 +1,680 @@
+ARCHIVE NOTE — V1.2
+This file preserves the original V1.0 source specification for traceability only.
+Its historical MODULE 6 mass title-generation / Top-3 / Final-Title / title-scoring instructions are SUPERSEDED by V1.2 Primary + Supporting Title Protocol.
+Do not execute those historical instructions in V1.2 production. Authoritative runtime rules are SKILL.md + MASTER_SYSTEM_V1_2_LOCKED.md. V1.2 keeps PRIMARY TITLE verbatim and creates exactly 2 SUPPORTING TITLES (≤100 visible characters each) without replacing the primary.
+
+BUILD MASTER PROJECT
+
+Tôi đã gửi xong dữ liệu competitor.
+
+Hãy sử dụng toàn bộ dataset để xây:
+
+MASTER YOUTUBE SEO, PACKAGING & 8-SECOND HOOK SYSTEM V1.0
+
+Đây phải là một OPERATING SYSTEM có thể sử dụng lặp lại.
+
+Không phải một báo cáo mô tả competitor.
+
+=================================
+MODULE 1 — MARKET DNA
+=================================
+
+Phân tích:
+
+- audience promise
+- emotional triggers
+- content families
+- protagonist archetypes
+- conflict archetypes
+- curiosity mechanisms
+- common title mechanics
+- common thumbnail psychology
+- winning patterns
+- weak patterns
+
+Phân biệt:
+
+OBSERVED
+STRONG INFERENCE
+WEAK INFERENCE
+INSUFFICIENT DATA
+
+=================================
+MODULE 2 — CHANNEL DNA
+=================================
+
+Xây riêng:
+
+CHANNEL A DNA
+CHANNEL B DNA
+CHANNEL C DNA
+
+Với mỗi channel xác định:
+
+- core audience promise
+- emotional engine
+- content families
+- protagonist archetype
+- relationship dynamic
+- conflict structure
+- reveal mechanism
+- payoff
+- title DNA
+- thumbnail DNA
+- click psychology
+- anti-patterns
+
+TUYỆT ĐỐI không merge A/B/C.
+
+=================================
+MODULE 3 — DIFFERENTIATION ENGINE
+=================================
+
+Xây bảng:
+
+A vs B vs C
+
+để hệ thống biết rõ:
+
+- điều gì là DNA chung của niche;
+- điều gì là A-specific;
+- điều gì là B-specific;
+- điều gì là C-specific.
+
+=================================
+MODULE 4 — CONTENT FAMILY ENGINE
+=================================
+
+Tự xây taxonomy phù hợp với niche.
+
+Ví dụ có thể là:
+
+F1
+F2
+F3
+...
+
+Không bắt buộc số lượng cố định.
+
+Mỗi video mới phải có:
+
+PRIMARY FAMILY
+SECONDARY FAMILY
+
+=================================
+MODULE 5 — SCRIPT / IDEA CLASSIFIER
+=================================
+
+Hệ thống phải chấp nhận 3 mức input:
+
+LEVEL 1:
+TITLE / PREMISE ONLY
+
+LEVEL 2:
+TITLE + OUTLINE
+
+LEVEL 3:
+FULL SCRIPT
+
+Confidence phải phụ thuộc lượng thông tin.
+
+FULL SCRIPT phải có confidence cao nhất.
+
+Hệ thống phải trả:
+
+A-FIT /100
+B-FIT /100
+C-FIT /100
+
+PRIMARY DNA
+SECONDARY DNA
+CONFIDENCE
+
+Không cưỡng ép A/B/C.
+
+Nếu fit không đủ mạnh:
+
+MARKET-NATIVE MODE.
+
+=================================
+MODULE 6 — TITLE ENGINE
+=================================
+
+Xây riêng:
+
+TITLE ENGINE A
+TITLE ENGINE B
+TITLE ENGINE C
+MARKET-NATIVE TITLE ENGINE
+
+Phân tích từ RAW titles:
+
+- sentence structure
+- opening clause
+- direct dialogue
+- contrast
+- curiosity gap
+- hidden information
+- emotional trigger
+- role placement
+- keyword placement
+- typical length
+- reveal structure
+- consequence structure
+
+Học MECHANISM.
+
+Không copy title đối thủ.
+
+Mỗi video:
+
+Generate nhiều title internally.
+
+Chỉ trả Top 3.
+
+Sau đó chọn:
+
+FINAL TITLE.
+
+Title phải được chấm:
+
+- script accuracy
+- clarity
+- curiosity
+- emotional power
+- channel DNA fit
+- differentiation
+- SEO/niche keyword
+- title-thumbnail potential
+
+=================================
+MODULE 7 — SEO DESCRIPTION ENGINE
+=================================
+
+Description phải:
+
+- US-English tự nhiên nếu target là Mỹ;
+- có niche keywords tự nhiên;
+- giới thiệu protagonist + conflict;
+- tạo curiosity;
+- không spoil payoff mạnh nhất;
+- không keyword stuffing;
+- có CTA tự nhiên;
+- có disclaimer fiction nếu niche là fictional storytelling.
+
+=================================
+MODULE 8 — TAG ENGINE
+=================================
+
+Tạo tags theo 4 tầng:
+
+1. CORE NICHE
+2. CHARACTER / ROLE
+3. STORY MECHANIC
+4. VIDEO-SPECIFIC
+
+Chỉ dùng tag thật sự liên quan.
+
+Không tag stuffing.
+
+=================================
+MODULE 9 — THUMBNAIL ENGINE
+=================================
+
+Thumbnail không được tạo bằng cách random một cảnh đẹp.
+
+Trước tiên phải phân tích:
+
+1. strongest visual moment;
+2. strongest conflict;
+3. strongest emotion;
+4. evidence object;
+5. protagonist expression;
+6. antagonist expression;
+7. character placement;
+8. camera framing;
+9. lighting;
+10. background;
+11. title-thumbnail curiosity gap;
+12. spoiler cần giấu.
+
+Mỗi video generate internally tối thiểu:
+
+THUMBNAIL HYPOTHESIS 1
+THUMBNAIL HYPOTHESIS 2
+THUMBNAIL HYPOTHESIS 3
+
+Ví dụ click hypotheses:
+
+DANGER
+EMOTION
+CONFRONTATION
+PROTECTION
+HUMILIATION
+MYSTERY
+TRANSFORMATION
+JEALOUSY
+etc.
+
+Chấm và chọn:
+
+FINAL THUMBNAIL CONCEPT.
+
+=================================
+MODULE 10 — CHATGPT IMAGE PROMPT
+=================================
+
+Sau khi chọn thumbnail winner:
+
+Viết một prompt English hoàn chỉnh để tôi copy trực tiếp vào ChatGPT Image.
+
+Prompt phải quy định khi cần:
+
+- 16:9
+- realistic/cinematic style
+- protagonist
+- antagonist
+- age
+- wardrobe
+- facial expressions
+- physical interaction
+- character positions
+- camera angle
+- shot size
+- key evidence
+- setting
+- lighting
+- depth
+- composition
+- visual hierarchy
+- negative space
+- emotional tension
+- elements to avoid
+- no logo
+- no watermark
+- no text nếu thumbnail DNA không yêu cầu
+
+Ảnh phải đọc được rõ ở kích thước thumbnail nhỏ.
+
+=================================
+MODULE 11 — 8-SECOND VIDEO HOOK ENGINE
+=================================
+
+Đây là MODULE CỰC KỲ QUAN TRỌNG.
+
+Thumbnail image sẽ được sử dụng làm FIRST FRAME / SOURCE IMAGE để tạo một video khoảng 8 giây.
+
+Video này xuất hiện ở đầu video YouTube.
+
+Mục tiêu:
+
+STOP SCROLL
++
+EMOTIONAL IMPACT
++
+CURIOSITY
++
+MAKE VIEWER WANT TO KNOW WHAT HAPPENS NEXT.
+
+Hệ thống phải đọc nội dung video và tự chọn:
+
+HOOK EMOTION.
+
+Các mode có thể gồm:
+
+DANGER
+FEAR
+ANGER
+INJUSTICE
+EMPATHY
+ROMANTIC TENSION
+HEARTBREAK
+JEALOUSY
+SHOCK
+MYSTERY
+PROTECTION
+HUMILIATION
+etc.
+
+Không phải video nào cũng dùng drama giống nhau.
+
+=================================
+NẾU STORY LÀ DRAMA / DANGER
+=================================
+
+Hook cần ưu tiên:
+
+- immediate tension;
+- sudden realization;
+- hostile eye contact;
+- urgent body movement;
+- physical danger;
+- shocking reaction;
+- background people reacting;
+- camera push-in;
+- micro-expression;
+- unresolved threat.
+
+Không giải quyết vấn đề trong 8 giây.
+
+Video phải KẾT THÚC trong trạng thái:
+
+"WHAT HAPPENS NEXT?"
+
+=================================
+NẾU STORY LÀ EMOTIONAL
+=================================
+
+Hook ưu tiên:
+
+- trembling expression;
+- eye contact;
+- tears;
+- hesitation;
+- subtle touch;
+- emotional distance;
+- rejection;
+- grief;
+- longing;
+- realization.
+
+Phải khơi:
+
+EMPATHY
++
+CURIOSITY.
+
+=================================
+NẾU STORY LÀ INJUSTICE / REVENGE
+=================================
+
+Hook ưu tiên:
+
+- humiliation;
+- contempt;
+- protagonist trying not to break;
+- antagonist arrogance;
+- shocked witnesses;
+- sudden change in protagonist expression;
+- beginning of reversal.
+
+Mục tiêu tạo:
+
+ANGER
++
+DESIRE TO SEE JUSTICE.
+
+=================================
+8-SECOND HOOK STRUCTURE
+=================================
+
+Default structure:
+
+0.0–2.0s
+IMMEDIATE VISUAL HOOK
+
+2.0–5.0s
+ESCALATION / REACTION
+
+5.0–7.0s
+KEY REALIZATION / THREAT
+
+7.0–8.0s
+CUT BEFORE PAYOFF
+
+Do not resolve the scene.
+
+=================================
+VIDEO MOTION RULES
+=================================
+
+Because the source is a thumbnail image:
+
+Keep character identity, clothing, setting and composition consistent with the source image.
+
+Animation must feel natural.
+
+Use only movements appropriate to the scene, such as:
+
+- character turns head;
+- eyes widen;
+- breath changes;
+- hand tightens;
+- one step closer;
+- subtle recoil;
+- tear forming;
+- antagonist leans in;
+- background characters react;
+- camera slow push-in;
+- slight handheld tension;
+- subtle rack focus.
+
+Avoid:
+
+- random running;
+- excessive movement;
+- changing wardrobe;
+- changing faces;
+- adding unrelated objects;
+- full scene transformation;
+- revealing the ending.
+
+=================================
+HOOK DIALOGUE
+=================================
+
+When dialogue materially improves the hook:
+
+Generate ONE short spoken line.
+
+Usually:
+
+3–10 words.
+
+It must sound natural in US English.
+
+The dialogue must:
+
+- increase tension;
+- create curiosity;
+- expose conflict;
+
+but NOT explain the whole story.
+
+If silence + facial acting is stronger:
+
+NO DIALOGUE.
+
+=================================
+FINAL VIDEO HOOK PROMPT
+=================================
+
+Every production output must provide:
+
+HOOK TYPE:
+PRIMARY EMOTION:
+SECONDARY EMOTION:
+VIEWER QUESTION:
+8-SECOND ACTION:
+CAMERA:
+FACIAL ACTING:
+BACKGROUND REACTION:
+DIALOGUE:
+END FRAME:
+FINAL VIDEO GENERATION PROMPT:
+
+The FINAL VIDEO GENERATION PROMPT must be English and copy-ready.
+
+=================================
+MODULE 12 — TITLE × THUMBNAIL × HOOK ENGINE
+=================================
+
+Three assets have different jobs.
+
+TITLE:
+context + stakes + curiosity.
+
+THUMBNAIL:
+emotion + visual conflict.
+
+8S HOOK:
+movement + escalation + emotional confirmation.
+
+They must cooperate.
+
+They must NOT repeat exactly the same information.
+
+=================================
+MODULE 13 — SIMILARITY GUARD
+=================================
+
+Compare new titles against competitor titles.
+
+Avoid:
+
+- long identical phrases;
+- same role + same event + same reveal + same payoff;
+- near-copy structure with only names changed.
+
+Preserve niche recognition without cloning.
+
+=================================
+MODULE 14 — PACKAGING FATIGUE GUARD
+=================================
+
+When my own channel has enough videos, compare with recent uploads.
+
+Track:
+
+- role
+- content family
+- setting
+- title mechanic
+- key object
+- thumbnail action
+- hook emotion
+
+Warn me if packaging is becoming repetitive.
+
+=================================
+MODULE 15 — FINAL QA
+=================================
+
+Score:
+
+TITLE /100
+DESCRIPTION /100
+TAGS /100
+THUMBNAIL /100
+8S HOOK /100
+TITLE × THUMBNAIL /100
+TITLE × THUMBNAIL × HOOK /100
+CHANNEL DNA FIT /100
+SCRIPT ACCURACY /100
+ORIGINALITY /100
+
+Hard Fail if:
+
+- invents major story event;
+- wrong protagonist;
+- wrong channel classification;
+- title near-copy;
+- thumbnail event absent from story;
+- hook event absent from story;
+- reveals full ending;
+- title-thumbnail-hook simply repeat each other.
+
+If package is weak:
+
+REVISION must happen BEFORE final output.
+
+=================================
+FINAL PRODUCTION OUTPUT
+=================================
+
+Whenever I later submit a NEW VIDEO, return:
+
+1. INPUT DIAGNOSIS
+
+2. CONTENT FAMILY
+
+3. CHANNEL CLASSIFICATION
+A-FIT:
+B-FIT:
+C-FIT:
+
+PRIMARY CHANNEL:
+CONFIDENCE:
+
+4. WHY THIS CHANNEL
+
+5. VIDEO SELLING POINT
+
+6. CLICK PSYCHOLOGY
+Primary emotion:
+Secondary emotion:
+Curiosity gap:
+Viewer fantasy:
+
+7. PACKAGING STRATEGY
+
+8. TOP 3 TITLES
+Title A:
+Score:
+
+Title B:
+Score:
+
+Title C:
+Score:
+
+9. FINAL TITLE
+
+10. SEO DESCRIPTION
+
+11. SEO TAGS
+
+12. HASHTAGS
+
+13. THUMBNAIL HYPOTHESES
+H1
+H2
+H3
+
+14. FINAL THUMBNAIL CONCEPT
+
+15. FINAL CHATGPT IMAGE PROMPT
+
+16. 8-SECOND VIDEO HOOK STRATEGY
+Hook type:
+Primary emotion:
+Viewer question:
+Timeline:
+Dialogue:
+End frame:
+
+17. FINAL 8-SECOND VIDEO GENERATION PROMPT
+
+18. TITLE × THUMBNAIL × HOOK CHECK
+
+19. FINAL QA
+
+20. FINAL CHANNEL RECOMMENDATION
+
+=================================
+PROJECT COMPLETION
+=================================
+
+Sau khi hoàn thành tất cả modules:
+
+Hãy ghi:
+
+MASTER PROJECT BUILT
+VERSION: V1.0
+STATUS: READY FOR PRODUCTION
+
+Từ sau thời điểm đó:
+
+Không cần nghiên cứu lại competitor mỗi khi tôi gửi video mới.
+
+Video mới chỉ chạy qua MASTER PROJECT hiện tại.

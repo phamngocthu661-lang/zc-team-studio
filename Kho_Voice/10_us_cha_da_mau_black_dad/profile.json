@@ -1,0 +1,15 @@
+{
+  "id": "10_us_cha_da_mau_black_dad",
+  "name": "10. Dorian Mercer — Cha Da Màu CEO Ngầm US",
+  "language": "en",
+  "description": "[Key: 10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US] Dorian Mercer (47 tuổi) - Tỷ phú chuỗi khách sạn Mercer Crown giả nghèo vi hành — Dày, ấm, vang (deep resonant), phong độ đĩnh đạc, uy quyền thầm lặng",
+  "personality": "Dorian Mercer (47 tuổi) - Tỷ phú chuỗi khách sạn Mercer Crown giả nghèo vi hành. Dày, ấm, vang (deep resonant), phong độ đĩnh đạc, uy quyền thầm lặng",
+  "refText": "To understand what happened that Thursday evening at Larkin Ember, you need to understand one thing about Dorian Mercer. He had not eaten at one of his own restaurants in nearly three years.",
+  "channelKey": "10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US",
+  "speed": 1.0,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "70a85166",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

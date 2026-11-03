@@ -1,0 +1,2034 @@
+<!doctype html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZC TEAM — Video Batch Studio Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===================================================================== -->
+  <!-- TOPBAR: ZC TEAM CYBERNETIC BROADCAST TERMINAL (STITCH SHELL)          -->
+  <!-- ===================================================================== -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-logo-box">
+        <img src="assets/zc-logo.png" alt="ZC TEAM" class="topbar-logo" width="38" height="38" onerror="this.style.display='none'" />
+      </div>
+      <div class="topbar-title-wrap">
+        <div class="topbar-title-row">
+          <h1>ZC TEAM · VIDEO BATCH STUDIO</h1>
+          <span class="pill version" id="versionPill" style="cursor:pointer;" title="Phiên bản hiện tại — Bấm để xem chi tiết & kiểm tra bản cập nhật mới trên GitHub">V1.0.0</span>
+          <button type="button" id="btnCheckUpdateTopbar" class="stitch-chip" style="cursor:pointer;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.4);color:#34d399;padding:3px 9px;font-size:11px;font-weight:700;" title="Kiểm tra bản cập nhật mới nhất trên GitHub">🔄 Kiểm tra cập nhật</button>
+          <button type="button" id="btnOtaUpdateAvailable" style="display:none;cursor:pointer;background:linear-gradient(135deg,#f59e0b,#ea580c);border:1px solid #fbbf24;color:#fff;padding:4px 12px;border-radius:999px;font-size:11.5px;font-weight:800;box-shadow:0 0 16px rgba(245,158,11,0.55);animation:pulse 1.8s infinite;" title="Đã có phiên bản mới trên GitHub! Bấm để xem thay đổi và chọn Cập Nhật hoặc Để Sau">🚀 Có bản cập nhật mới!</button>
+          <span class="stitch-chip emerald"><span class="material-symbols-outlined">memory</span> DUAL-NVENC</span>
+        </div>
+        <p>GPU AI Video Production Engine · Kịch Bản AI 9 Bàn (:8098) ➔ VoiceStudio (:3900) ➔ Render Video (:3999)</p>
+      </div>
+    </div>
+
+    <div class="top-pills">
+      <!-- BỘ CHỌN KEY / KÊNH SẢN XUẤT TOÀN CỤC -->
+      <div class="key-select-shell" title="Chọn Bộ Key / Kênh kịch bản đang vận hành">
+        <span class="key-label"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">vpn_key</span> CHỌN KEY:</span>
+        <select id="topGlobalKeySelect">
+          <option value="01_Nhom_Ong_Gia_Tra_Dua_My_US">🇺🇸 01_Nhom_Ong_Gia_Tra_Dua_My_US (Ông già trả đũa · US)</option>
+          <option value="02_Nhom_Phu_Nu_Bao_Thu_My_US">🇺🇸 02_Nhom_Phu_Nu_Bao_Thu_My_US (Phụ nữ báo thù · US)</option>
+          <option value="03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico" selected>🇲🇽 03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico (Bà già Drama · Mexico)</option>
+          <option value="04_Nhom_Ong_Gia_Trung_Tri_Mexico">🇲🇽 04_Nhom_Ong_Gia_Trung_Tri_Mexico (Ông già trừng trị · Mexico)</option>
+          <option value="05_Nhom_Manga_Doc_Than_Japan">🇯🇵 05_Nhom_Manga_Doc_Than_Japan (Manga Độc thân · Japan)</option>
+          <option value="06_Huu_Tri_Viec_Lam_Japan">🇯🇵 06_Huu_Tri_Viec_Lam_Japan (Hưu trí Kuchikomi · Japan)</option>
+          <option value="07_Dong_Que_Co_Dien_Mexico">🇲🇽 07_Dong_Que_Co_Dien_Mexico (Đồng quê Cổ điển · Mexico)</option>
+          <option value="08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico">🇲🇽 08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico (Ngoại tình · Mexico)</option>
+          <option value="09_Tieu_Su_Goc_Khuat_Sao_Mexico">🇲🇽 09_Tieu_Su_Goc_Khuat_Sao_Mexico (Tiểu sử Sao · Mexico)</option>
+          <option value="10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US">🇺🇸 10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US (Cha da màu CEO · US)</option>
+          <option value="11_Chuyen_Tinh_Dan_Ong_My_US">🇺🇸 11_Chuyen_Tinh_Dan_Ong_My_US (Chuyện tình Đàn ông · US)</option>
+          <option value="12_Kinh_Di_Dem_Khuya_My_US">🇺🇸 12_Kinh_Di_Dem_Khuya_My_US (Kinh dị Đêm khuya · US)</option>
+          <option value="mexico">🇲🇽 KEY MEXICO BÀ CÔ (7 Phần · ES-MX)</option>
+          <option value="homeless">🏚️ KEY HOMELESS V12 (7 Phần · US)</option>
+          <option value="mafia">🎩 KEY BÊN MAFIA (Người Hầu · US)</option>
+        </select>
+      </div>
+
+      <div class="pill" id="licensePill" style="cursor:pointer;font-weight:700;" title="Bấm để xem hoặc nhập mã bản quyền tháng">🔑 Đang kiểm tra bản quyền...</div>
+      <div class="pill ok" id="systemPill"><span class="pulse-dot"></span> Đang kiểm tra hệ thống...</div>
+      <div class="pill stitch-ports-pill" title="Cổng dịch vụ nội bộ đang chạy">:3999 | :8098 | :3900</div>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- MAIN APPLICATION SHELL (SIDEBAR + 10 STITCH WORKSPACE PAGES)          -->
+  <!-- ===================================================================== -->
+  <div class="shell">
+    <aside class="sidebar">
+      <nav>
+        <div class="nav-group-title">
+          <span>SẢN XUẤT KHÉP KÍN</span>
+          <span class="stitch-count-tag">5</span>
+        </div>
+        <button class="nav" data-page="script-studio">
+          <span class="nav-idx">01</span>
+          <span class="material-symbols-outlined nav-icon">auto_stories</span>
+          <span class="nav-label">Viết Kịch Bản AI</span>
+          <span class="nav-badge">9 Bàn</span>
+        </button>
+        <button class="nav active" data-page="batch">
+          <span class="nav-idx">02</span>
+          <span class="material-symbols-outlined nav-icon">movie_filter</span>
+          <span class="nav-label">Tạo Batch Video</span>
+          <span class="nav-badge">Core GPU</span>
+        </button>
+        <button class="nav" data-page="voice-studio">
+          <span class="nav-idx">03</span>
+          <span class="material-symbols-outlined nav-icon">graphic_eq</span>
+          <span class="nav-label">Quản Lý Voice AI</span>
+          <span class="nav-badge">:3900</span>
+        </button>
+        <button class="nav" data-page="story-video">
+          <span class="nav-idx">04</span>
+          <span class="material-symbols-outlined nav-icon">auto_awesome_motion</span>
+          <span class="nav-label">Tạo Video Từ Ảnh</span>
+          <span class="nav-badge">Story PIP</span>
+        </button>
+        <button class="nav" data-page="templates">
+          <span class="nav-idx">05</span>
+          <span class="material-symbols-outlined nav-icon">dashboard_customize</span>
+          <span class="nav-label">Thiết Kế Template</span>
+          <span class="nav-badge">16:9</span>
+        </button>
+
+        <div class="nav-group-title" style="margin-top:10px;">
+          <span>KHO &amp; HỆ THỐNG</span>
+          <span class="stitch-count-tag">5</span>
+        </div>
+        <button class="nav" data-page="projects">
+          <span class="nav-idx">06</span>
+          <span class="material-symbols-outlined nav-icon">folder_managed</span>
+          <span class="nav-label">Quản Lý Project</span>
+        </button>
+        <button class="nav" data-page="libraries">
+          <span class="nav-idx">07</span>
+          <span class="material-symbols-outlined nav-icon">video_library</span>
+          <span class="nav-label">Thư Viện Stock</span>
+        </button>
+        <button class="nav" data-page="resources">
+          <span class="nav-idx">08</span>
+          <span class="material-symbols-outlined nav-icon">switch_video</span>
+          <span class="nav-label">Kho Green &amp; Intro</span>
+          <span class="nav-badge">Kho_Green</span>
+        </button>
+        <button class="nav" data-page="queue">
+          <span class="nav-idx">09</span>
+          <span class="material-symbols-outlined nav-icon">history</span>
+          <span class="nav-label">Lịch Sử &amp; Queue</span>
+          <span class="nav-badge">History</span>
+        </button>
+        <button class="nav" data-page="dashboard">
+          <span class="nav-idx">10</span>
+          <span class="material-symbols-outlined nav-icon">developer_board</span>
+          <span class="nav-label">Hệ Thống &amp; GPU</span>
+        </button>
+      </nav>
+
+      <!-- STITCH SIDEBAR HARDWARE TELEMETRY WIDGET -->
+      <div class="side-note stitch-telemetry-card">
+        <div class="stitch-telemetry-row">
+          <span>GPU CORE LOAD</span>
+          <strong id="sidebarGpuLoadText">READY</strong>
+        </div>
+        <div class="stitch-mini-bar"><div class="stitch-mini-fill" id="sidebarGpuLoadBar" style="width:32%;"></div></div>
+
+        <div class="stitch-telemetry-row" style="margin-top:4px;">
+          <span>VRAM PIPELINE</span>
+          <strong id="sidebarVramText">NVENC ACTIVE</strong>
+        </div>
+        <div class="stitch-mini-bar"><div class="stitch-mini-fill emerald" id="sidebarVramBar" style="width:45%;"></div></div>
+
+        <div class="side-telemetry">
+          <span><span class="status-dot">●</span> IPC: OK</span>
+          <span>SQLite: READY</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- ================================================================= -->
+      <!-- TAB 01: VIẾT KỊCH BẢN AI & TỰ ĐỘNG HÓA 9 BÀN                      -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-script-studio">
+        <div class="stitch-command-bar">
+          <div class="stitch-cmd-left">
+            <div class="stitch-icon-box">
+              <span class="material-symbols-outlined">auto_stories</span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>VIẾT KỊCH BẢN AI &amp; TỰ ĐỘNG HÓA 9 BÀN</h2>
+                <span id="scriptStudioServerBadge" class="badge" style="background:#065f46;color:#34d399;">🟢 Engine Kịch Bản: Đang kết nối...</span>
+                <span class="stitch-chip">PIPELINE BÀN #1 ➔ #9</span>
+              </div>
+              <div id="bridgeLockedConfigSummaryText" class="stitch-locked-summary">
+                <span>📌 <strong>Cấu hình Video đã khóa:</strong> Đang đồng bộ từ tab Tạo Batch Video...</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stitch-cmd-right">
+            <label class="stitch-inline-control" title="Cài đặt Project cố định riêng cho Key đang chọn (Chỉ cần chọn 1 lần cho mỗi Key)">
+              <span>📁 Project của Key:</span>
+              <select id="bridgeKeyProjectSelect" style="width:auto;min-width:165px;"></select>
+            </label>
+            <label class="stitch-inline-control" title="Cài đặt Giọng đọc (Voice AI) cố định riêng cho Key đang chọn (Chỉ cần chọn 1 lần cho mỗi Key)">
+              <span>🎙️ Voice của Key:</span>
+              <select id="bridgeKeyVoiceSelect" style="width:auto;min-width:165px;"></select>
+            </label>
+            <label class="stitch-inline-control">
+              <span>🔄 Tự động Bàn #7:</span>
+              <select id="bridgeModeSelect" style="width:auto;min-width:235px;">
+                <option value="STREAMING_VIDEO">⚡ Xong bài nào ➔ Tạo Voice + Render Video ngay</option>
+                <option value="BATCH_VIDEO">📦 Đợi xong cả lô ➔ Tạo Voice + Render Video</option>
+                <option value="STREAMING_VOICE">🎙️ Chỉ tự động tạo file Voice (.wav)</option>
+                <option value="DISABLED">⏸️ Tắt tự động (Chỉ xuất kịch bản vào TONG HOP)</option>
+              </select>
+            </label>
+            <label class="check stitch-check-pill" title="Tự động copy file video .mp4 hoàn chỉnh về lại thư mục TONG HOP của kịch bản">
+              <input id="bridgeCopyMp4ToTongHop" type="checkbox" checked />
+              <span>Copy MP4 về TONG HOP</span>
+            </label>
+            <button id="btnInspectLockedConfig" type="button" class="stitch-btn-amber">
+              <span class="material-symbols-outlined">fact_check</span> Xem Cấu Hình &amp; Folder
+            </button>
+            <button id="btnGoToVideoConfigTab" type="button">
+              <span class="material-symbols-outlined">tune</span> Đổi Cấu Hình Video
+            </button>
+            <button id="btnManualRunTongHopToVideo" type="button" class="stitch-btn-emerald">
+              <span class="material-symbols-outlined">play_circle</span> Chọn Folder TONG HOP ➔ Tạo Video
+            </button>
+            <button id="btnReloadScriptStudioFrame" type="button" title="Làm mới giao diện Viết Kịch Bản AI">
+              <span class="material-symbols-outlined">refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="bridgeQueueBox" class="panel stitch-bridge-queue" style="display:none;">
+          <div class="stitch-section-head">
+            <strong id="bridgeQueueTitle">🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice &amp; Render Video GPU</strong>
+            <div class="actions">
+              <button id="btnOpenBridgeOutputFolder" type="button"><span class="material-symbols-outlined">folder_open</span> Mở Folder Output Video</button>
+              <button id="btnClearBridgeCompleted" type="button"><span class="material-symbols-outlined">cleaning_services</span> Dọn mục đã xong</button>
+            </div>
+          </div>
+          <div id="bridgeQueueList" class="stitch-bridge-queue-list"></div>
+        </div>
+
+        <div class="panel stitch-iframe-shell">
+          <iframe id="scriptStudioIframe" src="http://127.0.0.1:8098/?embedded=1" style="width:100%;height:100%;border:0;background:#090b10;" allow="clipboard-read; clipboard-write"></iframe>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 02: TẠO BATCH VIDEO HÀNG LOẠT (STITCH SCREEN 04)              -->
+      <!-- ================================================================= -->
+      <section class="page active" id="page-batch">
+        <!-- Top Action Bar (Stitch Screen 04) -->
+        <div class="stitch-page-header">
+          <div class="stitch-header-left">
+            <div class="stitch-icon-box neon">
+              <span class="material-symbols-outlined">movie_filter</span>
+              <span class="corner-dot"></span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>TẠO BATCH VIDEO HÀNG LOẠT</h2>
+                <span class="stitch-chip neon">HARDWARE ACCELERATED</span>
+              </div>
+              <p class="stitch-subtitle">Trung tâm điều phối sản xuất GPU · Ghép Voice + Subtitle + Stock + Green Screen đa luồng</p>
+            </div>
+          </div>
+
+          <div class="stitch-header-actions">
+            <button id="btnLockConfigForScriptStudio" type="button" class="stitch-btn-amber" title="Lưu & Khóa toàn bộ cấu hình Template, Giọng đọc, Kho Stock và Output hiện tại để tự động dùng khi Viết Kịch Bản AI xong">
+              <span class="material-symbols-outlined">lock</span> Khóa Cấu Hình ➔ Kịch Bản AI
+            </button>
+            <button id="scanBatch" type="button">
+              <span class="material-symbols-outlined">fact_check</span> Kiểm Tra Đầu Vào (Preflight)
+            </button>
+            <button class="primary" id="startBatch" type="button">
+              <span class="material-symbols-outlined">bolt</span> Bắt Đầu Render Batch
+            </button>
+            <span class="stitch-divider"></span>
+            <button id="pauseBatch" type="button">
+              <span class="material-symbols-outlined">pause</span> Tạm Dừng
+            </button>
+            <button class="danger" id="cancelBatch" type="button">
+              <span class="material-symbols-outlined">close</span> Hủy
+            </button>
+            <button id="btnOpenCurrentBatchOutput" type="button" title="Mở thư mục Output">
+              <span class="material-symbols-outlined">folder_open</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Main 2-Column Workspace (Stitch Screen 04: Left Input & Script / Right GPU & Export) -->
+        <div class="stitch-batch-grid">
+          <!-- LEFT COLUMN: 1. NGUỒN DỮ LIỆU & KỊCH BẢN -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">database</span>
+                <h3>1. Nguồn Dữ Liệu &amp; Kịch Bản</h3>
+              </div>
+              <span class="stitch-mono-tag">NVME VIRTUAL FS</span>
+            </div>
+
+            <div class="form two-col stitch-form-grid">
+              <!-- Batch Name (Full Width) -->
+              <label class="span-2">
+                <span class="stitch-label-row">
+                  <span>TÊN BATCH JOB</span>
+                  <span class="stitch-mono-hint">AUTO-INDEXED</span>
+                </span>
+                <input id="batchName" value="Batch_Render" placeholder="Nhập tên lô sản xuất video..." />
+              </label>
+
+              <!-- Project & Template (2 Columns) -->
+              <label>
+                <span>PROJECT ÁP DỤNG</span>
+                <select id="batchProject"></select>
+              </label>
+              <label>
+                <span class="stitch-label-row">
+                  <span>TEMPLATE THIẾT KẾ</span>
+                  <a href="#" onclick="document.querySelector('[data-page=templates]')?.click();return false;" class="stitch-inline-link">🎨 Chỉnh Canvas</a>
+                </span>
+                <select id="batchTemplate"></select>
+              </label>
+
+              <!-- Background Mode: Stitch 4-Pill Selector + Synced Select (Full Width) -->
+              <div class="span-2 stitch-bg-mode-box">
+                <div class="stitch-label-row" style="margin-bottom:6px;">
+                  <span class="stitch-field-title">CHẾ ĐỘ NỀN (BACKGROUND MODE)</span>
+                  <span class="stitch-mono-hint">PIPELINE ROUTER</span>
+                </div>
+                <div class="stitch-mode-pills" id="batchBgModePills">
+                  <button type="button" class="stitch-mode-pill active" data-bg-mode="STOCK_VIDEO">
+                    <span class="material-symbols-outlined">movie</span>
+                    <span>STOCK VIDEO</span>
+                  </button>
+                  <button type="button" class="stitch-mode-pill" data-bg-mode="IMAGE_SEQUENCE">
+                    <span class="material-symbols-outlined">collections</span>
+                    <span>IMAGE SEQ</span>
+                  </button>
+                  <button type="button" class="stitch-mode-pill" data-bg-mode="MANUAL_MEDIA">
+                    <span class="material-symbols-outlined">upload_file</span>
+                    <span>MANUAL MEDIA</span>
+                  </button>
+                  <button type="button" class="stitch-mode-pill" data-bg-mode="STORY_PIP_STOCK">
+                    <span class="material-symbols-outlined">picture_in_picture_alt</span>
+                    <span>STORY PIP</span>
+                  </button>
+                </div>
+                <label class="stitch-sr-select">
+                  <span>Chế độ nền</span>
+                  <select id="backgroundMode">
+                    <option value="STOCK_VIDEO">Ghép nhiều stock video từ kho</option>
+                    <option value="IMAGE_SEQUENCE">Tạo nền từ thư mục ảnh</option>
+                    <option value="MANUAL_MEDIA">Một video/ảnh nền cố định</option>
+                    <option value="STORY_PIP_STOCK">Ảnh câu chuyện chạy đè trên nền Stock (Story PIP)</option>
+                  </select>
+                </label>
+              </div>
+
+              <!-- AI Story PIP Panel (Shown when STORY_PIP_STOCK is active) -->
+              <div id="farmAiImagePanel" class="span-2 stitch-subcard" style="display:none;">
+                <div class="stitch-label-row" style="margin-bottom:8px;">
+                  <strong style="color:var(--cyber-green);font-size:12px;">🎨 AI Story Image Generator (G-Labs Nano Banana 2 Lite)</strong>
+                  <span id="glabsStatusBadge" class="badge">Đang kiểm tra 8765...</span>
+                </div>
+                <div class="form two-col compact">
+                  <label>Chế độ chia cảnh kịch bản
+                    <select id="farmStoryDivisionMode">
+                      <option value="CUE">Theo từng câu cảm xúc kịch bản (Chuẩn Skill 08)</option>
+                      <option value="FIXED">Cố định mỗi N giây 1 ảnh</option>
+                      <option value="DISTRIBUTE">Chia đều đúng N ảnh cho cả bài</option>
+                    </select>
+                  </label>
+                  <label id="farmStorySecondsRow" style="display:none;">Số giây mỗi ảnh
+                    <input id="farmStorySecondsInput" type="number" value="6" min="2" max="60" />
+                  </label>
+                  <label id="farmStoryCountRow" style="display:none;">Tổng số ảnh muốn tạo
+                    <input id="farmStoryCountInput" type="number" value="30" min="1" max="200" />
+                  </label>
+                  <label class="span-2">Character DNA (Tùy chọn — Để trống AI tự trích xuất)
+                    <input id="farmStoryCharacterDna" placeholder="Ví dụ: Arthur Pendelton, 68yo homeless veteran, grey beard, worn olive coat..." />
+                  </label>
+                </div>
+                <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+                  <button type="button" id="btnFarmGenerateImagesNow" class="primary" style="width:100%;">
+                    <span class="material-symbols-outlined">auto_awesome</span> Tự Động Tạo Bộ Ảnh Phân Cảnh Vào Folder Voice/images
+                  </button>
+                </div>
+                <div class="progress-shell" id="farmImageProgressBarShell" style="display:none;margin-top:8px;">
+                  <div class="progress-bar" id="farmImageProgressBar"></div>
+                </div>
+                <div id="farmGenerateImagesStatus" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>
+              </div>
+
+              <!-- Voice Source & Voice Profile (2 Columns) -->
+              <label>
+                <span>NGUỒN GIỌNG ĐỌC (VOICE SOURCE)</span>
+                <select id="batchVoiceSourceMode">
+                  <option value="EXISTING_AUDIO">🎵 Dùng file Voice có sẵn (.mp3/.wav)</option>
+                  <option value="AUTO_GENERATE_VOICE">🤖 Tự tạo Voice từ kịch bản (.txt) ➔ Ghép Video</option>
+                  <option value="ONLY_RENDER_VOICE">🎙️ Chỉ tạo file Voice (.wav) từ kịch bản (.txt)</option>
+                </select>
+              </label>
+              <label id="batchVoiceProfileRow">
+                <span class="stitch-label-row">
+                  <span>GIỌNG CLONE AI (:3900)</span>
+                  <a href="#" onclick="document.querySelector('[data-page=voice-studio]')?.click();return false;" class="stitch-inline-link">🎙️ Thêm giọng</a>
+                </span>
+                <select id="batchVoiceProfileSelect">
+                  <option value="default">🎙️ VoiceStudio OmniVoice (Mặc định)</option>
+                </select>
+              </label>
+
+              <!-- Voice Folder (Full Width - Anchor for ensureJobAssetControls) -->
+              <label id="batchVoiceFolderLabel" class="span-2">
+                <span>THƯ MỤC VOICE (.MP3/.WAV) HOẶC KỊCH BẢN (.TXT)</span>
+                <div class="path">
+                  <input id="voiceFolder" placeholder="Chọn thư mục chứa voice hoặc kịch bản .txt..." />
+                  <button type="button" data-pick-dir="voiceFolder"><span class="material-symbols-outlined" style="font-size:14px;">folder_open</span> Browse</button>
+                </div>
+              </label>
+
+              <!-- Whisper Language & Subtitle Effect (2 Columns) -->
+              <label>
+                <span>NGÔN NGỮ SUBTITLE (WHISPER GPU)</span>
+                <select id="batchSrtLanguage">
+                  <option value="auto">Tự nhận diện (Auto Detect)</option>
+                  <option value="en">Tiếng Anh (English)</option>
+                  <option value="es">Tiếng Tây Ban Nha (Español Mexico)</option>
+                  <option value="vi">Tiếng Việt</option>
+                  <option value="ja">Tiếng Nhật (日本語)</option>
+                  <option value="ko">Tiếng Hàn</option>
+                  <option value="zh">Tiếng Trung</option>
+                  <option value="fr">Tiếng Pháp</option>
+                  <option value="de">Tiếng Đức</option>
+                  <option value="pt">Tiếng Bồ Đào Nha</option>
+                  <option value="ru">Tiếng Nga</option>
+                </select>
+              </label>
+              <label>
+                <span>HIỆU ỨNG SUBTITLE (KARAOKE)</span>
+                <select id="batchSubtitleEffect">
+                  <option value="none">Phụ đề thường (Tĩnh)</option>
+                  <option value="karaoke_box">Karaoke nhảy ô màu từng chữ</option>
+                </select>
+              </label>
+              <label id="batchKaraokeBoxColorRow" class="span-2" style="display:none;">
+                <span>MÀU Ô CHỮ ĐANG ĐỌC (KARAOKE BOX)</span>
+                <input id="batchKaraokeBoxColor" type="color" value="#7C00FF" />
+              </label>
+
+              <!-- Stock Library & Media Folder (2 Columns) -->
+              <label>
+                <span>THƯ VIỆN STOCK ĐÃ LƯU</span>
+                <select id="batchLibrary"></select>
+              </label>
+              <label>
+                <span class="stitch-label-row">
+                  <span>THƯ MỤC STOCK VIDEO / MEDIA</span>
+                  <button type="button" id="btnConformStock" class="stitch-mini-action" title="Chuẩn hóa toàn bộ video trong kho về chuẩn 1080p, 24fps, H.264">⚡ Chuẩn hóa 1080p 24fps</button>
+                </span>
+                <div class="path">
+                  <input id="mediaFolder" placeholder="Hoặc chọn trực tiếp thư mục chứa video stock..." />
+                  <button type="button" data-pick-dir="mediaFolder">...</button>
+                </div>
+                <div id="stockConformStatus" style="font-size:11px;color:#38bdf8;margin-top:4px;display:none;"></div>
+              </label>
+
+              <!-- Manual Media Path (Full Width) -->
+              <label class="span-2">
+                <span>MEDIA CỐ ĐỊNH (DÙNG CHO CHẾ ĐỘ MANUAL MEDIA)</span>
+                <div class="path">
+                  <input id="manualMediaPath" placeholder="Chọn 1 file video hoặc ảnh nền cố định..." />
+                  <button type="button" id="pickManualMedia">...</button>
+                </div>
+              </label>
+
+              <!-- Output Folder (Full Width - Anchor for ensureDisclaimerControls) -->
+              <label class="span-2">
+                <span>THƯ MỤC XUẤT VIDEO THÀNH PHẨM (.MP4 OUTPUT)</span>
+                <div class="path">
+                  <input id="outputFolder" placeholder="Chọn thư mục lưu các file video .mp4 sau khi render..." />
+                  <button type="button" data-pick-dir="outputFolder"><span class="material-symbols-outlined" style="font-size:14px;">output</span> Thay Đổi</button>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: 2. CẤU HÌNH XUẤT VIDEO & GPU NVENC (STITCH SCREEN 04) -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">memory</span>
+                <h3>2. Cấu Hình Xuất Video &amp; GPU NVENC</h3>
+              </div>
+              <span class="stitch-mono-tag">CUDA DUPLEX</span>
+            </div>
+
+            <!-- 2x2 Hardware Spec Box Cards (Stitch Screen 04) -->
+            <div class="stitch-hw-grid">
+              <div class="stitch-hw-box">
+                <div class="stitch-hw-head">
+                  <span>HARDWARE ENCODER</span>
+                  <span class="material-symbols-outlined">developer_board</span>
+                </div>
+                <label>Codec
+                  <select id="batchCodec">
+                    <option value="auto" selected>Auto — Ưu tiên NVIDIA NVENC</option>
+                    <option value="h264_nvenc">H.264 NVENC (GPU NVIDIA)</option>
+                    <option value="hevc_nvenc">HEVC NVENC (GPU NVIDIA)</option>
+                    <option value="libx264">H.264 CPU (libx264)</option>
+                  </select>
+                </label>
+                <div class="stitch-hw-sub">Dual-NVENC chiplets active</div>
+              </div>
+
+              <div class="stitch-hw-box">
+                <div class="stitch-hw-head">
+                  <span>LUỒNG SONG SONG</span>
+                  <span class="material-symbols-outlined">dynamic_form</span>
+                </div>
+                <label>Số luồng render song song
+                  <div class="stitch-input-suffix">
+                    <input id="batchWorkers" type="number" value="2" min="1" max="8" />
+                    <span>WORKERS</span>
+                  </div>
+                </label>
+                <div class="stitch-hw-sub">Khuyên dùng: 2–4 luồng (Tối ưu VRAM)</div>
+              </div>
+
+              <div class="stitch-hw-box">
+                <div class="stitch-hw-head">
+                  <span>FPS TARGET</span>
+                  <span class="material-symbols-outlined">speed</span>
+                </div>
+                <label>FPS
+                  <select id="batchFps">
+                    <option value="24" selected>24 FPS (Chuẩn Điện Ảnh · Nhanh)</option>
+                    <option value="25">25 FPS (PAL Broadcast)</option>
+                    <option value="30">30 FPS (Standard Digital)</option>
+                    <option value="60">60 FPS (Ultra Smooth)</option>
+                  </select>
+                </label>
+                <div class="stitch-hw-sub">Frame rate drop protection ON</div>
+              </div>
+
+              <div class="stitch-hw-box">
+                <div class="stitch-hw-head">
+                  <span>CHỌN STOCK VIDEO</span>
+                  <span class="material-symbols-outlined">shuffle</span>
+                </div>
+                <label>Chế độ chọn stock
+                  <select id="selectionMode">
+                    <option value="RANDOM_NO_REPEAT">Random không lặp lại clip</option>
+                    <option value="SEQUENTIAL_NO_REPEAT">Tuần tự không lặp lại</option>
+                    <option value="PURE_RANDOM">Random tự do</option>
+                  </select>
+                </label>
+                <div class="stitch-hw-sub">Thuật toán chống trùng lặp cảnh</div>
+              </div>
+            </div>
+
+            <!-- Image Duration & Flip Strip (Stitch Screen 04) -->
+            <div class="stitch-strip-bar">
+              <label class="stitch-strip-item">
+                <span>THỜI LƯỢNG MỖI ẢNH (GIÂY)</span>
+                <input id="imageSeconds" type="number" value="4" min="1" max="60" style="width:90px;" />
+              </label>
+              <label class="check stitch-strip-check">
+                <input id="allowFlip" type="checkbox" checked />
+                <span>Cho phép lật ngang &amp; Zoom nhẹ (Ken Burns)</span>
+              </label>
+            </div>
+
+            <!-- GPU Pipeline Banner -->
+            <div class="gpu-note">
+              <strong>⚡ GPU Pipeline:</strong> Tận dụng tối đa phần cứng NVIDIA (NVDEC + CUDA + NVENC). Mặc định chạy <strong>24fps</strong>, hạ tốc độ stock <strong>0.75x</strong> và tự động xóa phần stock đã khớp sau khi hoàn thành để không bao giờ trùng lặp.
+            </div>
+
+            <!-- Collapsible Advanced GPU & Transitions Drawer (Stitch Screen 04) -->
+            <details class="stitch-details" open>
+              <summary>
+                <span><span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">tune</span> TÙY CHỈNH NÂNG CAO &amp; TĂNG TỐC GPU (ADVANCED NVENC &amp; TRANSITIONS)</span>
+                <span class="stitch-mono-tag">EXPAND</span>
+              </summary>
+              <div class="stitch-details-body">
+                <div class="form three-col compact">
+                  <label>Chế độ tăng tốc
+                    <select id="batchAcceleration">
+                      <option value="AUTO_STABLE" selected>Auto ổn định (NVENC + CPU filter)</option>
+                      <option value="HYBRID_CUDA">Hybrid GPU (NVDEC/CUDA + NVENC)</option>
+                      <option value="FULL_GPU_ZERO_COPY">Full GPU Zero-Copy (Video đơn giản)</option>
+                      <option value="CPU_ONLY">Chỉ dùng CPU</option>
+                    </select>
+                  </label>
+                  <label>Hiệu năng render
+                    <select id="batchPerformance">
+                      <option value="FAST" selected>Nhanh (P1/veryfast)</option>
+                      <option value="BALANCED">Cân bằng (P4/faster)</option>
+                      <option value="QUALITY">Chất lượng cao (P5/medium)</option>
+                    </select>
+                  </label>
+                  <label>GPU sử dụng
+                    <select id="batchGpuIndex">
+                      <option value="-1" selected>Auto GPU</option>
+                      <option value="0">GPU #0</option>
+                      <option value="1">GPU #1</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="form four-col compact" style="margin-top:10px;">
+                  <label>Chiều rộng<input id="batchWidth" type="number" value="1920" /></label>
+                  <label>Chiều cao<input id="batchHeight" type="number" value="1080" /></label>
+                  <label>GB / giờ<input id="batchGbHour" type="number" step="0.1" value="1.5" /></label>
+                  <label>Thử lại tối đa<input id="batchAttempts" type="number" value="2" min="1" max="5" /></label>
+                </div>
+
+                <!-- Hidden/Managed Subtitle Overrides (Preserved for app.js compatibility) -->
+                <div class="form four-col compact" style="margin-top:6px;">
+                  <label>Preset subtitle<select id="batchSubtitlePreset"></select></label>
+                  <label>Font subtitle<select id="batchSubtitleFont"></select></label>
+                  <label>Màu chữ<input id="batchSubtitleColor" type="color" value="#ffffff" /></label>
+                  <label>Màu viền<input id="batchSubtitleOutlineColor" type="color" value="#000000" /></label>
+                  <label>Cỡ chữ<input id="batchSubtitleSize" type="number" value="52" min="18" max="120" /></label>
+                  <label>Độ dày viền<input id="batchSubtitleOutline" type="number" value="1" min="0" max="12" step="0.5" /></label>
+                  <label>Lề dưới<input id="batchSubtitleBottom" type="number" value="44" min="10" max="400" /></label>
+                  <label class="check"><input id="batchSubtitleBold" type="checkbox" /> Chữ đậm</label>
+                  <label class="check"><input id="batchSubtitleUppercase" type="checkbox" /> IN HOA</label>
+                </div>
+
+                <!-- Transition Random Pool -->
+                <div class="stitch-transition-box">
+                  <div class="stitch-label-row" style="margin-bottom:6px;">
+                    <strong style="font-size:11px;color:var(--cyber-green);font-family:var(--font-mono);">TRANSITION RANDOM POOL (CHUYỂN CẢNH GIỮA CÁC CLIP)</strong>
+                    <span class="stitch-mono-hint">MULTI-SELECT</span>
+                  </div>
+                  <div id="batchTransitions" class="transition-grid"></div>
+                  <div class="form three-col compact">
+                    <label>Tối thiểu (ms)<input id="batchTransitionMin" type="number" value="600" min="200" max="2000" step="50" /></label>
+                    <label>Tối đa (ms)<input id="batchTransitionMax" type="number" value="900" min="200" max="2000" step="50" /></label>
+                    <label>Tránh lặp N lần<input id="batchAvoidRepeat" type="number" value="2" min="0" max="6" /></label>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- BOTTOM SECTION 1: TIẾN ĐỘ RENDER THEO LÔ (BATCH PIPELINE - STITCH SCREEN 04) -->
+        <div class="panel stitch-card" style="margin-bottom:14px;">
+          <div class="stitch-card-header">
+            <div class="stitch-card-title">
+              <span class="material-symbols-outlined text-neon">queue_play_next</span>
+              <h3>TIẾN ĐỘ RENDER THEO LÔ (BATCH PIPELINE)</h3>
+            </div>
+            <div class="muted" id="batchProgressLabel" style="margin:0;">Chưa quét dữ liệu đầu vào (Bấm "Kiểm Tra Đầu Vào" để quét).</div>
+          </div>
+          <div class="progress-shell"><div class="progress-bar" id="batchProgress"></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>VOICE SOURCE</th>
+                  <th>SRT SUBTITLE</th>
+                  <th>ẢNH / GREEN THEO VOICE</th>
+                  <th>THỜI LƯỢNG</th>
+                  <th>TRẠNG THÁI</th>
+                  <th>THỜI GIAN RENDER</th>
+                  <th>OUTPUT FILE</th>
+                </tr>
+              </thead>
+              <tbody id="batchJobs"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- BOTTOM SECTION 2: NVENC HARDWARE RENDER LOG (STITCH SCREEN 04) -->
+        <div class="panel stitch-card">
+          <div class="stitch-card-header">
+            <div class="stitch-card-title">
+              <span class="material-symbols-outlined text-neon">terminal</span>
+              <h3>NVENC HARDWARE RENDER LOG &amp; COMPOSITOR STREAM</h3>
+            </div>
+            <span class="stitch-live-indicator"><span class="pulse-dot"></span> STREAMING 60 FPS</span>
+          </div>
+          <pre id="renderLog" class="console"></pre>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 03: QUẢN LÝ VOICE AI & NHÂN BẢN GIỌNG (STITCH SCREEN 01)      -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-voice-studio">
+        <!-- Top Engine Telemetry Header Bar (Stitch Screen 01) -->
+        <div class="stitch-page-header">
+          <div class="stitch-header-left">
+            <div class="stitch-icon-box neon">
+              <span class="material-symbols-outlined">graphic_eq</span>
+              <span class="corner-dot"></span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>QUẢN LÝ VOICE AI &amp; NHÂN BẢN GIỌNG</h2>
+                <span id="voiceStatusBadge" class="badge" style="background:#1e293b;color:#94a3b8;">Đang kiểm tra cổng 3900...</span>
+                <span class="stitch-chip">OMNIVOICE GPU :3900</span>
+              </div>
+              <p class="stitch-subtitle" id="voiceModelInfo">Engine: debpalash/VoiceStudio v0.5.6 · Zero-Shot Voice Cloning · Local GPU Direct</p>
+            </div>
+          </div>
+          <div class="stitch-header-actions">
+            <button id="refreshVoiceList" type="button">
+              <span class="material-symbols-outlined">refresh</span> Làm Mới &amp; Kiểm Tra Server
+            </button>
+            <button id="btnLaunchVoiceStudio" type="button" class="stitch-btn-emerald">
+              <span class="material-symbols-outlined">rocket_launch</span> Mở VoiceStudio (Cổng 3900)
+            </button>
+          </div>
+        </div>
+
+        <!-- 2-Column Workspace (4 Cols Left / 8 Cols Right — Stitch Screen 01) -->
+        <div class="stitch-grid-4-8">
+          <!-- LEFT COLUMN (4 COLS): KHO_VOICE CLONES -->
+          <div class="panel stitch-card stitch-voice-sidebar">
+            <div class="stitch-card-header">
+              <div>
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">library_music</span>
+                  <h3>Kho_Voice Clones</h3>
+                </div>
+                <small class="stitch-subcaption">Danh sách giọng mẫu lưu trong thư mục Kho_Voice/</small>
+              </div>
+              <span class="stitch-chip neon" id="voiceProfileCountBadge">CLONES</span>
+            </div>
+
+            <!-- Search & Language Filter Pills -->
+            <div class="stitch-search-box">
+              <input id="voiceSearchInput" placeholder="🔍 Tìm tên giọng, mã ID, ngôn ngữ..." />
+              <div class="stitch-filter-pills" id="voiceLangFilterPills">
+                <button type="button" class="stitch-pill active" data-voice-filter="ALL">Tất Cả</button>
+                <button type="button" class="stitch-pill" data-voice-filter="es">Español (MX)</button>
+                <button type="button" class="stitch-pill" data-voice-filter="en">English (US)</button>
+                <button type="button" class="stitch-pill" data-voice-filter="ja">日本語 (JP)</button>
+                <button type="button" class="stitch-pill" data-voice-filter="vi">Tiếng Việt</button>
+              </div>
+            </div>
+
+            <div id="voiceProfilesList" class="list stitch-voice-list">
+              <div class="empty">Chưa có giọng nói nào. Hãy thêm mẫu giọng ở khung bên phải.</div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN (8 COLS): 3 STACKED STITCH VOICE CARDS -->
+          <div class="stitch-stack">
+            <!-- CARD 1: THÊM MỚI HOẶC SỬA MẪU GIỌNG CLONE -->
+            <div class="panel stitch-card stitch-accent-left" id="voiceFormCard">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">mic</span>
+                  <h3 id="voiceFormHeaderTitle">1. THÊM MỚI HOẶC CHỈNH SỬA GIỌNG CLONE (.WAV / .MP3)</h3>
+                </div>
+                <span class="stitch-mono-tag" id="voiceFormModeBadge">CREATE / EDIT MODE</span>
+              </div>
+
+              <div id="voiceEditingBanner" style="display:none;margin-bottom:10px;padding:9px 12px;border-radius:8px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.5);color:#fde68a;font-size:11.5px;align-items:center;justify-content:space-between;gap:10px;">
+                <span id="voiceEditingBannerText">✏️ Đang chỉnh sửa giọng: <strong>—</strong> (Giữ nguyên đường dẫn mẫu nếu không muốn đổi file âm thanh)</span>
+                <button type="button" onclick="window.resetVoiceProfileForm && window.resetVoiceProfileForm()" style="padding:3px 9px;font-size:10.5px;white-space:nowrap;">➕ Chuyển sang Tạo Mới</button>
+              </div>
+
+              <div class="form two-col compact">
+                <label>TÊN HIỂN THỊ GIỌNG NÓI
+                  <input id="voiceNewName" placeholder="VD: Bà Cô Mexico Trầm Ấm, Homeless Kể Chuyện..." />
+                </label>
+                <label>MÃ ĐỊNH DANH (ID KHÔNG DẤU — TÙY CHỌN)
+                  <input id="voiceNewId" placeholder="VD: mexico_baco_01 (để trống sẽ tự tạo)" />
+                </label>
+                <label class="span-2">FILE MẪU ÂM THANH (.WAV / .MP3 THAM CHIẾU TỪ 5–30 GIÂY — KHI SỬA CÓ THỂ GIỮ NGUYÊN HOẶC CHỌN FILE MỚI)
+                  <div class="path">
+                    <input id="voiceNewSamplePath" placeholder="Chọn file audio mẫu để AI học giọng..." />
+                    <button type="button" id="btnPickVoiceSample"><span class="material-symbols-outlined" style="font-size:14px;">upload_file</span> Chọn File Mẫu</button>
+                  </div>
+                </label>
+              </div>
+
+              <div class="form three-col compact" style="margin-top:8px;">
+                <label>NGÔN NGỮ CHÍNH
+                  <select id="voiceNewLanguage">
+                    <option value="es">Español (Tây Ban Nha Mexico)</option>
+                    <option value="en">English (Tiếng Anh Mỹ)</option>
+                    <option value="vi">Tiếng Việt</option>
+                    <option value="ja">日本語 (Tiếng Nhật)</option>
+                    <option value="zh">中文 (Tiếng Trung)</option>
+                    <option value="ko">한국어 (Tiếng Hàn)</option>
+                    <option value="fr">Français (Tiếng Pháp)</option>
+                    <option value="de">Deutsch (Tiếng Đức)</option>
+                  </select>
+                </label>
+                <label>TỐC ĐỘ ĐỌC MẶC ĐỊNH
+                  <input id="voiceNewSpeed" type="number" value="1.0" min="0.5" max="2.0" step="0.05" />
+                </label>
+                <label>ENGINE MODEL
+                  <select id="voiceNewModel">
+                    <option value="omnivoice">VoiceStudio OmniVoice (Khuyên dùng)</option>
+                    <option value="f5tts">F5-TTS Clone</option>
+                    <option value="xtts">Coqui XTTS-v2</option>
+                  </select>
+                </label>
+              </div>
+
+              <label style="margin-top:8px;">GHI CHÚ / MÔ TẢ CHẤT GIỌNG
+                <input id="voiceNewDescription" placeholder="VD: Giọng nữ lớn tuổi Mexico kể chuyện gia đình sâu sắc..." />
+              </label>
+
+              <div class="actions" style="margin-top:12px;justify-content:flex-end;">
+                <button type="button" id="btnCancelEditVoice" onclick="window.resetVoiceProfileForm && window.resetVoiceProfileForm()">Làm Trống / Hủy Sửa</button>
+                <button class="primary" id="btnSaveVoiceProfile" type="button">
+                  <span class="material-symbols-outlined">save</span> Lưu Giọng Vào Kho_Voice
+                </button>
+              </div>
+            </div>
+
+            <!-- CARD 2: KHUNG THỬ GIỌNG NHANH (VOICE TEST REALTIME) -->
+            <div class="panel stitch-card stitch-accent-left">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">spatial_audio_off</span>
+                  <h3>2. KHUNG THỬ GIỌNG NHANH (VOICE TEST REALTIME)</h3>
+                </div>
+                <span class="stitch-mono-tag">REALTIME SYNTHESIS</span>
+              </div>
+
+              <label>VĂN BẢN THỬ GIỌNG
+                <textarea id="voiceTestText" rows="2" placeholder="Nhập câu thoại bất kỳ để nghe thử chất giọng đã nhân bản...">Xin chào, đây là hệ thống nhân bản giọng nói AI tích hợp trực tiếp trong Video Batch Studio.</textarea>
+              </label>
+
+              <div class="stitch-voice-test-bar">
+                <label style="flex:2;">CHỌN GIỌNG ĐỌC
+                  <select id="voiceTestSelect">
+                    <option value="default">🎙️ VoiceStudio Mặc định</option>
+                  </select>
+                </label>
+                <label style="width:110px;">TỐC ĐỘ
+                  <input id="voiceTestSpeed" type="number" value="1.0" min="0.5" max="2.0" step="0.05" />
+                </label>
+                <div style="display:flex;align-items:flex-end;">
+                  <button class="primary" id="btnRunVoiceTest" type="button" style="height:36px;padding:0 18px;">
+                    <span class="material-symbols-outlined">volume_up</span> Đọc Thử Ngay
+                  </button>
+                </div>
+              </div>
+
+              <div id="voiceTestResult" class="stitch-audio-result" style="display:none;">
+                <div class="stitch-audio-meta">
+                  <span class="text-neon">✅ Đã tạo mẫu âm thanh thử:</span>
+                  <span id="voiceTestDuration" class="stitch-mono-hint"></span>
+                </div>
+                <audio id="voiceTestAudioPlayer" controls style="width:100%;height:34px;"></audio>
+              </div>
+            </div>
+
+            <!-- CARD 3: TẠO VOICE KỊCH BẢN DÀI (.TXT -> .WAV ĐỘC LẬP) -->
+            <div class="panel stitch-card stitch-accent-left">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">description</span>
+                  <h3>3. TẠO VOICE KỊCH BẢN DÀI (.TXT ➔ .WAV ĐỘC LẬP) CHO CẢ BÀI</h3>
+                </div>
+                <span class="stitch-mono-tag">BATCH CORE GPU</span>
+              </div>
+
+              <p class="stitch-subcaption" style="margin-bottom:10px;">
+                Tự động chia nhỏ kịch bản dài theo từng câu, đọc tuần tự qua GPU VoiceStudio, ghép thành <strong>1 file .WAV duy nhất</strong> và tự động dọn sạch cache tạm.
+              </p>
+
+              <div class="form compact">
+                <label>FILE KỊCH BẢN (.TXT)
+                  <div class="path">
+                    <input id="voiceScriptFilePath" placeholder="Chọn file kịch bản .txt cần đọc thành 1 file voice hoàn chỉnh..." />
+                    <button type="button" id="btnPickVoiceScriptFile"><span class="material-symbols-outlined" style="font-size:14px;">folder_open</span> Chọn File .TXT</button>
+                  </div>
+                </label>
+
+                <details class="stitch-details">
+                  <summary>
+                    <span>📝 XEM / DÁN TRỰC TIẾP NỘI DUNG KỊCH BẢN DÀI VÀO ĐÂY</span>
+                    <span class="stitch-mono-tag">TEXT EDITOR</span>
+                  </summary>
+                  <div class="stitch-details-body">
+                    <textarea id="voiceScriptContent" rows="5" placeholder="Khi chọn file .txt nội dung sẽ hiện ở đây, hoặc bạn có thể dán trực tiếp toàn bộ kịch bản vào đây..."></textarea>
+                  </div>
+                </details>
+
+                <div class="stitch-voice-test-bar">
+                  <label style="flex:2;">GIỌNG ĐỌC KỊCH BẢN
+                    <select id="voiceScriptProfileSelect">
+                      <option value="default">🎙️ VoiceStudio Mặc định</option>
+                    </select>
+                  </label>
+                  <label style="width:100px;">TỐC ĐỘ
+                    <input id="voiceScriptSpeed" type="number" value="1.0" min="0.5" max="2.0" step="0.05" />
+                  </label>
+                  <label style="flex:2;">FILE WAV ĐẦU RA
+                    <div class="path">
+                      <input id="voiceScriptOutputPath" placeholder="Đường dẫn lưu file .wav hoàn chỉnh..." />
+                      <button type="button" id="btnPickVoiceScriptOut">...</button>
+                    </div>
+                  </label>
+                </div>
+
+                <button class="primary" id="btnGenerateFullScriptNow" type="button" style="width:100%;padding:11px;margin-top:6px;font-size:12.5px;">
+                  <span class="material-symbols-outlined">bolt</span> Tạo 1 File WAV Hoàn Chỉnh Cho Toàn Bộ Kịch Bản (Tự Động Ghép &amp; Xóa Cache)
+                </button>
+
+                <div id="voiceScriptProgressBox" class="stitch-audio-result" style="display:none;">
+                  <div class="stitch-audio-meta">
+                    <span id="voiceScriptProgressStatus" class="text-neon">Đang xử lý kịch bản...</span>
+                    <span id="voiceScriptProgressPct" style="color:var(--cyber-green);font-weight:700;">0%</span>
+                  </div>
+                  <div class="progress-shell" style="margin:6px 0 0 0;">
+                    <div class="progress-bar" id="voiceScriptProgressBar" style="width:0%;"></div>
+                  </div>
+                </div>
+
+                <div id="voiceFullScriptResult" class="stitch-audio-result" style="display:none;">
+                  <div class="stitch-audio-meta">
+                    <span class="text-neon" style="font-weight:700;">✅ Đã xuất xong 1 file WAV kịch bản hoàn chỉnh (Đã dọn sạch cache tạm):</span>
+                    <button type="button" id="btnOpenVoiceScriptOutFolder" style="padding:3px 8px;font-size:11px;">📂 Mở Thư Mục Chứa File</button>
+                  </div>
+                  <audio id="voiceFullScriptAudioPlayer" controls style="width:100%;height:34px;"></audio>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 04: TẠO VIDEO TỪ DANH SÁCH ẢNH (STORY PIP - STITCH SCREEN 05) -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-story-video">
+        <!-- Top Header Bar (Stitch Screen 05) -->
+        <div class="stitch-page-header">
+          <div class="stitch-header-left">
+            <div class="stitch-icon-box neon">
+              <span class="material-symbols-outlined">auto_awesome_motion</span>
+              <span class="corner-dot"></span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>TẠO VIDEO TỪ DANH SÁCH ẢNH (STORY PIP / SLIDESHOW MATRIX)</h2>
+                <span class="stitch-chip neon">CUDA ACCELERATED</span>
+              </div>
+              <p class="stitch-subtitle">PIPELINE CORE // TAB-04 · Kết hợp Voice + Subtitle SRT + Thư mục Ảnh thành Video hoàn chỉnh</p>
+            </div>
+          </div>
+          <div class="stitch-header-actions">
+            <button id="scanStoryVideo" type="button">
+              <span class="material-symbols-outlined">troubleshoot</span> Kiểm Tra Đầu Vào (Preflight)
+            </button>
+            <button class="danger" id="cancelStoryVideo" type="button">
+              <span class="material-symbols-outlined">cancel</span> Hủy Tiến Trình
+            </button>
+            <button class="primary" id="startStoryVideo" type="button">
+              <span class="material-symbols-outlined">bolt</span> Bắt Đầu Tạo Video
+            </button>
+          </div>
+        </div>
+
+        <!-- 2-Column Workspace (4 Cols Left / 8 Cols Right — Stitch Screen 05) -->
+        <div class="stitch-grid-4-8">
+          <!-- LEFT COLUMN (4 COLS): 3 STACKED CONFIGURATION CARDS -->
+          <div class="stitch-stack">
+            <!-- CARD 1: 1. CHẾ ĐỘ TẠO VIDEO -->
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">tune</span>
+                  <h3>1. Chế Độ Tạo Video</h3>
+                </div>
+                <span class="stitch-mono-tag">SYNC ENGINE</span>
+              </div>
+
+              <div class="stitch-radio-stack">
+                <label class="stitch-radio-card">
+                  <input type="radio" name="storyMode" value="fixed" checked />
+                  <div>
+                    <div class="stitch-radio-title">
+                      <strong>Chế độ 1: Cố định giây mỗi ảnh</strong>
+                      <span class="stitch-chip neon">DEFAULT</span>
+                    </div>
+                    <small>Mỗi ảnh hiển thị đúng N giây, lặp tuần hoàn cho đến khi hết thời lượng file Voice.</small>
+                  </div>
+                </label>
+
+                <label class="stitch-radio-card">
+                  <input type="radio" name="storyMode" value="distribute" />
+                  <div>
+                    <div class="stitch-radio-title">
+                      <strong>Chế độ 2: Chia đều ảnh theo thời lượng Voice</strong>
+                    </div>
+                    <small>Tự tính thời lượng mỗi ảnh = Tổng thời lượng Voice chia đều cho tổng số ảnh trong thư mục.</small>
+                  </div>
+                </label>
+
+                <label class="stitch-radio-card">
+                  <input type="radio" name="storyMode" value="srt" />
+                  <div>
+                    <div class="stitch-radio-title">
+                      <strong>Chế độ 3: Đồng bộ theo dòng Subtitle SRT</strong>
+                    </div>
+                    <small>Tự động đổi ảnh khớp chính xác với từng câu/dòng phụ đề trong file .SRT.</small>
+                  </div>
+                </label>
+              </div>
+
+              <div class="form two-col compact" style="margin-top:10px;">
+                <label>Số giây / ảnh (Chế độ 1)
+                  <input id="storyImageSeconds" type="number" value="4" min="1" max="120" step="0.5" />
+                </label>
+                <label class="check" style="align-self:end;padding-bottom:6px;">
+                  <input id="storyAllowFlip" type="checkbox" checked />
+                  <span>Auto Flip / Ken Burns</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- CARD 2: 2. PROJECT & TEMPLATE -->
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">layers</span>
+                  <h3>2. Project &amp; Template</h3>
+                </div>
+                <span class="stitch-mono-tag">NVENC DOCK</span>
+              </div>
+
+              <div class="form compact">
+                <label>Project
+                  <select id="storyProject"></select>
+                </label>
+                <label>Template (Áp dụng Overlay &amp; Kiểu chữ Subtitle)
+                  <select id="storyTemplate"></select>
+                </label>
+                <label>Thư mục xuất Video (Output Folder)
+                  <div class="path">
+                    <input id="storyOutputFolder" placeholder="Mặc định lấy theo Output của Project..." />
+                    <button type="button" data-pick-dir="storyOutputFolder">...</button>
+                  </div>
+                </label>
+                <label>Số luồng xử lý song song (Workers)
+                  <input id="storyWorkers" type="number" value="2" min="1" max="6" />
+                </label>
+              </div>
+            </div>
+
+            <!-- CARD 3: 3. CHUYỂN CẢNH & CODEC -->
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">settings_video_camera</span>
+                  <h3>3. Chuyển Cảnh &amp; Codec</h3>
+                </div>
+                <span class="stitch-mono-tag">FFMPEG HARDWARE</span>
+              </div>
+
+              <div class="form two-col compact">
+                <label>Thời lượng chuyển (ms)
+                  <input id="storyTransitionMs" type="number" value="700" min="0" max="2000" step="50" />
+                </label>
+                <label>Hiệu ứng chuyển cảnh
+                  <select id="storyTransitionSelect">
+                    <option value="random" selected>Ngẫu nhiên (Random mượt)</option>
+                    <option value="fade">Mờ dần (Fade)</option>
+                    <option value=" dissolve">Hòa tan (Dissolve)</option>
+                    <option value="wipeleft">Gạt trái (Wipe Left)</option>
+                    <option value="wiperight">Gạt phải (Wipe Right)</option>
+                    <option value="slideleft">Trượt trái (Slide Left)</option>
+                    <option value="slideright">Trượt phải (Slide Right)</option>
+                    <option value="circleopen">Mở vòng tròn (Circle Open)</option>
+                    <option value="none">Không chuyển cảnh (Cut cứng)</option>
+                  </select>
+                </label>
+                <label class="span-2">Codec xuất video
+                  <select id="storyCodec">
+                    <option value="auto" selected>Auto — Ưu tiên GPU NVIDIA NVENC</option>
+                    <option value="h264_nvenc">H.264 NVENC (GPU NVIDIA)</option>
+                    <option value="libx264">H.264 CPU (libx264)</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN (8 COLS): DANH SÁCH HÀNG ĐỢI DỰNG VIDEO (STITCH SCREEN 05) -->
+          <div class="panel stitch-card" style="display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <div class="stitch-card-header">
+                <div>
+                  <div class="stitch-card-title">
+                    <span class="material-symbols-outlined text-neon">view_list</span>
+                    <h3>Danh Sách Hàng Đợi Dựng Video</h3>
+                  </div>
+                  <small class="stitch-subcaption">Mỗi dòng tương ứng với 1 video đầu ra (1 Voice + 1 SRT + 1 Folder Ảnh)</small>
+                </div>
+                <div class="actions">
+                  <button type="button" id="addStoryRow"><span class="material-symbols-outlined">add</span> Thêm Dòng</button>
+                  <button type="button" id="batchAddStoryRows"><span class="material-symbols-outlined">create_new_folder</span> Thêm Nhiều Từ Thư Mục</button>
+                  <button type="button" class="danger" id="clearStoryRows"><span class="material-symbols-outlined">delete_sweep</span> Xóa Tất Cả</button>
+                </div>
+              </div>
+
+              <div class="table-wrap" style="max-height:510px;">
+                <table id="storyInputTable">
+                  <thead>
+                    <tr>
+                      <th style="width:36px;">#</th>
+                      <th>File Voice (.mp3/.wav)</th>
+                      <th>File Phụ Đề (.srt)</th>
+                      <th>Thư Mục Chứa Ảnh</th>
+                      <th style="width:140px;">Thông Tin Quét</th>
+                      <th style="width:95px;">Trạng Thái</th>
+                      <th style="width:48px;">Xóa</th>
+                    </tr>
+                  </thead>
+                  <tbody id="storyInputRows"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 3 Summary Metric Cards at Bottom of Right Card (Stitch Screen 05) -->
+            <div class="stitch-mini-metrics-row">
+              <div class="stitch-mini-metric">
+                <span>TỔNG HÀNG ĐỢI</span>
+                <strong id="storyMetricTotalRows">1 VIDEO</strong>
+              </div>
+              <div class="stitch-mini-metric">
+                <span>CHẾ ĐỘ ĐỒNG BỘ</span>
+                <strong id="storyMetricSyncMode">FIXED SEC / IMG</strong>
+              </div>
+              <div class="stitch-mini-metric">
+                <span>ENGINE RENDER</span>
+                <strong class="text-neon">NVENC PIPELINE</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Render Progress & Log (Stitch Screen 05) -->
+        <div class="panel stitch-card" style="margin-top:14px;">
+          <div class="stitch-card-header">
+            <div class="stitch-card-title">
+              <span class="material-symbols-outlined text-neon">terminal</span>
+              <h3>Tiến Độ &amp; Nhật Ký Render GPU</h3>
+            </div>
+            <div class="muted" id="storyProgressLabel" style="margin:0;">Chưa chạy</div>
+          </div>
+          <div class="progress-shell"><div class="progress-bar" id="storyProgress"></div></div>
+          <pre id="storyLog" class="console"></pre>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 05: THIẾT KẾ TEMPLATE CANVAS 16:9 (STITCH SCREEN 07)          -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-templates">
+        <!-- Top Studio Toolbar Bar (Stitch Screen 07) -->
+        <div class="stitch-template-toolbar">
+          <div class="stitch-tpl-left">
+            <label class="stitch-inline-control">
+              <span><span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;">folder</span> Dự án:</span>
+              <select id="templateProject" style="min-width:190px;"></select>
+            </label>
+            <span class="stitch-divider"></span>
+            <label class="stitch-inline-control">
+              <span><span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;">space_dashboard</span> Bố cục Template:</span>
+              <select id="templateSelect" style="min-width:220px;"></select>
+            </label>
+          </div>
+
+          <div class="stitch-tpl-right">
+            <button id="newTemplate" type="button"><span class="material-symbols-outlined">add_circle</span> Tạo Mới</button>
+            <button class="primary" id="saveTemplate" type="button"><span class="material-symbols-outlined">save</span> Lưu Template</button>
+            <button id="templateHistory" type="button" title="Lịch sử phiên bản Template"><span class="material-symbols-outlined">history</span> Lịch Sử</button>
+            <span class="stitch-divider"></span>
+            <button id="exportTemplate" type="button"><span class="material-symbols-outlined">upload_file</span> Xuất JSON</button>
+            <button id="importTemplate" type="button"><span class="material-symbols-outlined">download</span> Nhập JSON</button>
+          </div>
+        </div>
+
+        <!-- 3-Column Studio Suite (Left Tools & Stack / Center 16:9 Viewport / Right Inspector — Stitch Screen 07) -->
+        <div class="editor stitch-editor-suite">
+          <!-- LEFT PANEL: THÊM LỚP PHỦ & LAYER STACK -->
+          <div class="panel editor-tools stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">add_to_photos</span>
+                <h3>THÊM LỚP PHỦ</h3>
+              </div>
+              <span class="stitch-mono-tag">TOOLS</span>
+            </div>
+
+            <div class="tool-grid stitch-tool-grid">
+              <button type="button" data-add-layer="TEXT"><span class="material-symbols-outlined">title</span> + Text</button>
+              <button type="button" data-add-layer="LOGO"><span class="material-symbols-outlined">branding_watermark</span> + Logo</button>
+              <button type="button" data-add-layer="IMAGE"><span class="material-symbols-outlined">image</span> + Ảnh tĩnh</button>
+              <button type="button" data-add-layer="VIDEO"><span class="material-symbols-outlined">movie</span> + Video</button>
+              <button type="button" data-add-layer="GREENSCREEN_IMAGE"><span class="material-symbols-outlined">wallpaper</span> + Ảnh Green</button>
+              <button type="button" data-add-layer="GREENSCREEN_VIDEO"><span class="material-symbols-outlined">switch_video</span> + Video Green</button>
+              <button type="button" data-add-layer="OVERLAY_IMAGE"><span class="material-symbols-outlined">filter_frames</span> + Khung ảnh</button>
+              <button type="button" data-add-layer="OVERLAY_VIDEO"><span class="material-symbols-outlined">video_stable</span> + Video đè</button>
+            </div>
+
+            <div class="stitch-card-header" style="margin-top:8px;">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">stacks</span>
+                <h3>STACK (LỚP)</h3>
+              </div>
+              <span class="stitch-mono-hint">Top-to-Bottom</span>
+            </div>
+            <div id="layerList" class="layers"></div>
+          </div>
+
+          <!-- CENTER STAGE: 16:9 PRO-CANVAS VIEWPORT -->
+          <div class="panel editor-stage stitch-canvas-panel">
+            <div class="stitch-viewport-bar">
+              <div class="stitch-vp-left">
+                <span class="pulse-dot"></span>
+                <strong>VIEWPORT: 1920×1080 (16:9 PRO-CANVAS)</strong>
+              </div>
+              <div class="stitch-vp-right">
+                <span id="canvasSizeLabel" class="stitch-mono-tag">1920 × 1080</span>
+                <span class="stitch-mono-hint">SAFE-ZONE: ON</span>
+              </div>
+            </div>
+
+            <div id="previewCanvas" class="preview-canvas">
+              <div class="subtitle-demo" data-subtitle-box="1">
+                <span class="subtitle-resize nw" data-resize="nw" title="Kéo góc để đổi cỡ khung subtitle"></span>
+                <span class="subtitle-resize ne" data-resize="ne" title="Kéo góc để đổi cỡ khung subtitle"></span>
+                <span class="subtitle-resize sw" data-resize="sw" title="Kéo góc để đổi cỡ khung subtitle"></span>
+                <span class="subtitle-resize se" data-resize="se" title="Kéo góc để đổi cỡ khung subtitle"></span>
+                <span class="subtitle-text">Subtitle mẫu sẽ hiển thị ở đây</span>
+              </div>
+            </div>
+
+            <div class="canvas-info stitch-transport-bar">
+              <span>🖱️ Kéo trực tiếp layer để di chuyển · Kéo 4 góc xanh để đổi kích thước · Bấm chọn Subtitle để chỉnh phụ đề</span>
+              <span class="stitch-mono-hint">TIMELINE: 00:00:00:00 · 16:9 LOCK</span>
+            </div>
+          </div>
+
+          <!-- RIGHT PANEL: THUỘC TÍNH LAYER (INSPECTOR) -->
+          <div class="panel editor-properties stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">tune</span>
+                <h3>THUỘC TÍNH LAYER</h3>
+              </div>
+              <span class="stitch-mono-tag">#L-ACTIVE</span>
+            </div>
+
+            <div id="noLayer" class="muted stitch-empty-inspector">
+              Chọn một layer trên Canvas hoặc danh sách bên trái để chỉnh sửa tọa độ (X, Y, W, H) và nguồn media.
+            </div>
+
+            <div id="layerProperties" class="form compact" hidden>
+              <label>Tên layer<input id="layerName" /></label>
+              <label>Nội dung chữ (Text)<textarea id="layerText"></textarea></label>
+              <label>Đường dẫn nguồn (Source Path)
+                <div class="path">
+                  <input id="layerSource" placeholder="Chọn ảnh hoặc video..." />
+                  <button type="button" id="pickLayerSource">...</button>
+                </div>
+              </label>
+              <div id="layerPreviewInfo" class="source-preview-info" hidden></div>
+
+              <div class="form two-col compact">
+                <label>Tọa độ X<input id="layerX" type="number" /></label>
+                <label>Tọa độ Y<input id="layerY" type="number" /></label>
+                <label>Chiều rộng (W)<input id="layerWidth" type="number" /></label>
+                <label>Chiều cao (H)<input id="layerHeight" type="number" /></label>
+                <label>Góc xoay (°)<input id="layerRotation" type="number" /></label>
+                <label>Độ mờ (0–1)<input id="layerOpacity" type="number" step="0.05" min="0" max="1" /></label>
+                <label>Cỡ chữ (px)<input id="layerFontSize" type="number" value="44" /></label>
+                <label>Blend Mode
+                  <select id="layerBlend">
+                    <option value="normal">Normal (Mặc định)</option>
+                    <option value="screen">Screen (Lọc nền đen — Hạt bụi / Ánh sáng)</option>
+                    <option value="add">Add (Cộng sáng rực)</option>
+                    <option value="lighten">Lighten (Giữ điểm sáng)</option>
+                    <option value="multiply">Multiply (Làm tối)</option>
+                    <option value="overlay">Overlay (Tương phản)</option>
+                  </select>
+                </label>
+                <label>Bắt đầu (ms)<input id="layerStart" type="number" value="0" /></label>
+                <label>Kết thúc (ms)<input id="layerEnd" type="number" placeholder="Để trống = hết video" /></label>
+              </div>
+
+              <div class="form two-col compact">
+                <label class="check"><input id="layerLoop" type="checkbox" checked /> Lặp vô hạn</label>
+                <label class="check"><input id="layerVisible" type="checkbox" checked /> Hiển thị</label>
+              </div>
+
+              <div class="actions stitch-layer-order-bar">
+                <button type="button" id="layerBack" title="Đưa xuống dưới cùng">⏬ Dưới cùng</button>
+                <button type="button" id="layerDown" title="Xuống 1 lớp">⬇️ Xuống</button>
+                <button type="button" id="layerUp" title="Lên 1 lớp">⬆️ Lên</button>
+                <button type="button" id="layerFront" title="Đưa lên trên cùng">⏫ Trên cùng</button>
+                <button type="button" id="duplicateLayer">📋 Nhân bản</button>
+                <button type="button" class="danger" id="removeLayer">🗑️ Xóa</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Dual Configuration Racks (Stitch Screen 07) -->
+        <div class="grid two template-bottom">
+          <!-- Bottom-Left: Thiết lập Canvas & Xuất Hình -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">aspect_ratio</span>
+                <h3>THIẾT LẬP CANVAS &amp; XUẤT HÌNH</h3>
+              </div>
+              <span class="stitch-mono-tag">NVENC ACCELERATED</span>
+            </div>
+            <div class="form four-col compact">
+              <label>Chiều rộng<input id="tplWidth" type="number" value="1920" /></label>
+              <label>Chiều cao<input id="tplHeight" type="number" value="1080" /></label>
+              <label>FPS<input id="tplFps" type="number" value="30" /></label>
+              <label>Nền mặc định
+                <select id="tplBackground">
+                  <option value="STOCK_VIDEO">Stock video</option>
+                  <option value="IMAGE_SEQUENCE">Image sequence</option>
+                  <option value="SOLID">Solid color</option>
+                </select>
+              </label>
+            </div>
+            <div class="stitch-preset-row">
+              <span class="stitch-mono-hint">PRESETS:</span>
+              <button type="button" class="stitch-pill active" onclick="document.getElementById('tplWidth').value=1920;document.getElementById('tplHeight').value=1080;document.getElementById('tplWidth').dispatchEvent(new Event('input'));">YouTube 16:9 (1920×1080)</button>
+              <button type="button" class="stitch-pill" onclick="document.getElementById('tplWidth').value=1080;document.getElementById('tplHeight').value=1920;document.getElementById('tplWidth').dispatchEvent(new Event('input'));">Shorts/TikTok 9:16</button>
+              <button type="button" class="stitch-pill" onclick="document.getElementById('tplWidth').value=1080;document.getElementById('tplHeight').value=1080;document.getElementById('tplWidth').dispatchEvent(new Event('input'));">Square 1:1</button>
+            </div>
+          </div>
+
+          <!-- Bottom-Right: Định dạng Subtitle & Hiệu ứng Karaoke -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">subtitles</span>
+                <h3>ĐỊNH DẠNG SUBTITLE &amp; HIỆU ỨNG KARAOKE</h3>
+              </div>
+              <span class="stitch-mono-tag">WORD-BY-WORD SYNC</span>
+            </div>
+            <div class="form four-col compact">
+              <label>Preset kiểu chữ<select id="tplSubtitlePreset"></select></label>
+              <label>Hiệu ứng Subtitle
+                <select id="tplSubtitleEffect">
+                  <option value="none">Phụ đề thường (Tĩnh)</option>
+                  <option value="karaoke_box">Karaoke nhảy ô màu từng chữ</option>
+                </select>
+              </label>
+              <label id="tplKaraokeBoxColorRow" style="display:none;">Màu ô chữ đang đọc
+                <input id="tplKaraokeBoxColor" type="color" value="#7C00FF" />
+              </label>
+              <label>Font chữ<select id="tplSubtitleFont"></select></label>
+              <label>Màu chữ<input id="tplSubtitleColor" type="color" value="#ffffff" /></label>
+              <label>Màu viền<input id="tplSubtitleOutlineColor" type="color" value="#000000" /></label>
+              <label>Cỡ chữ (px)<input id="tplSubtitleSize" type="number" value="52" min="18" max="120" /></label>
+              <label>Độ dày viền<input id="tplSubtitleOutline" type="number" value="1" min="0" max="12" step="0.5" /></label>
+              <label>Lề dưới<input id="tplSubtitleBottom" type="number" value="44" min="10" max="400" /></label>
+              <label>Vị trí X (%)<input id="tplSubtitleX" type="number" value="8" min="0" max="90" step="0.5" /></label>
+              <label>Vị trí Y (%)<input id="tplSubtitleY" type="number" value="82" min="0" max="95" step="0.5" /></label>
+              <label>Rộng khung (%)<input id="tplSubtitleW" type="number" value="84" min="5" max="100" step="0.5" /></label>
+              <label>Cao khung (%)<input id="tplSubtitleH" type="number" value="14" min="5" max="70" step="0.5" /></label>
+              <label class="check"><input id="tplSubtitleBold" type="checkbox" /> Chữ đậm</label>
+              <label class="check"><input id="tplSubtitleUppercase" type="checkbox" /> IN HOA</label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 06: QUẢN LÝ PROJECT & OUTPUT (STITCH SCREEN 08)               -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-projects">
+        <div class="stitch-page-header">
+          <div class="stitch-header-left">
+            <div class="stitch-icon-box neon">
+              <span class="material-symbols-outlined">folder_managed</span>
+              <span class="corner-dot"></span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>QUẢN LÝ DỰ ÁN &amp; OUTPUT</h2>
+                <span class="stitch-chip neon">SQLITE DATABASE ENGINE</span>
+              </div>
+              <p class="stitch-subtitle">VBS Local Data Core • app.sqlite • Quản lý cấu hình chuẩn cho từng Kênh YouTube</p>
+            </div>
+          </div>
+          <div class="stitch-header-actions">
+            <button class="primary" id="newProject" type="button">
+              <span class="material-symbols-outlined">add</span> + Tạo Project Mới
+            </button>
+          </div>
+        </div>
+
+        <div class="stitch-grid-5-7">
+          <!-- Left Column: Pool Danh Sách Dự Án -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">inventory_2</span>
+                <h3>POOL DANH SÁCH DỰ ÁN</h3>
+              </div>
+              <span class="stitch-mono-tag">LOCAL STORE</span>
+            </div>
+            <div class="stitch-search-box">
+              <input id="projectSearchInput" placeholder="🔍 Tìm kiếm tên dự án hoặc thư mục output..." />
+            </div>
+            <div id="projectList" class="list"></div>
+          </div>
+
+          <!-- Right Column: Thông Số & Cấu Hình Dự Án -->
+          <div class="stitch-stack">
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">settings_applications</span>
+                  <h3>THÔNG SỐ &amp; CẤU HÌNH DỰ ÁN</h3>
+                </div>
+                <span class="stitch-mono-tag">ACTIVE WORKSPACE</span>
+              </div>
+
+              <div class="form">
+                <label>TÊN DỰ ÁN (PROJECT NAME)
+                  <input id="projectName" placeholder="VD: Kênh Mexico Bà Cô, Kênh Homeless Drama..." />
+                </label>
+                <label>THƯ MỤC OUTPUT MẶC ĐỊNH (DEFAULT OUTPUT ROOT)
+                  <div class="path">
+                    <input id="projectOutput" placeholder="Chọn thư mục xuất video mặc định cho dự án này..." />
+                    <button type="button" data-pick-dir="projectOutput">Browse</button>
+                  </div>
+                </label>
+
+                <div class="stitch-subcard">
+                  <div class="stitch-label-row" style="margin-bottom:8px;">
+                    <strong style="font-size:11px;color:var(--cyber-green);font-family:var(--font-mono);">ĐỘ PHÂN GIẢI CANVAS VIDEO (DIMENSIONS &amp; FPS)</strong>
+                    <div class="stitch-preset-row" style="margin:0;">
+                      <button type="button" class="stitch-pill active" onclick="document.getElementById('projectWidth').value=1920;document.getElementById('projectHeight').value=1080;">16:9 (1920×1080)</button>
+                      <button type="button" class="stitch-pill" onclick="document.getElementById('projectWidth').value=1080;document.getElementById('projectHeight').value=1920;">9:16 (1080×1920)</button>
+                      <button type="button" class="stitch-pill" onclick="document.getElementById('projectWidth').value=1080;document.getElementById('projectHeight').value=1080;">1:1 (1080×1080)</button>
+                    </div>
+                  </div>
+                  <div class="form three-col compact">
+                    <label>Chiều rộng (Width)<input id="projectWidth" type="number" value="1920" /></label>
+                    <label>Chiều cao (Height)<input id="projectHeight" type="number" value="1080" /></label>
+                    <label>Khung hình (FPS)<input id="projectFps" type="number" value="30" /></label>
+                  </div>
+                </div>
+
+                <label>MÔ TẢ DỰ ÁN &amp; GHI CHÚ KÊNH
+                  <textarea id="projectDescription" placeholder="Ghi chú về phong cách dựng, giọng đọc hoặc quy chuẩn của kênh..."></textarea>
+                </label>
+
+                <div class="actions" style="justify-content:space-between;margin-top:6px;">
+                  <button class="danger" id="deleteProject" type="button">
+                    <span class="material-symbols-outlined">delete</span> Xóa Project
+                  </button>
+                  <button class="primary" id="saveProject" type="button">
+                    <span class="material-symbols-outlined">save</span> Lưu Cấu Hình Project
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Storage Telemetry Card (Stitch Screen 08) -->
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">hard_drive</span>
+                  <h3>THỐNG KÊ LƯU TRỮ &amp; QUY CHUẨN ĐẦU RA</h3>
+                </div>
+                <span class="stitch-mono-tag">IO TELEMETRY</span>
+              </div>
+              <div class="stitch-mini-metrics-row" style="margin-top:0;">
+                <div class="stitch-mini-metric">
+                  <span>CHUẨN KHUNG HÌNH</span>
+                  <strong class="text-neon">1920 × 1080 FHD</strong>
+                </div>
+                <div class="stitch-mini-metric">
+                  <span>DATABASE ENGINE</span>
+                  <strong>SQLITE WAL MODE</strong>
+                </div>
+                <div class="stitch-mini-metric">
+                  <span>TỐC ĐỘ GHI DRIVE</span>
+                  <strong>ZERO-COPY STREAM</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 07: THƯ VIỆN VIDEO NỀN STOCK (STITCH SCREEN 09)               -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-libraries">
+        <div class="stitch-page-header">
+          <div class="stitch-header-left">
+            <div class="stitch-icon-box neon">
+              <span class="material-symbols-outlined">video_library</span>
+              <span class="corner-dot"></span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>THƯ VIỆN VIDEO NỀN STOCK</h2>
+                <span class="stitch-chip neon">NVENC GPU ACCELERATED</span>
+              </div>
+              <p class="stitch-subtitle">Quản lý các kho video nền · Tự động kiểm tra Codec, độ phân giải &amp; thời lượng bằng FFprobe</p>
+            </div>
+          </div>
+          <div class="stitch-header-actions">
+            <button class="primary" id="newLibrary" type="button">
+              <span class="material-symbols-outlined">create_new_folder</span> + Thêm Thư Viện Stock
+            </button>
+            <button id="scanLibrary" type="button">
+              <span class="material-symbols-outlined">radar</span> Quét Lại Kho Stock
+            </button>
+            <button id="purgeUnusable" type="button">
+              <span class="material-symbols-outlined">cleaning_services</span> Dọn File Lỗi / Missing
+            </button>
+          </div>
+        </div>
+
+        <div class="stitch-grid-4-8">
+          <!-- Left Column: Kho Lưu Trữ Tổ Chức -->
+          <div class="panel stitch-card" style="display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">folder_special</span>
+                  <h3>KHO LƯU TRỮ TỔ CHỨC</h3>
+                </div>
+                <span class="stitch-mono-tag">STOCK POOLS</span>
+              </div>
+              <div id="libraryList" class="list"></div>
+            </div>
+
+            <div class="stitch-subcard" style="margin-top:14px;">
+              <strong style="font-size:10.5px;color:#fca5a5;font-family:var(--font-mono);display:block;margin-bottom:8px;">⚠️ THAO TÁC QUẢN TRỊ KHO GỐC</strong>
+              <div class="actions" style="display:grid;grid-template-columns:1fr;gap:6px;">
+                <button class="danger" id="deleteLibrary" type="button">Gỡ Thư Viện Khỏi App (Giữ File Gốc)</button>
+                <button class="danger" id="deleteLibraryFiles" type="button">🗑️ Xóa File Video Đã Chọn Trên Ổ Cứng</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Chi Tiết Thư Viện & Asset Grid -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">analytics</span>
+                <h3 id="libraryTitle">Chi Tiết Thư Viện Stock</h3>
+              </div>
+              <span class="stitch-chip neon">NVENC DUAL-STREAM</span>
+            </div>
+
+            <div id="libraryStats" class="library-stats">Chọn một thư viện bên trái để xem tổng thời lượng và danh sách video clip.</div>
+            <div class="progress-shell"><div class="progress-bar" id="libraryProgress"></div></div>
+
+            <div class="stitch-search-box" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;">
+              <div class="stitch-filter-pills" id="stockAssetFilterPills">
+                <button type="button" class="stitch-pill active" data-stock-filter="ALL">Tất cả clips</button>
+                <button type="button" class="stitch-pill" data-stock-filter="AVAILABLE">Sẵn sàng (AVAILABLE)</button>
+                <button type="button" class="stitch-pill" data-stock-filter="USED">Đã dùng (USED)</button>
+                <button type="button" class="stitch-pill" data-stock-filter="INVALID">File lỗi (INVALID)</button>
+              </div>
+              <input id="stockAssetSearchInput" placeholder="🔍 Lọc tên file clip..." style="max-width:240px;" />
+            </div>
+
+            <div id="assetGrid" class="asset-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 08: KHO TÀI NGUYÊN TOÀN CỤC (KHO_GREEN - STITCH SCREEN 02)    -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-resources">
+        <div class="stitch-page-header">
+          <div class="stitch-header-left">
+            <div class="stitch-icon-box neon">
+              <span class="material-symbols-outlined">switch_video</span>
+              <span class="corner-dot"></span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>KHO TÀI NGUYÊN TOÀN CỤC (KHO_GREEN)</h2>
+                <span class="stitch-chip neon">CHROMA KEY ENGINE</span>
+              </div>
+              <p class="stitch-subtitle" id="greenStoragePathInfo">Đang kiểm tra thư mục Kho_Green...</p>
+            </div>
+          </div>
+          <div class="stitch-header-actions">
+            <button id="openGreenFolder" type="button">
+              <span class="material-symbols-outlined">folder_open</span> Mở Thư Mục Kho_Green
+            </button>
+            <button id="refreshProjectAssets" type="button">
+              <span class="material-symbols-outlined">sync</span> Làm Mới
+            </button>
+            <button class="primary" id="addGreenVideoAsset" type="button">
+              <span class="material-symbols-outlined">video_call</span> + Video Phông Xanh
+            </button>
+            <button class="primary" id="addGreenImageAsset" type="button">
+              <span class="material-symbols-outlined">add_photo_alternate</span> + Ảnh Phông Xanh
+            </button>
+            <button class="primary" id="addDisclaimerAsset" type="button">
+              <span class="material-symbols-outlined">warning</span> + Video Disclaimer
+            </button>
+          </div>
+        </div>
+
+        <div class="stitch-grid-7-5">
+          <!-- Left Column (7 Cols): Danh Sách File Trong Kho_Green -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">perm_media</span>
+                <h3>DANH SÁCH TÀI NGUYÊN TRONG KHO_GREEN</h3>
+              </div>
+              <span class="stitch-mono-tag">INDEX: SYNCHRONIZED</span>
+            </div>
+
+            <div class="stitch-search-box" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+              <div class="stitch-filter-pills" id="greenCategoryFilterPills">
+                <button type="button" class="stitch-pill active" data-green-filter="ALL">Tất Cả</button>
+                <button type="button" class="stitch-pill" data-green-filter="GREEN_VIDEO">🎬 Video Phông Xanh</button>
+                <button type="button" class="stitch-pill" data-green-filter="GREEN_IMAGE">🖼️ Ảnh Phông Xanh</button>
+                <button type="button" class="stitch-pill" data-green-filter="DISCLAIMER_VIDEO">⚠️ Disclaimer</button>
+              </div>
+              <input id="greenAssetSearchInput" placeholder="🔍 Tìm tài nguyên..." style="max-width:220px;" />
+            </div>
+
+            <div id="projectAssetList" class="list"></div>
+          </div>
+
+          <!-- Right Column (5 Cols): Xem Trước & Kiểm Tra Tài Nguyên -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">preview</span>
+                <h3>XEM TRƯỚC &amp; THÔNG SỐ CHROMA</h3>
+              </div>
+              <button class="danger" id="deleteProjectAsset" type="button" style="padding:4px 10px;font-size:11px;">
+                <span class="material-symbols-outlined" style="font-size:14px;">delete</span> Xóa Khỏi Kho
+              </button>
+            </div>
+
+            <div id="projectAssetPreview" class="asset-preview empty">
+              Chọn một tài nguyên bên trái để xem trước video/ảnh và kiểm tra đường dẫn lưu trữ.
+            </div>
+
+            <div class="gpu-note" style="margin-top:12px;">
+              <strong>💡 CHROMA PIPELINE:</strong> Mọi file thêm vào đây được tự động sao chép vào thư mục <code>Kho_Green</code> của ứng dụng. Bạn có thể chọn nhanh chúng trong <strong>Thiết kế Template</strong> hoặc <strong>Disclaimer đầu video</strong> mà không sợ mất file gốc.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 09: LỊCH SỬ KHO RENDER & QUẢN LÝ HÀNG ĐỢI (STITCH SCREEN 06)  -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-queue">
+        <div class="stitch-page-header">
+          <div class="stitch-header-left">
+            <div class="stitch-icon-box neon">
+              <span class="material-symbols-outlined">history</span>
+              <span class="corner-dot"></span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>LỊCH SỬ KHO RENDER &amp; QUẢN LÝ HÀNG ĐỢI</h2>
+                <span class="stitch-chip neon">QUEUE ENGINE ACTIVE</span>
+              </div>
+              <p class="stitch-subtitle">Theo dõi các phiên Batch đã chạy, khôi phục lô bị gián đoạn và kiểm tra báo cáo lỗi</p>
+            </div>
+          </div>
+          <div class="stitch-header-actions">
+            <button id="refreshQueue" type="button">
+              <span class="material-symbols-outlined">refresh</span> Làm Mới
+            </button>
+            <button class="primary" id="resumeBatch" type="button">
+              <span class="material-symbols-outlined">play_arrow</span> Tiếp Tục Batch Đang Dở
+            </button>
+            <button id="retryFailedBatch" type="button">
+              <span class="material-symbols-outlined">replay</span> Chạy Lại Các Video Lỗi
+            </button>
+            <button id="openBatchOutput" type="button">
+              <span class="material-symbols-outlined">folder_open</span> Mở Thư Mục Output
+            </button>
+          </div>
+        </div>
+
+        <div class="stitch-grid-5-7">
+          <!-- Left Column (5 Cols): Phiên Batch Gần Đây -->
+          <div class="panel stitch-card">
+            <div class="stitch-card-header">
+              <div class="stitch-card-title">
+                <span class="material-symbols-outlined text-neon">playlist_play</span>
+                <h3>PHIÊN BATCH GẦN ĐÂY</h3>
+              </div>
+              <span class="stitch-mono-tag">BATCH HISTORY</span>
+            </div>
+            <div class="stitch-filter-pills" id="queueBatchFilterPills" style="margin-bottom:10px;">
+              <button type="button" class="stitch-pill active" data-queue-filter="ALL">Tất cả</button>
+              <button type="button" class="stitch-pill" data-queue-filter="COMPLETED">Hoàn tất</button>
+              <button type="button" class="stitch-pill" data-queue-filter="RUNNING">Đang chạy</button>
+              <button type="button" class="stitch-pill" data-queue-filter="FAILED">Lỗi / Cảnh báo</button>
+            </div>
+            <div id="batchHistory" class="list"></div>
+          </div>
+
+          <!-- Right Column (7 Cols): Jobs Table & Reports -->
+          <div class="stitch-stack">
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">movie_info</span>
+                  <h3>DANH SÁCH TẬP TIN RENDER TRONG PHIÊN</h3>
+                </div>
+                <span class="stitch-mono-tag">JOB DETAILS</span>
+              </div>
+              <div id="queueJobs"></div>
+            </div>
+
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">assignment_late</span>
+                  <h3>BÁO CÁO TELEMETRY &amp; NHẬT KÝ HỆ THỐNG</h3>
+                </div>
+                <span class="stitch-mono-tag">DIAGNOSTICS</span>
+              </div>
+              <div id="reportList" class="list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- TAB 10: HỆ THỐNG & TĂNG TỐC PHẦN CỨNG GPU (STITCH SCREEN 03)      -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-dashboard">
+        <div class="stitch-page-header">
+          <div class="stitch-header-left">
+            <div class="stitch-icon-box neon">
+              <span class="material-symbols-outlined">developer_board</span>
+              <span class="corner-dot"></span>
+            </div>
+            <div>
+              <div class="stitch-title-inline">
+                <h2>TỔNG QUAN HỆ THỐNG &amp; TĂNG TỐC PHẦN CỨNG GPU</h2>
+                <span class="stitch-chip neon">NVIDIA CUDA / NVENC</span>
+              </div>
+              <p class="stitch-subtitle">Kiểm định phần cứng đồ họa, FFmpeg/FFprobe, VoiceStudio (:3900) và thông lượng Render</p>
+            </div>
+          </div>
+          <div class="stitch-header-actions">
+            <button id="refreshDashboard" type="button">
+              <span class="material-symbols-outlined">refresh</span> Làm Mới Hệ Thống
+            </button>
+            <button class="primary" id="refreshGpu" type="button">
+              <span class="material-symbols-outlined">memory</span> Quét Lại GPU NVIDIA
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Metric Cards Row (Stitch Screen 03) -->
+        <div class="cards stitch-metric-cards">
+          <div class="metric stitch-metric-card">
+            <div class="stitch-metric-top">
+              <span>PROJECT ARCHITECTURE</span>
+              <span class="material-symbols-outlined text-neon">folder_managed</span>
+            </div>
+            <strong id="metricProjects">0</strong>
+            <div class="stitch-mini-bar"><div class="stitch-mini-fill" style="width:75%;"></div></div>
+          </div>
+          <div class="metric stitch-metric-card">
+            <div class="stitch-metric-top">
+              <span>RENDER BLUEPRINTS</span>
+              <span class="material-symbols-outlined text-neon">dashboard_customize</span>
+            </div>
+            <strong id="metricTemplates">0</strong>
+            <div class="stitch-mini-bar"><div class="stitch-mini-fill emerald" style="width:65%;"></div></div>
+          </div>
+          <div class="metric stitch-metric-card">
+            <div class="stitch-metric-top">
+              <span>FOOTAGE REPOSITORY</span>
+              <span class="material-symbols-outlined text-neon">video_library</span>
+            </div>
+            <strong id="metricLibraries">0</strong>
+            <div class="stitch-mini-bar"><div class="stitch-mini-fill" style="width:85%;"></div></div>
+          </div>
+          <div class="metric stitch-metric-card">
+            <div class="stitch-metric-top">
+              <span>BATCH PIPELINE RUNS</span>
+              <span class="material-symbols-outlined text-neon">bolt</span>
+            </div>
+            <strong id="metricBatches">0</strong>
+            <div class="stitch-mini-bar"><div class="stitch-mini-fill emerald" style="width:92%;"></div></div>
+          </div>
+        </div>
+
+        <!-- 2-Column Matrix (5 Cols Left / 7 Cols Right — Stitch Screen 03) -->
+        <div class="stitch-grid-5-7">
+          <div class="stitch-stack">
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">memory</span>
+                  <h3>GPU &amp; NVENC ENGINE TELEMETRY</h3>
+                </div>
+                <span class="stitch-mono-tag">HARDWARE SPEC</span>
+              </div>
+              <pre id="systemDetails" class="console"></pre>
+            </div>
+
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">hub</span>
+                  <h3>CORE BINARIES &amp; LOCAL DAEMONS</h3>
+                </div>
+                <span class="stitch-mono-tag">SERVICES</span>
+              </div>
+              <div class="stitch-daemon-list">
+                <div class="stitch-daemon-item">
+                  <span>🎬 FFmpeg / FFprobe Hardware Compositor</span>
+                  <span class="badge COMPLETED">NVENC READY</span>
+                </div>
+                <div class="stitch-daemon-item">
+                  <span>🎙️ VoiceStudio OmniVoice Clone Server</span>
+                  <span class="badge COMPLETED">PORT :3900</span>
+                </div>
+                <div class="stitch-daemon-item">
+                  <span>📝 Script Studio 9-Bàn AI Engine</span>
+                  <span class="badge COMPLETED">PORT :8098</span>
+                </div>
+                <div class="stitch-daemon-item">
+                  <span>🔗 Auto-Bridge Pipeline Server</span>
+                  <span class="badge COMPLETED">PORT :3999</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stitch-stack">
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">monitoring</span>
+                  <h3>THROUGHPUT &amp; BATCH GẦN ĐÂY</h3>
+                </div>
+                <span class="stitch-mono-tag">RECENT RUNS</span>
+              </div>
+              <div id="recentBatches" class="list"></div>
+            </div>
+
+            <div class="panel stitch-card">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">rocket_launch</span>
+                  <h3>ĐIỀU HÀNH NHANH (QUICK LAUNCH)</h3>
+                </div>
+                <span class="stitch-mono-tag">SHORTCUTS</span>
+              </div>
+              <div class="stitch-quick-grid">
+                <button type="button" class="stitch-quick-card" onclick="document.querySelector('[data-page=script-studio]')?.click()">
+                  <span class="material-symbols-outlined text-neon">auto_stories</span>
+                  <strong>Viết Kịch Bản AI (9 Bàn)</strong>
+                  <small>Tạo kịch bản 7 phần &amp; tự đẩy sang Bàn #7</small>
+                </button>
+                <button type="button" class="stitch-quick-card" onclick="document.querySelector('[data-page=batch]')?.click()">
+                  <span class="material-symbols-outlined text-neon">movie_filter</span>
+                  <strong>Tạo Batch Video GPU</strong>
+                  <small>Render hàng loạt với NVENC &amp; Whisper</small>
+                </button>
+                <button type="button" class="stitch-quick-card" onclick="document.querySelector('[data-page=voice-studio]')?.click()">
+                  <span class="material-symbols-outlined text-neon">graphic_eq</span>
+                  <strong>Quản Lý Voice AI (:3900)</strong>
+                  <small>Nhân bản giọng đọc &amp; xuất WAV kịch bản</small>
+                </button>
+                <button type="button" class="stitch-quick-card" onclick="document.querySelector('[data-page=templates]')?.click()">
+                  <span class="material-symbols-outlined text-neon">dashboard_customize</span>
+                  <strong>Thiết Kế Template 16:9</strong>
+                  <small>Căn chỉnh khung hình, Green Screen &amp; Sub</small>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL & TOAST SYSTEM                                                  -->
+  <!-- ===================================================================== -->
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalTitle">Chi tiết</h3>
+        <button id="closeModal" type="button">×</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MÀN HÌNH KÍCH HOẠT & QUẢN LÝ BẢN QUYỀN THEO THÁNG (LICENSE GUARD)    -->
+  <!-- ===================================================================== -->
+  <div id="licenseLockOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(6,9,15,0.92);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:20px;">
+    <div style="width:min(620px,95vw);background:#0f172a;border:1px solid #334155;border-radius:16px;padding:24px;box-shadow:0 25px 70px rgba(0,0,0,0.65);color:#f8fafc;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="assets/zc-logo.png" alt="ZC TEAM" width="42" height="42" style="width:42px;height:42px;max-width:42px;max-height:42px;border-radius:10px;border:1px solid rgba(0,255,136,0.5);background:#000;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'" />
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;color:#00ff88;text-transform:uppercase;">BẢO VỆ BẢN QUYỀN ZC TEAM · THEO THÁNG</div>
+            <h2 id="licenseOverlayTitle" style="margin:4px 0 0 0;font-size:20px;">Kích Hoạt Bản Quyền Video Batch Studio</h2>
+          </div>
+        </div>
+        <button id="btnCloseLicenseOverlay" type="button" style="display:none;font-size:18px;padding:4px 10px;">×</button>
+      </div>
+
+      <div id="licenseOverlayBanner" style="padding:12px 14px;border-radius:10px;background:#1e293b;border:1px solid #475569;font-size:13px;line-height:1.5;margin-bottom:16px;color:#e2e8f0;">
+        Vui lòng gửi <strong>Mã Máy (Machine ID)</strong> bên dưới cho quản trị viên để nhận <strong>Mã Key Bản Quyền Tháng</strong>.
+      </div>
+
+      <div style="display:grid;gap:12px;">
+        <div style="padding:12px;background:#090d16;border:1px solid #1e293b;border-radius:10px;">
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">🖥️ MÃ MÁY CỦA BẠN (MACHINE ID — KHÓA CỨNG THEO PHẦN CỨNG MÁY):</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="licenseMachineIdInput" readonly value="Đang đọc mã phần cứng..." style="font-family:monospace;font-size:14px;font-weight:700;color:#00ff88;background:#0f172a;border-color:#059669;letter-spacing:0.06em;" />
+            <button id="btnCopyMachineId" type="button" class="primary" style="white-space:nowrap;">📋 Copy Mã Máy</button>
+          </div>
+        </div>
+
+        <div id="licenseActiveInfoBox" style="display:none;padding:12px;background:#064e3b;border:1px solid #10b981;border-radius:10px;font-size:13px;color:#ecfdf5;">
+          <div><strong>👤 Khách hàng:</strong> <span id="licInfoCustomer">—</span></div>
+          <div style="margin-top:4px;"><strong>📦 Gói bản quyền:</strong> <span id="licInfoPlan">—</span></div>
+          <div style="margin-top:4px;"><strong>⏳ Ngày hết hạn:</strong> <span id="licInfoExpiry">—</span> (<strong id="licInfoRemaining" style="color:#fde047;">—</strong>)</div>
+        </div>
+
+        <div style="padding:12px;background:#090d16;border:1px solid #1e293b;border-radius:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:#94a3b8;">🔑 CHỌN NHANH HOẶC DÁN MÃ LICENSE KEY (GIA HẠN / KÍCH HOẠT MỚI):</span>
+            <select id="licenseKeyPresetSelect" style="width:auto;min-width:250px;padding:4px 8px;font-size:11px;background:#0f172a;color:#00ff88;border:1px solid #059669;border-radius:6px;font-weight:600;">
+              <option value="">-- ⚡ Chọn tác vụ nạp Key nhanh --</option>
+              <option value="CLIPBOARD">📋 Tự động dán mã Key từ Clipboard</option>
+              <option value="CURRENT_ACTIVE">🔑 Xem lại mã Key đang kích hoạt trên máy</option>
+            </select>
+          </div>
+          <textarea id="licenseKeyInput" rows="3" placeholder="VBS1.eyJ2IjoxLCJtaWQiOi..." style="font-family:monospace;font-size:12px;background:#0f172a;color:#f8fafc;"></textarea>
+          <div id="licenseActivateError" style="display:none;color:#f87171;font-size:12px;margin-top:6px;font-weight:600;"></div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:4px;">
+          <button id="btnDeactivateLicense" type="button" class="danger" style="display:none;">🗑️ Gỡ Key Hiện Tại</button>
+          <div style="display:flex;gap:8px;margin-left:auto;">
+            <button id="btnPasteLicenseKey" type="button">📋 Dán Key từ Clipboard</button>
+            <button id="btnActivateLicenseNow" type="button" class="primary" style="padding:10px 20px;font-weight:700;">🚀 Kích Hoạt Bản Quyền</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MÀN HÌNH CẬP NHẬT TỰ ĐỘNG TỪ GITHUB (OTA UPDATE MODAL)                -->
+  <!-- ===================================================================== -->
+  <div id="otaUpdateModalOverlay" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(6,9,15,0.88);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:20px;">
+    <div style="width:min(640px,95vw);background:#0f172a;border:1px solid #10b981;border-radius:16px;padding:24px;box-shadow:0 25px 70px rgba(0,0,0,0.75),0 0 30px rgba(16,185,129,0.2);color:#f8fafc;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="assets/zc-logo.png" alt="ZC TEAM" width="42" height="42" style="width:42px;height:42px;max-width:42px;max-height:42px;border-radius:10px;border:1px solid rgba(0,255,136,0.5);background:#000;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'" />
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:0.12em;color:#00ff88;text-transform:uppercase;">HỆ THỐNG CẬP NHẬT TỰ ĐỘNG GITHUB OTA · ZC TEAM</div>
+            <h2 id="otaModalTitle" style="margin:4px 0 0 0;font-size:20px;">Kiểm Tra &amp; Cập Nhật Phiên Bản Mới</h2>
+          </div>
+        </div>
+        <button id="btnCloseOtaModal" type="button" style="font-size:18px;padding:4px 10px;">×</button>
+      </div>
+
+      <div id="otaStatusBanner" style="padding:12px 14px;border-radius:10px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.4);font-size:13px;line-height:1.5;margin-bottom:14px;color:#ecfdf5;">
+        Đang kiểm tra phiên bản mới nhất từ máy chủ GitHub...
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <div style="padding:12px;background:#090d16;border:1px solid #1e293b;border-radius:10px;">
+          <div style="font-size:11px;color:#94a3b8;">📦 PHIÊN BẢN TRÊN MÁY BẠN:</div>
+          <div id="otaCurrentVerText" style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:#e2e8f0;margin-top:4px;">V1.0.0</div>
+          <div id="otaCurrentBuildText" style="font-size:11px;color:#64748b;margin-top:2px;">Build #100</div>
+        </div>
+        <div style="padding:12px;background:#090d16;border:1px solid rgba(0,255,136,0.35);border-radius:10px;">
+          <div style="font-size:11px;color:#94a3b8;">🚀 PHIÊN BẢN MỚI NHẤT TRÊN GITHUB:</div>
+          <div id="otaRemoteVerText" style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:#00ff88;margin-top:4px;">V1.0.0</div>
+          <div id="otaRemoteDateText" style="font-size:11px;color:#34d399;margin-top:2px;">Build #100</div>
+        </div>
+      </div>
+
+      <div style="padding:12px;background:#090d16;border:1px solid #1e293b;border-radius:10px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:#00ff88;margin-bottom:8px;text-transform:uppercase;">📋 NỘI DUNG CẬP NHẬT &amp; TÍNH NĂNG MỚI (CHANGELOG):</div>
+        <div id="otaChangelogList" style="max-height:185px;overflow-y:auto;font-size:12.5px;line-height:1.6;color:#cbd5e1;padding-right:6px;">
+          —
+        </div>
+      </div>
+
+      <div id="otaProgressWrap" style="display:none;padding:12px;background:#090d16;border:1px solid #059669;border-radius:10px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">
+          <span id="otaProgressMessage" style="color:#34d399;font-weight:600;">Đang tải bản cập nhật...</span>
+          <strong id="otaProgressPct" style="color:#00ff88;font-family:monospace;">0%</strong>
+        </div>
+        <div style="height:10px;background:#1e293b;border-radius:999px;overflow:hidden;">
+          <div id="otaProgressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#10b981,#00ff88);transition:width 0.25s ease;"></div>
+        </div>
+      </div>
+
+      <div style="font-size:11.5px;color:#94a3b8;margin-bottom:14px;">
+        💡 <em>Lưu ý an toàn: Quá trình cập nhật giữ nguyên 100% Bản quyền (License Key), Project, Template, Kho Voice, Kho Green và Kịch bản đã tạo trên máy khách.</em>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <button id="btnRecheckOtaNow" type="button" style="font-size:12px;padding:8px 14px;">🔄 Kiểm tra lại</button>
+        <div style="display:flex;gap:10px;margin-left:auto;">
+          <button id="btnPostponeOtaUpdate" type="button" style="padding:10px 16px;font-weight:600;background:#1e293b;color:#e2e8f0;border:1px solid #475569;">⏳ Để Sau (Không cập nhật lúc này)</button>
+          <button id="btnApplyOtaUpdateNow" type="button" class="primary" style="padding:10px 22px;font-weight:800;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:1px solid #34d399;">🚀 Cập Nhật Ngay (Tự động tải &amp; cài đặt)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

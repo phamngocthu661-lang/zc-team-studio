@@ -1,0 +1,23 @@
+{
+  "voice_id": "10_US_Male_BlackDadCEO_Chronicles_10s",
+  "topic_id": "10",
+  "topic_name_vn": "Người cha da màu đơn thân & CEO ngầm",
+  "channel_name": "@BlackDadChronicles-b8x",
+  "channel_url": "https://www.youtube.com/@BlackDadChronicles-b8x",
+  "market": "Mỹ (US) / African-American",
+  "rpm_range": "$10 - $18",
+  "language_code": "en",
+  "language_name": "English (US - African American tone)",
+  "gender": "Nam (Male)",
+  "age_range": "40 - 50 tuổi",
+  "character_archetype": "Dorian Mercer (47 tuổi) - Tỷ phú chuỗi khách sạn Mercer Crown giả nghèo vi hành",
+  "voice_style": "Dày, ấm, vang (deep resonant), phong độ đĩnh đạc, uy quyền thầm lặng",
+  "recommended_engine": "CosyVoice 2 / F5-TTS / OmniVoice (Temperature: 0.7, Speed: 1.0)",
+  "source_timestamp_start": 53.05,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "To understand what happened that Thursday evening at Larkin Ember, you need to understand one thing about Dorian Mercer. He had not eaten at one of his own restaurants in nearly three years."
+}

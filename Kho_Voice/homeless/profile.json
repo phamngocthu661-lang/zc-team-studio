@@ -1,0 +1,12 @@
+{
+  "id": "homeless",
+  "name": "HOMELESS",
+  "language": "en",
+  "description": "",
+  "speed": 0.97,
+  "model": "omnivoice",
+  "sampleFile": "sample.mp3",
+  "vsProfileId": "583470f5",
+  "createdAt": "2026-10-14T05:43:09.317Z",
+  "updatedAt": "2026-10-30T04:29:43.196Z"
+}

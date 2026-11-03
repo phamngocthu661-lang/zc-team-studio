@@ -1,0 +1,4 @@
+Skill: Viết Giàn Ý Người Hầu
+Version: 1.1
+Status: SYNCED FOR PRODUCTION
+Contract: CURRENT FINAL TITLE → outline; shared downstream 44k–48k chars, 7,400–7,650 words, strict <8k, zero bracket TTS.

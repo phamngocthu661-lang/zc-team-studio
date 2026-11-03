@@ -1,0 +1,5 @@
+# Observed reference visuals (uploaded dataset)
+DADSFINALSAY: 16:9 horizontal; cinematic silver-haired man at right about 35–45% width; black field with many lines of high contrast white/yellow/red condensed all-caps story text at left; one physical emotion/prop (fork, boarding pass, phone, suit). Strong severe moment, expression legibility.
+HouseholdTales: mature gray-haired man at right in warm interior (dark wood/bookshelf); bold white/yellow text block left; bright cobalt-blue footer with “TRUE LIFE STORY”. That claim must NOT be repeated on fictional uploads as a literal factual assertion. Work with an honest footer such as “FATHER'S FINAL CHOICE” or omit footer for CTR test.
+
+Generate original portrait and scene appropriate to current script. No clone of specific source person's face or competitor's complete layout/text. Testing three *distinct* hypotheses useful; avoid text density impossible on mobile. Keep high contrast, 2–3 focal anchors, no decorative arrows unless they explain plot.

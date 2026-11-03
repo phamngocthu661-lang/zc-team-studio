@@ -1,0 +1,200 @@
+OPERATIONAL STATUS — HISTORICAL EVIDENCE ONLY
+This file is a raw competitor/DNA extraction. For production use, `../SKILL.md`, `SHARED_PRODUCTION_CONTRACT.md`, and the operational Master Prompt take precedence. Absolute claims inside this raw extraction are descriptive evidence, NOT mandatory rules. In particular: do not force marriage, luxury climax, police incompetence, no-mercy resolution, a messy-bun look, explicit/graphic violence, or bracketed audio cues unless the active title/outline explicitly supports them.
+
+---
+
+Dưới đây là tài liệu reverse-engineering chi tiết và toàn diện cho kênh "Mafia Boss Romance" dựa trên các nguồn transcript video được cung cấp. Bản thiết kế này phân tích sâu sắc các yếu tố tâm lý hành vi, cấu trúc nội dung và các thủ thuật tối ưu hóa tỷ lệ giữ chân người xem (retention) đặc trưng của kênh.
+
+---
+
+# CHANNEL BLUEPRINT — Mafia Boss Romance
+Số video phân tích: 5
+
+## KHÁN GIẢ & TÂM LÝ
+   Demographic: Nữ giới, độ tuổi từ 18–35+, sinh sống tại các khu vực đô thị lớn (vùng nói tiếng Anh/Mỹ là chủ yếu), có xu hướng yêu thích thể loại romance đen tối (dark romance), truyện drama kịch tính hoặc tiểu thuyết trực quan (visual novels).
+   Pain points:
+    1.  Cảm giác vô hình và không được công nhận năng lực thực tế trong môi trường công sở hoặc gia đình: Khán giả cảm thấy mình giống như những "vật trang trí" vô hại bị ngó lơ.
+    2.  Sự áp bức và bất công từ các mối quan hệ độc hại cũ hoặc gia đình thực dụng: Phải cam chịu sự áp đặt, bạo hành tinh thần hoặc thể xác mà không thể tự giải thoát.
+    3.  Gánh nặng tài chính và nợ nần đè nặng lên vai hàng ngày: Gây ra trạng thái kiệt quệ về thể chất lẫn tinh thần.
+   Khao khát thầm kín:
+    1.  Được bảo vệ tuyệt đối và vô điều kiện bởi một thế lực mạnh mẽ, vô song: Mong muốn có một người đàn ông sẵn sàng hủy diệt cả thế giới chỉ để giữ cho mình an toàn.
+    2.  Đạt được quyền lực ngang hàng (partnership) và sự tôn trọng tối thượng thay vì chỉ là kẻ lệ thuộc: Được công nhận trí tuệ và sự kiên cường chứ không chỉ là visual bên ngoài.
+   Cách kênh build trust:
+    1.  Sử dụng kiến thức nghiệp vụ thực tế cực kỳ chi tiết: Việc đan cài các thuật ngữ chuyên môn như mã ICD-10 trong y tế, quy trình kiểm toán chuyển khoản ngân hàng qua Swift log, hay thao tác sử dụng súng Glock 19 giúp bối cảnh mafia phi thực tế trở nên vô cùng chân thực và đáng tin cậy.
+    2.  Mô tả phản ứng sinh lý thực tế trước chấn thương và bạo lực: Nhân vật không "ngầu" một cách sáo rỗng; họ có sự run rẩy do sụt giảm adrenaline, nôn mửa do căng thẳng, và kiệt quệ thể xác.
+    3.  Cơ chế "Thừa nhận điểm yếu": Các nam chính mafia tối thượng chỉ hạ vũ khí và bộc lộ sự tổn thương, gạt bỏ lớp mặt nạ lạnh lùng duy nhất trước mặt nữ chính.
+
+---
+
+## UVP
+   Một câu <25 từ: Trải nghiệm biến đổi tâm lý từ nạn nhân bất lực thành cộng sự quyền lực đứng ngang hàng với kẻ thống trị thế giới ngầm.
+   Khác biệt vs competitors: 
+       Về Tone: Thay vì tone lãng mạn ngọt ngào sáo rỗng, kênh sử dụng tone lạnh lùng, thực tế, đen tối (dark & gritty) với nhịp độ căng thẳng cao.
+       Về Góc nhìn: Nữ chính không phải là "búp bê trong lồng kính" cần được cứu rỗi, mà cô ấy tự cứu mình bằng trí tuệ vượt trội (kiểm toán, y khoa, phân tích hành vi) và ép nam chính phải phục tùng năng lực của mình.
+       Về Format: Cấu trúc hội thoại mang tính đối đầu đối xứng (verbal sparring) sắc lẹm thay vì những lời đường mật.
+   Vì sao work với khán giả: Khán giả được giải tỏa tâm lý cực độ (catharsis) khi thấy một nhân vật "bị định giá thấp" sử dụng chính sự vô hình của mình làm vũ khí để kiểm soát kẻ kiểm soát cả thế giới. Sự kết hợp giữa khao khát được bảo vệ thể xác và khao khát được tôn trọng trí tuệ tạo nên một ma lực khó cưỡng.
+
+---
+
+## CONTENT PILLARS (3)
+
+### 1. Tối Hậu Quyền Lực (The Queen's Ascent)
+   Funnel position: Top of Funnel (TOF).
+   Mục đích & Đặc điểm: Thu hút lượng click lớn từ người xem mới thông qua sự tương phản cực hạn ở Thumbnail và Tiêu đề (mousy secretary/maid vs Ruthless Boss). Tập trung vào cảnh lột xác visual hoặc màn đối đầu trực diện đầu tiên khiến nam chính "câm nín".
+   Tỷ lệ ước tính: 45%.
+
+### 2. Bảo Vệ Lãnh Thổ (Territorial Protection)
+   Funnel position: Middle of Funnel (MOF).
+   Mục đích & Đặc điểm: Xây dựng sự gắn kết cảm xúc sâu sắc. Tập trung vào các phân cảnh nam chính bộc lộ sự chiếm hữu điên cuồng, nổi điên khi có kẻ chạm vào nữ chính, hoặc cảnh chăm sóc vết thương dã chiến đầy căng thẳng tình dục.
+   Tỷ lệ ước tính: 35%.
+
+### 3. Trí Tuệ Vượt Trội (The Brains of the Operation)
+   Funnel position: Bottom of Funnel (BOF).
+   Mục đích & Đặc điểm: Giữ chân tệp fan trung thành bằng sự thỏa mãn trí tuệ. Tập trung vào cảnh nữ chính giải quyết các bài toán chiến thuật, vạch trần gián điệp hoặc tối ưu hóa dòng tiền rửa tiền cho syndicate.
+   Tỷ lệ ước tính: 20%.
+
+   Cách pillars feed nhau: Pillar 1 (TOOF) mở rộng tệp người xem bằng curiosity gap cực lớn về sự lột xác, dẫn họ vào Pillar 2 để thỏa mãn khao khát được yêu thương/chiếm hữu, và giữ chân họ ở Pillar 3 bằng cách nâng tầm nữ chính thành một nhân vật có chiều sâu trí tuệ đáng nể.
+
+---
+
+## HOOK MATRIX
+
+| STT | Tên Hook | Tâm lý đánh vào | Cấu trúc câu | Ví dụ thực tế từ nguồn |
+|---|---|---|---|---|
+| 1 | Lệnh Cấm Đoán | Sợ hãi & Tò mò cực hạn | `[Hành động tự do]` + `[Mệnh lệnh cấm đoán]` + `[Khẳng định sở hữu]` | "That dress isn't leaving this house... and neither are you" |
+| 2 | Sự Im Lặng Đáng Sợ | Bất công & Trừng phạt | `[Câu hỏi bạo lực]` + `[Sự im lặng]` + `[Phản ứng căn phòng đông cứng]` | "He hurt you... Her silence made the entire room freeze" |
+| 3 | Cảnh Báo Sát Sườn | Sinh tồn & Kịch tính | `[Hành động thân mật]` + `[Tiết lộ phản bội sát sườn]` | "Your driver has a gun, don't get in the car" |
+| 4 | Tuyên Ngôn Đổi Mạng | Bất công & Phục hận | `[Hành động đe dọa]` + `[Lời hăm dọa ngược từ kẻ yếu]` | "Shout At Me Again and I'll End You" [Heading, 376] |
+| 5 | Câu Hỏi Chiếm Hữu | Ghen tuông & Kiểm soát | `[Câu hỏi về trang phục]` + `[Sự đối mặt căng thẳng]` | "Where Are You Going in That Dress?" |
+
+   Hook dominant: Hook 2 (Sự Im Lặng Đáng Sợ) là dominant nhất vì nó trực tiếp kích hoạt bản năng bảo vệ (White Knight) và chuyển hóa sự bất công của nạn nhân thành sự phẫn nộ lạnh lùng của kẻ thực thi công lý tối thượng.
+
+---
+
+## RECURRING BEATS
+1.  The Mundane Armor (Vỏ bọc cam chịu) [Vị trí: 0–15%]: Giới thiệu cuộc sống kiệt quệ, nợ nần hoặc các vết thương đang được che giấu bằng phấn trang điểm của nữ chính. Retention: Hook & Trust.
+2.  The Catalyst Collision (Va chạm định mệnh) [Vị trí: 15–35%]: Một sự cố bất ngờ ép cả hai vào một không gian hẹp hoặc một giao dịch ép buộc. Retention: Tension.
+3.  The Threat/Vulnerability Reveal (Lộ diện hiểm họa) [Vị trí: 35–60%]: Nữ chính phát hiện nam chính bị trúng độc/thương tích, hoặc ngược lại nam chính phát hiện nữ chính đang nằm trong tầm ngắm của kẻ thù. Retention: Tension & Trust.
+4.  The Tactical Leverage (Đòn bẩy trí tuệ) [Vị trí: 60–80%]: Nữ chính thực hiện một hành động mang tính chiến thuật hoặc nghiệp vụ xuất sắc (cứu mạng nam chính, vạch trần gián điệp bằng sổ sách). Retention: Payoff.
+5.  The Crown & The Dark Pact (Lên ngôi trong bóng tối) [Vị trí: 80–100%]: Nam chính đầu hàng hoàn toàn trước nữ chính, gạt bỏ khoảng cách cấp bậc và xác lập một liên minh sinh tử. Retention: Payoff & CTA.
+
+   Tổng beats trung bình: 5 beats.
+   Cao trào (Climax): Nằm ở Beat 4 (Tactical Leverage) tại 75% thời lượng video, nơi nữ chính trực tiếp ra tay giải quyết khủng hoảng.
+   Pace shift quan trọng nhất: Chuyển từ nhịp dồn dập, hỗn loạn của bạo lực/chạy trốn sang nhịp độ tĩnh lặng tuyệt đối, chậm rãi và thì thầm của sự chiếm hữu vật lý ("the slow metallic slide of a deadbolt").
+
+---
+
+## RETENTION HACKS
+   Open loops: 
+       Cách mở: Đưa ra một vết thương vật lý hoặc một vết sẹo không rõ nguyên nhân ở đầu video (vd: vết sẹo trên xương quai xanh của Leo, vết bầm tím của Norah).
+       Cách giải: Tiết lộ nguồn gốc vết thương ở giữa/cuối video trong một phân cảnh thân mật cực kỳ riêng tư.
+   Audience triggers: Đan cài các câu hỏi tu từ mang tính thách thức nhân sinh từ nam chính ở các điểm nghẹt thở: "Are you willing?", "Are you happy Nora?", "Are you deaf or just stupid?".
+   Pattern interruption / re-hook tactics: Cắt ngang các phân cảnh căng thẳng tình dục hoặc lãng mạn bằng một chi tiết chiến thuật khô khốc: waiters đi giày cao su dã chiến, hoặc âm thanh kính vỡ báo hiệu đột kích.
+   Hook fails: Insufficient data.
+
+---
+
+## NGÔN NGỮ & STYLE (CHI TIẾT CHO VOICE AI/TTS)
+   Power words/signature terms (13): deadbolt, predator, lever, asset, inhospitable, defective, viper, ozone, shroud, calculus, precision, consequence, surrender.
+   Forbidden words (Kênh né tránh): fairy tale, prince charming, destiny, helpless, savior, magic (tránh làm loãng tone u tối, thực tế của thế giới ngầm).
+   Sentence rhythm: 20% câu dài (mô tả bối cảnh, mùi hương, nhịp thở) - 50% câu trung bình (hành động, di chuyển) - 30% câu cực ngắn từ 1-3 từ đặt ở cuối các đoạn hội thoại hoặc cao trào để tạo lực nặng cơ học ("Leave them.", "Who?", "Walk.", "I do.").
+   Contractions Mỹ: Sử dụng liên tục (didn't, he'd, can't, don't) để duy trì giọng đọc tự nhiên, gãy gọn của văn phong Mỹ.
+   Dialogue style:
+       Nam chính: Giọng trầm khàn (gravelly baritone), câu thoại ngắn (<8 từ), mang tính mệnh lệnh tuyệt đối, không giải thích.
+       Nữ chính: Bình tĩnh, mỉa mai (sarcastic), sử dụng thuật ngữ chuyên môn sắc lẹm, không dùng kính ngữ phục tùng. Độ dài thoại trung bình: 10-15 từ.
+   Energy dominant: Tense (căng thẳng nghẹt thở) -> Calm-lethal (lạnh lùng tàn nhẫn khi hành động) -> Building heat (ấm nóng rực cháy ở cảnh kết).
+   Voice DNA 1 câu: Giọng nam trầm khàn, đe dọa (gravelly baritone) hòa quyện cùng giọng nữ tĩnh lặng, không một chút run sợ trước cái chết.
+
+---
+
+## TITLE & THUMBNAIL
+   Title formulas (3):
+    1.  `[Visual đối lập/Nghề nghiệp] + "Broke the Rules/Unaware" + [Mafia Boss]` (vd: "No Nurse Lasted a Week with the Ruthless Mafia Boss — Until the Poor Nurse Broke the Rules").
+    2.  `[Mệnh lệnh/Câu thoại ghen tuông] + [Mafia Boss] + [Hành động đối đầu]` (vd: "“Where Are You Going in That Dress?” the Jealous Mafia Boss Snapped at His Secretary").
+    3.  `[Lời cầu cứu/Tuyên ngôn] + "Unaware/Not Knowing" + [Mafia Boss]` (vd: "“Please… Just Dance With Me. My Ex Is Here,” She Whispered — Not Knowing He Was the Mafia Boss").
+       Length trung bình: 15–18 từ.
+   Thumbnail patterns: 
+       Color: Tương phản cực mạnh giữa bóng tối đen thẫm (vest của nam chính) và màu sắc rực rỡ mang tính chỉ dấu của nữ chính (emerald green, arterial blood red).
+       Center object: Tiêu điểm là hành động đụng chạm vật lý đầy chiếm hữu (bàn tay siết chặt cổ tay, ngón tay điều chỉnh cà vạt).
+   Title-Thumbnail relationship: Tạo ra Curiosity Gap bổ trợ: Tiêu đề kể về một tình huống drama xã hội phổ thông (gặp lại người yêu cũ, ghen tuông vì trang phục), trong khi Thumbnail hé lộ thế giới ngầm đầy nguy hiểm thông qua visual vũ khí giấu kín hoặc vết xước máu.
+
+---
+
+## CTA NGẦM
+   Vị trí: Cuối video (95–100%). Tone: Emotional & Interactive.
+   CTA patterns thực tế từ nguồn:
+    1.  "Like this video to let us know you want more dark intense mafia romance stories".
+    2.  "Share this story with your fellow dark romance readers and don't forget to subscribe".
+    3.  "Drop a comment below what was your favorite moment".
+   Cơ chế tâm lý: Tận dụng đỉnh điểm dopamine của khán giả ngay sau phân cảnh "Coronation/Kiss". CTA không xuất hiện như một lời chào mời thương mại, mà như một nơi để người xem giải tỏa cảm xúc phấn khích vừa trải qua.
+   CTA timing trick: Gắn trực tiếp vào sau câu thoại triết lý cuối cùng của câu chuyện mà không có khoảng nghỉ.
+
+---
+
+## OPPORTUNITY GAP
+1.  Đẩy xa hơn từ đối thủ: Khai thác sâu hơn yếu tố "Kiểm toán tài chính" làm đòn bẩy chiến thuật. Đối thủ thường chỉ dừng lại ở việc nữ chính làm thư ký pha trà; kênh này có thể nâng tầm bằng cách biến nữ chính thành đầu não kiểm soát dòng tiền, đóng băng tài khoản capos nổi loạn.
+2.  Chưa khai thác: Sự kết hợp giữa "Y học cấp cứu dã chiến" và "Rửa tiền". Cho phép nữ chính trực tiếp khâu vết thương cho nam chính trong khi đang đọc mã hóa tài khoản Cayman qua điện thoại.
+3.  Điểm yếu của đối thủ có thể vượt qua: Đối thủ thường lạm dụng giọng đọc AI/TTS đơn điệu. Kênh có thể vượt lên bằng cách thiết kế nhịp ngắt câu cực ngắn (1-3 từ) đặc trưng để mô tả nhịp thở và nhịp tim của nhân vật, tạo ra trải nghiệm rùng mình cơ học cho người nghe.
+
+---
+
+## REALISM & EDUCATIONAL EMBEDDING
+   Realism mechanisms: Sử dụng tên súng chính xác (Glock 19, Sig Sauer P365), chất độc thực tế (thallium/arsenic) và quy trình cấp cứu lâm sàng (khâu cơ ngực granulating, sử dụng dmsa chelating agents). Tránh deus ex machina bằng cách cho nữ chính quan sát và phát hiện lỗ hổng hệ thống trước đó (vd: xem camera an ninh bị lỗi nhịp tuần tra).
+   Knowledge layers: 
+       Y học cấp cứu: Kỹ thuật cầm cự vết thương Septic.
+       Tài chính doanh nghiệp: Rửa tiền qua thực thể Cayman và Georgetown.
+       Embed: Lồng qua các đoạn độc thoại nội tâm hoặc phân tích hành vi của nữ chính. Độ chính xác ở mức tương đối cao về mặt danh từ chuyên môn.
+   Antagonist treatment: Kẻ phản diện (Benny, Victor, Declan) không bị biếm họa một màu. Họ có động cơ tài chính và sinh tồn rất rõ ràng (giành cảng phía Nam, xiết nợ). Tuyệt đối không demonize bất kỳ nhóm sắc tộc hay tôn giáo nào ngoài đời thực.
+   YouTube integrity check: Tránh hoàn toàn các tuyên bố "Dựa trên câu chuyện có thật" giả tạo; không sử dụng các trích dẫn ngụy tạo; duy trì tính nhất quán của thế giới hư cấu.
+
+---
+
+## RECURRING BEAT MAP (Chi tiết 5 beats)
+
+### Beat 1: The Mundane Armor
+   Mục đích & Vị trí: Thiết lập hoàn cảnh kiệt quệ và năng lực che giấu của nữ chính (0–15%).
+   Nội dung điển hình: Nữ chính đứng trước gương, tỉ mỉ dùng kem che khuyết điểm Peach tone để xóa vết bầm tím trên xương hàm. Cô khoác lên mình chiếc áo len xám quá khổ để giấu đi cơ thể gầy gò.
+   Audio & Visual cues: Tiếng kim đồng hồ tích tắc nặng nề trong căn phòng tối, ánh sáng huỳnh quang nhấp nháy.
+   Dialogue mẫu: "A split lip... she could cover that with a matte dark plum lipstick".
+   Transition: Tiếng còi xe bíp nhẹ hoặc tiếng deadbolt mở báo hiệu nam chính xuất hiện.
+
+### Beat 2: The Catalyst Collision
+   Mục đích & Vị trí: Tạo va chạm vật lý đầu tiên ép buộc hai nhân vật vào nhau (15–35%).
+   Nội dung điển hình: Nữ chính bị ép phải chỉnh cà vạt cho nam chính trong phòng thay đồ chật hẹp, ngửi thấy mùi gỗ tuyết tùng và adrenaline.
+   Audio & Visual cues: Cận cảnh bàn tay chạm vào xương quai xanh, tiếng vải silk ma sát sột soạt.
+   Dialogue mẫu: "Your driver has a gun... don't get in the car".
+   Transition: Nam chính ra lệnh đóng cửa hoặc lùi xe đột ngột.
+
+### Beat 3: The Threat/Vulnerability Reveal
+   Mục đích & Vị trí: Hé lộ vết thương thể xác của nam chính hoặc nguy cơ bị ám sát của nữ chính (35–60%).
+   Nội dung điển hình: Nữ chính phát hiện vũng máu loang lổ trên sàn gỗ từ vết thương giấu kín của nam chính dưới bàn ăn.
+   Audio & Visual cues: Tiếng rên rỉ trầm đục nén đau, vệt nước mưa lách tách ngoài cửa sổ.
+   Dialogue mẫu: "You are going into hypoalmic shock... show me".
+   Transition: Nữ chính mở hộp cứu thương dã chiến.
+
+### Beat 4: The Tactical Leverage
+   Mục đích & Vị trí: Nữ chính sử dụng chuyên môn để cứu vãn tình thế nguy cấp (60–80%).
+   Nội dung điển hình: Nữ chính vạch trần gián điệp ngay tại bàn đàm phán mỉa mai bằng cách chỉ ra sự bất khớp trong báo cáo Swift log.
+   Audio & Visual cues: Tiếng lật tài liệu dứt khoát, tiếng thở dốc hốt hoảng của kẻ phản bội.
+   Dialogue mẫu: "You are skimming from your own cartel bosses, Javier".
+   Transition: Tiếng súng nổ suppressed trầm đục dọn dẹp hiện trường.
+
+### Beat 5: The Surrender & Coronation
+   Mục đích & Vị trí: Liên minh bóng tối được thiết lập, nam chính thừa nhận sự sở hữu (80–100%).
+   Nội dung điển hình: Nam chính áp sát nữ chính vào tường gỗ, tháo bỏ những chiếc ghim cài tóc cuối cùng để tóc nàng xõa xuống tự do.
+   Audio & Visual cues: Ánh trăng chiếu qua lớp kính bulletproof, tiếng tim đập chậm rãi, vững chãi.
+   Dialogue mẫu: "You aren't just my wife... you're my partner".
+   Transition: Dẫn thẳng vào màn hình đen và âm thanh nhạc nền outtro kèm CTA.
+
+---
+
+## ANTI-PATTERNS (5)
+1.  Tuyệt đối không để nữ chính khóc lóc cầu xin sự cứu giúp mà không tự mình hành động trước: Sự yếu đuối vô dụng sẽ giết chết tính kịch tính của format.
+2.  Tuyệt đối không sử dụng bạo lực vô cớ của nam chính lên nữ chính: Sự căng thẳng là territorial & protective (chiếm hữu và bảo vệ), không phải là lạm dụng.
+3.  Tuyệt đối không bỏ qua các chi tiết vật lý thực tế: Nhân vật không thể bắn súng mà không bị giật nảy vai, bị phồng rộp tay, hoặc run rẩy khi adrenaline tụt.
+4.  Tuyệt đối không cho nam chính giải thích dông dài trong lúc chiến đấu: Mọi mệnh lệnh phải gãy gọn, lạnh lùng.
+5.  Tuyệt đối không có kết thúc "màu hồng cổ tích": Kết thúc luôn là sự đồng thuận trong bóng tối ngầm ("two monsters perfectly content in the dark").
+
+---
+
+Blueprint extraction complete. Sẵn sàng feed vào PROMPT 1.

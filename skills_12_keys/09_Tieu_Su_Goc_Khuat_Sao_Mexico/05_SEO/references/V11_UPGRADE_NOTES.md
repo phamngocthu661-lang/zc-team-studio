@@ -1,0 +1,5 @@
+# V1.1 STEP 6 — STRONG QA / SEO CROSS CHECK
+- Mandatory `python scripts/mexico_tools.py qa-check-strict --dir DELIVERY_FOLDER` before STEP6. Legacy `seo-check` alone insufficient. Hold SEO when QA_FINAL uses V1 schema or body count mismatches; re-seal metadata from measured script once review is valid, never edit script to fix bookkeeping.
+- Publish packaging claims must map to CLAIM_LEDGER and source citations. A 2-accident headline with limited/contested first record cannot appear in description as a conclusively verified firsthand finding; add honest attribution and reflect in thumbnail.
+- Verify no '100% archival photograph' claims when actually illustrative, rights/license of image/voice/music, no invented legal/medical documents. Thumbnail ABC should each have distinct source-backed hook and short mobile-first es-MX copy; A/B/C winners editorial hypotheses only.
+- The 12 SEO items, exact locked title, final script SHA and names must pass `audit-run --dir DELIVERY_FOLDER`; no declaration that TTS runtime 45–55min has been measured without audio test.

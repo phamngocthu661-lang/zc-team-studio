@@ -1,0 +1,2 @@
+# REQUIRED CROSS-SKILL CONTRACT
+Read `SHARED_CROSS_SKILL_CONTRACT_WRV_V1.md` and `WRV_US_STEP_CONTROLLER_V1.md` from the included `references/` folder (or bundle root). Per-video `LOCKED_TITLE`, `STORY_DNA`, original `CURRENT_FINAL_OUTLINE.txt`, canon ledger, `video_id`, source hashes, and most recent QA freeze always travel across steps. Machine checks prove source/format only; creative output must be genuinely produced and independently read. One repair per video_id, no exceptions.

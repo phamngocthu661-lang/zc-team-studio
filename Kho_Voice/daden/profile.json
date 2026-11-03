@@ -1,0 +1,12 @@
+{
+  "id": "daden",
+  "name": "DADEN",
+  "language": "en",
+  "description": "",
+  "speed": 0.96,
+  "model": "omnivoice",
+  "sampleFile": "sample.mp3",
+  "vsProfileId": "7d2dda84",
+  "createdAt": "2026-10-14T05:42:47.269Z",
+  "updatedAt": "2026-10-30T06:21:28.892Z"
+}

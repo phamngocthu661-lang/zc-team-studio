@@ -1,0 +1,5 @@
+# V1.1 STEP 1 — TITLE PROOF before CTR
+- Do not lock a numeral headline ("DOS ACCIDENTES", years, durations, quantities) without `TITLE_CLAIM_PROOF` table with event, date, at least two sources when possible, source independence, contemporaneous vs retrospective status, conflicting official claims, title support PASS/LIMITED/FAIL.
+- If a contemporaneous reference mentions "two prior incidents" as part of a rumor about a *cause*, distinguish whether it independently verifies the count. Check historical official biographies for contradictions; do not claim verified based only on reused syndication.
+- If evidence is insufficient for absolute promise, present a truthful, high-curiosity revised title (e.g. "Las crónicas de dos accidentes antes del último vuelo") in the same Step1, NOT a silent title change in Step2+.
+- Keep exactly 5 candidate scores when feasible, user title ≤100 Unicode, title history check. A numeric absolute claim can fail factual gate regardless of 96/100 editorial score.

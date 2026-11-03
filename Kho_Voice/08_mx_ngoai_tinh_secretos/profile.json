@@ -1,0 +1,15 @@
+{
+  "id": "08_mx_ngoai_tinh_secretos",
+  "name": "08. Secretos y Traición — Ngoại Tình Phản Bội Mexico",
+  "language": "es",
+  "description": "[Key: 08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico] Người vợ thượng lưu bị phản bội, quan sát kẻ thù trong bữa tiệc xa hoa — Kịch tính, sang trọng, hồi hộp nghẹt thở, sắc sảo quyến rũ",
+  "personality": "Người vợ thượng lưu bị phản bội, quan sát kẻ thù trong bữa tiệc xa hoa. Kịch tính, sang trọng, hồi hộp nghẹt thở, sắc sảo quyến rũ",
+  "refText": "era la única persona en el mundo capaz de convertir la compra de un traje en una operación militar. Esta noche, se veía muy bien en él, la mujer de su brazo se veía aún mejor.",
+  "channelKey": "08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico",
+  "speed": 1.0,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "e28f6aac",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

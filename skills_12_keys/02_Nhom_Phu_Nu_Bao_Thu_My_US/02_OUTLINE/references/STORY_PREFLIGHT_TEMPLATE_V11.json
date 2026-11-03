@@ -1,0 +1,322 @@
+{
+  "schema": "WRV_STORY_PREFLIGHT_V1_1",
+  "locked_title": "<COPY EXACT LOCKED TITLE <= 100 CHARS>",
+  "primary_dna": "IRON_ROSE",
+  "narrator": "<adult American woman narrator + background>",
+  "state_jurisdiction": "<state and county; court division>",
+  "promise": {
+    "explicit_claim": "<exact headline promise>",
+    "payoff_owner": "<named witness/record mentioned in title>",
+    "owner_evidence": "<specific non-substitutable item/observation>",
+    "irreplaceable_role": "<why no other witness could replace it>",
+    "setup_part": 2,
+    "payoff_part": 6,
+    "observed_payoff": "<what changes visibly in Part 6>",
+    "remedy_basis": "<facts and legal standard that plausibly produce the remedy>"
+  },
+  "parts": [
+    {
+      "part": 1,
+      "scenes": [
+        {
+          "scene_id": "P1S1",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P1S2",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P1S3",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        }
+      ]
+    },
+    {
+      "part": 2,
+      "scenes": [
+        {
+          "scene_id": "P2S1",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P2S2",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P2S3",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        }
+      ]
+    },
+    {
+      "part": 3,
+      "scenes": [
+        {
+          "scene_id": "P3S1",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P3S2",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P3S3",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        }
+      ]
+    },
+    {
+      "part": 4,
+      "scenes": [
+        {
+          "scene_id": "P4S1",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P4S2",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P4S3",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        }
+      ]
+    },
+    {
+      "part": 5,
+      "scenes": [
+        {
+          "scene_id": "P5S1",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P5S2",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P5S3",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        }
+      ]
+    },
+    {
+      "part": 6,
+      "scenes": [
+        {
+          "scene_id": "P6S1",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P6S2",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P6S3",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        }
+      ]
+    },
+    {
+      "part": 7,
+      "scenes": [
+        {
+          "scene_id": "P7S1",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P7S2",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        },
+        {
+          "scene_id": "P7S3",
+          "trigger": "<new cause>",
+          "decision": "<adult woman action>",
+          "state_before": "<what she knew/controlled>",
+          "state_after": "<changed fact/control>",
+          "new_fact": "<new evidence or contradiction>",
+          "cost": "<time/money/trust/relationship cost>",
+          "next_question": "<specific open loop>"
+        }
+      ]
+    }
+  ],
+  "agency_ledger": [
+    {
+      "part": 1,
+      "her_action": "<unique responsible decision>",
+      "direct_consequence": "<measurable consequence>"
+    },
+    {
+      "part": 2,
+      "her_action": "<unique responsible decision>",
+      "direct_consequence": "<measurable consequence>"
+    },
+    {
+      "part": 3,
+      "her_action": "<unique responsible decision>",
+      "direct_consequence": "<measurable consequence>"
+    },
+    {
+      "part": 4,
+      "her_action": "<unique responsible decision>",
+      "direct_consequence": "<measurable consequence>"
+    },
+    {
+      "part": 5,
+      "her_action": "<unique responsible decision>",
+      "direct_consequence": "<measurable consequence>"
+    },
+    {
+      "part": 6,
+      "her_action": "<unique responsible decision>",
+      "direct_consequence": "<measurable consequence>"
+    },
+    {
+      "part": 7,
+      "her_action": "<unique responsible decision>",
+      "direct_consequence": "<measurable consequence>"
+    }
+  ],
+  "runtime_fit": {
+    "target_body_chars": 76000,
+    "unique_major_reversals": [
+      "<credible midpoint evidence reversal>",
+      "<credible human/authority counter move>"
+    ],
+    "why_unique_plot_supports_length": "<list distinct scene dilemmas and why not repetitive>"
+  },
+  "legal_research": {
+    "outcome_determinative": true,
+    "claims": [
+      {
+        "claim": "<specific statutory or regulatory proposition>",
+        "jurisdiction": "<state/federal/agency>",
+        "story_application": "<how claim maps to invented facts>",
+        "source_type": "primary",
+        "source_url": "https://legislature.example.org/actual-section",
+        "verified_on": "2026-11-01"
+      }
+    ]
+  }
+}

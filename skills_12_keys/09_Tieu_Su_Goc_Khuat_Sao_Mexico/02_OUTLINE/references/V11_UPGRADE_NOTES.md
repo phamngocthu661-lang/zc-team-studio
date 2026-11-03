@@ -1,0 +1,6 @@
+# V1.1 STEP 2 — SOURCE + RETENTION PREFLIGHT
+- Mandatory `SOURCE_CONFLICT_MATRIX`: claim ID, each source's exact wording, primary/secondary, year, independent evidence, contradiction, chosen narrative wording, residual limitation. Record `TITLE_CLAIM_PROOF` inherited from Step1. Require 2+ material distinct sources for headline incident where feasible.
+- Count source-backed specific milestones/actions per Part, not just philosophical interpretation. At least 1 distinctive dated/publicly anchored event or work per Part; if Part 4 contains solely abstract source criticism, redesign before writing. Use source-backed humanity (reactions, works, consequences) without false private dialogue.
+- Seven Part beats MUST differ. Repetition test outline: no scene/claim repeated in >2 Part unless doing verifiable setup→payoff from a different angle.
+- Intro answer: 0–90 sec incident + precise conflict + question; by first 5–7 minutes provide first tangible source-supported answer. Every subsequent 5–7 mins add a genuine public action, specific film/work, dispute, testimony or chronology advancement. No recycled unanswered tease.
+- Budget flex within 40–49k char only if the source density is credible. Runtime remains unknown until TTS. "insufficient source material" is a valid block.

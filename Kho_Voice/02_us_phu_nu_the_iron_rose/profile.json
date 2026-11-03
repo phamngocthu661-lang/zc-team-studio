@@ -1,0 +1,15 @@
+{
+  "id": "02_us_phu_nu_the_iron_rose",
+  "name": "02. The Iron Rose — Phụ Nữ Báo Thù US",
+  "language": "en",
+  "description": "[Key: 02_Nhom_Phu_Nu_Bao_Thu_My_US] Nữ quân nhân cựu binh / Người mẹ bị con gái ruồng rẫy theo mẹ kế — Điềm tĩnh, sắc bén, kiểm soát cảm xúc tuyệt đối, nội lực thâm trầm",
+  "personality": "Nữ quân nhân cựu binh / Người mẹ bị con gái ruồng rẫy theo mẹ kế. Điềm tĩnh, sắc bén, kiểm soát cảm xúc tuyệt đối, nội lực thâm trầm",
+  "refText": "Her name is Emily, she's 22, married to a good young man named Nathan Brooks, and living about 15 minutes from me. We talked about Christmas dinner the previous Sunday.",
+  "channelKey": "02_Nhom_Phu_Nu_Bao_Thu_My_US",
+  "speed": 1.0,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "bcd64447",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

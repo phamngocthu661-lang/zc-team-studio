@@ -1,0 +1,59 @@
+{
+  "skill_dirs": 5,
+  "skill_files": {
+    "01_TITULOS_MEXICO": 10,
+    "02_ARQUITECTURA_MEXICO": 11,
+    "03_ESCRITOR_MEXICO": 20,
+    "04_AUDITOR_MEXICO": 19,
+    "05_SEO_MEXICO": 16
+  },
+  "script_files": [
+    "test_v1_tools.py",
+    "test_minor_score_gate.py",
+    "05_SEO_MEXICO/scripts/verify_seo_ready.py",
+    "04_AUDITOR_MEXICO/scripts/freeze_repair_contract.py",
+    "04_AUDITOR_MEXICO/scripts/record_qa_lessons.py",
+    "04_AUDITOR_MEXICO/scripts/qa_checkpoint.py",
+    "03_ESCRITOR_MEXICO/scripts/apply_authorized_patches.py",
+    "03_ESCRITOR_MEXICO/scripts/segment_workflow.py",
+    "03_ESCRITOR_MEXICO/scripts/verify_full_script.py"
+  ],
+  "compileall": true,
+  "old_homeless_named_paths": [],
+  "test_v1_tools.py": {
+    "returncode": 0,
+    "output": "{\n  \"passed\": true,\n  \"cases\": 22,\n  \"fixture_type\": \"synthetic structural source, NOT a completed literary QA\",\n  \"body_chars\": 74547,\n  \"draft_manifest\": \"v2 title+outline bound\",\n  \"qa_checkpoint_unfilled_rejected\": true,\n  \"qa_scoped_windows\": \"verified\",\n  \"immutable_spans\": \"byte-identical\",\n  \"QA_readiness\": \"synthetic format validated only, NOT editorial score/approval\"\n}",
+    "stderr": ""
+  },
+  "test_minor_score_gate.py": {
+    "returncode": 0,
+    "output": "{\n  \"synthetic_gate_pass\": true,\n  \"ready_score_98\": true,\n  \"invalid_minor_3_rejected\": true,\n  \"body_chars\": 74627,\n  \"editorial_QA_performed\": false\n}",
+    "stderr": ""
+  },
+  "outputs": {
+    "01_TITULOS_MEXICO": {
+      "path": "/mnt/data/01_TITULOS_MEXICO.zip",
+      "bytes": 17242
+    },
+    "02_ARQUITECTURA_MEXICO": {
+      "path": "/mnt/data/02_ARQUITECTURA_MEXICO.zip",
+      "bytes": 22649
+    },
+    "03_ESCRITOR_MEXICO": {
+      "path": "/mnt/data/03_ESCRITOR_MEXICO.zip",
+      "bytes": 31681
+    },
+    "04_AUDITOR_MEXICO": {
+      "path": "/mnt/data/04_AUDITOR_MEXICO.zip",
+      "bytes": 30883
+    },
+    "05_SEO_MEXICO": {
+      "path": "/mnt/data/05_SEO_MEXICO.zip",
+      "bytes": 22153
+    },
+    "MASTER": {
+      "path": "/mnt/data/MEXICO_FAMILY_SKILLS_V1_FULL.zip",
+      "bytes": 148091
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "04_mx_ong_gia_padre_implacable",
+  "name": "04. Padre Implacable — Ông Già Trừng Trị Mexico",
+  "language": "es",
+  "description": "[Key: 04_Nhom_Ong_Gia_Trung_Tri_Mexico] Người cha già sắt đá (Padre Implacable) bị con ruột đuổi ra nhà kho — U uất, đanh thép, nghiêm nghị, uy quyền phụ hệ không khoan nhượng",
+  "personality": "Người cha già sắt đá (Padre Implacable) bị con ruột đuổi ra nhà kho. U uất, đanh thép, nghiêm nghị, uy quyền phụ hệ không khoan nhượng",
+  "refText": "a la seis y cuarto de la mañana, mientras yo estaba tumbado en un cattre, en la cochera de la casa de mi hijo, con una tos que sonaba a tornillos sueltos dentro de una lata.",
+  "channelKey": "04_Nhom_Ong_Gia_Trung_Tri_Mexico",
+  "speed": 1.0,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "1355e7b4",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

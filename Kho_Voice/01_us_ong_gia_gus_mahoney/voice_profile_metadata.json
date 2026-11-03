@@ -1,0 +1,23 @@
+{
+  "voice_id": "01_US_Male_OldMan_GusMahoney_DADSFINALSAY_10s",
+  "topic_id": "01",
+  "topic_name_vn": "Ông già trả đũa & Lòng tự trọng người cha",
+  "channel_name": "@DADSFINALSAY",
+  "channel_url": "https://www.youtube.com/@DADSFINALSAY",
+  "market": "Mỹ (US) / Toàn cầu",
+  "rpm_range": "$10 - $20",
+  "language_code": "en",
+  "language_name": "English (US)",
+  "gender": "Nam (Male)",
+  "age_range": "60 - 65 tuổi",
+  "character_archetype": "Gus Mahoney - Người cha già công nhân kỳ cựu Toledo, chất phác, kiên cường",
+  "voice_style": "Trầm ấm, khàn nhẹ (gravelly), đĩnh đạc, mộc mạc, đậm chất lão niên Mỹ",
+  "recommended_engine": "CosyVoice 2 / F5-TTS / OmniVoice (Temperature: 0.7, Speed: 1.0)",
+  "source_timestamp_start": 87.1,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "I didn't know how to do any of it. I didn't know how to buy a girl a winter coat, or what to say when she cried with the bathroom door locked, or how to cook anything that didn't come in a box."
+}

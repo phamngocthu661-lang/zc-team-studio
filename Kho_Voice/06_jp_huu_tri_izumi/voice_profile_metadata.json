@@ -1,0 +1,23 @@
+{
+  "voice_id": "06_JP_Female_PensionKuchikomi_Izumi_10s",
+  "topic_id": "06",
+  "topic_name_vn": "Tâm sự hưu trí & Việc làm tuổi già (Kuchikomi)",
+  "channel_name": "@izumi_kuchikomi",
+  "channel_url": "https://www.youtube.com/@izumi_kuchikomi",
+  "market": "Nhật Bản (Japan)",
+  "rpm_range": "$6 - $12",
+  "language_code": "ja",
+  "language_name": "Japanese (Nhật Bản)",
+  "gender": "Nữ (Female)",
+  "age_range": "50 - 65 tuổi",
+  "character_archetype": "Izumi - Giọng đọc tâm sự hưu trí, đời sống chung cư tập thể (Danchi)",
+  "voice_style": "Nhẹ nhàng, mộc mạc, điềm đạm, lắng đọng, tạo sự đồng cảm sâu sắc",
+  "recommended_engine": "CosyVoice 2 / F5-TTS / OmniVoice (Temperature: 0.6, Speed: 0.95)",
+  "source_timestamp_start": 61.5,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "だが、安い家に入るのに、金が掛かるとは思っていなかった。 引っ越しの日に、もう一回引っ越し台を払う家。"
+}

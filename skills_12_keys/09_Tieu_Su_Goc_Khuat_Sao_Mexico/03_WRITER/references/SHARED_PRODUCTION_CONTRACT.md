@@ -1,0 +1,50 @@
+# SHARED PRODUCTION CONTRACT — MEXICO CELEBRITY V1.0
+
+Applies to ALL five Skills. This replaces, for this genre only, the Mafia/HomeLESS fictional-fiction contracts. Do not load rules from other genres into this workflow.
+
+## 1. Mission, language, video style
+- Genre: mini-documental biográfico / tras la fama / controversias documentadas / historia y legado de artistas y presentadores, targeted to audiences in Mexico and Spanish-language Latin America.
+- Research, QA explanation, operator-facing routing: Vietnamese. ALL publish-facing titles, narration, SEO, thumbnail text, trailer narration: idiomatic **español de México**; preserve accents (á é í ó ú ñ), native grammar and consistent names. English competitor titles are market signals, NOT output language defaults.
+- Target finished narration: approximately 45–55 minutes depending on TTS; target 42,000–48,000 Spanish Unicode characters (40,000–49,000 hard range) and ~6,800–8,000 narrative words as an approximate secondary control, not a substitute for TTS test. Never assert time derived from characters alone.
+- 7 Part documentary chapters, 3-stage authoring: A=Part1–2, B=Part3–5, C=Part6–7; final script exact concatenation. Only explicit command executes its step. Narration should feel gripping, sympathetic where appropriate, analytically balanced, never like a list of insults.
+
+## 2. Ground truth: people are real, unlike HOMELESS / MAFIA fiction
+- DO NOT infer facts from competitor title, description, AI image, or video narration. This competitor corpus has dramatic claims, and may include fictionalized/speculative language. Use it for click packaging and pacing only.
+- Categorize EVERY material narrative claim into `VERIFIED`, `ATTRIBUTED/CONTESTED`, `INFERENCE` (non-accusatory only), or `UNSUPPORTED`. An `UNSUPPORTED` adverse allegation is BLOCKED and must be omitted rather than presented as fact. Conjectural explanations of private motives, cheating, violence, crimes, intimate/sexual conduct, substance use, family relationships or medical diagnosis are NEVER narrated as established fact.
+- For allegations, reputational harm or sensitive personal matters: seek trustworthy independent reporting plus direct statements/documents where feasible; two independent credible sources as an operational standard, noting if absent. Attribution and relevant denials/context are mandatory. Two stories repeating a single allegation are not independent corroboration. Don't treat a press release, memoir or self-reported statement as confirmation of all underlying events.
+- Chronology, dates, ages, divorce/court outcomes, death causes, net worth, medical details: only assert when supported by reputable, attributable sources; retain source URL/title/publisher/date/access date and direct quotation no longer than necessary. Prefer primary interviews, official records, contemporary reports, major news outlet archives; consider source recency and corrections. No fake citations/links/documents. Source access unavailable => `RESEARCH_REQUIRED` on the unsupported aspects.
+- No fabricated quotes/dialogues, unseen conversations, unverified diaries/papers, staged evidence, made-up first-person internal monologues, or impersonation of a living figure as a real sound recording. Reconstructed sequence can be paraphrased with transparent qualifiers but never presented as secretly witnessed evidence.
+- Respect distinctions: singer's public career versus private person, accusation vs finding, factual event vs interpretation, association vs culpability. Avoid victim-blaming, prejudice and graphic gratuitous details. No private addresses, identifiable minors' details or invasive photos.
+
+## 3. Immutable handoff (same six-step system)
+- `step1` TITLE: candidate titles + 100-point scoring + one `LOCKED_TITLE` (exact text), `TITLE_ANCHORS`, `SOURCE_STATUS`, `FAMILY`, `FACT_LEDGER_DRAFT`, title history check.
+- `step2` OUTLINE: 7-Part, source audit, master timeline, causal links, verification matrix, outline file; no prose script.
+- `step3` WRITER: 3 explicit calls A/B/C, TTS-ready Spanish documentary narration in 7 Parts; preserve verified facts; exact assembly; no invented allegations. `SCRIPT_MANIFEST.json` binds title and outline hash.
+- `step4` INDEPENDENT QA: ONE complete logic/fact/Spanish spelling pass; freeze one patch ledger (or READY) only. No prose revision by QA.
+- `step5` WRITER ONE-SHOT REPAIR: apply ALL authorized logic/orthography/grammar patches in **ONE** single batch; NEVER loop to additional script edits within same run. No creative expansion. Verified revision, mark `repair_used=true`. A postrepair structural+source verification is not a second rewrite.
+- `step6` SEO: only exact QA-approved latest script SHA256, locked primary title, two alternatives, full SEO and 3 thumbnail A/B/C prompt concepts + opening 8s trailer.
+- Each step may accept latest explicit source files or a verified exact prior-turn artifact. Missing material source is a real BLOCK; never invent missing file, hash, source proof, state, or count. Tool-unavailable: clearly identify manual/unverified statuses.
+
+## 4. Identity, artifacts and authority
+- Canonical title cannot change after Step1 except a new explicitly requested Step1 episode. `title_sha12=SHA256(UTF8 title)[:12]`; `outline_sha256=SHA256(exact outline bytes)`; `video_id=SHA256(UTF8(title+"\n"+outline_sha256))[:16]`. Title text counts Unicode code points, not bytes.
+- Naming: `MEX_<title_sha12>_OUTLINE.md`, `MEX_<title_sha12>_SCRIPT_A.txt`, `_SCRIPT_B.txt`, `_SCRIPT_C.txt`, `FULL_SCRIPT.txt`, `SCRIPT_MANIFEST.json`, `QA_REPORT.md`, `QA_PATCHES.json`, `FULL_SCRIPT_REVISED.txt`, `QA_FINAL.json`, `SEO_PACK.md`.
+- Exact file SHA256 is provenance proof only. It does not prove facts, real-world claims, originality, or story quality.
+- Handoff title, outline and all artifacts must correspond to SAME person, same focus and same title_sha12/video_id. An AI should not claim a script reached 45–55 min without validating its actual TTS audio.
+- Hard priorities: current user explicit scope > this shared contract > selected Skill `SKILL.md` > selected references > raw competitor metadata. For truth claims, credible original evidence always outranks competitor content.
+
+## 5. Completion and output integrity
+- A finished document may only claim `PASS` when the corresponding real checks were completed. Do not print fabricated scores, word counts, SHA256, verified sources or QA status.
+- Violations blocking release: unverified harmful claim; contradictory central dates; wrong person; violated locked title; made-up corroborating sources; substantial typos still present; wrong script file/version; unauthorized second repair; headline/thumbnail materially contradicts verified evidence.
+- QA scoring for clarity: `MAX 100`; critical factual/source errors block regardless numeric score; unresolved significant chronology or language errors block. After a single authorized repair, `PASS_READY` requires QA score >=97 and zero unresolved critical/major actionable findings. If not achieved, mark `BLOCKED_AFTER_ONE_REPAIR` without another repair within that run. The final score is manually justified, never calculated solely from an issue list.
+
+
+## V1.1 HARDENED RELEASE CONTRACT (2026-11-01)
+- 5 Skills / 6 STEPS, exact legacy skill directory names, artifact names and handoff remain unchanged. Title immutable; 7 Spanish Parts; A/B/C assembly; ONE batch Step5; ONE read-only final verification. No second creative/script rewrite.
+- All canonical numbers are generated by `mexico_tools.py count --file ACTUAL_FILE` (`body_chars` exactly), not hand copied or recomputed by ad-hoc trimming. QA_FINAL body_chars/words MUST match the exact final script hash. If mismatch, `BLOCKED_METADATA_INTEGRITY` despite apparent 98/100.
+- Source truth is a separate, nonautomated editorial gate. A title with numerals, incidents, absolute causation or 'reveal' requires a `TITLE_CLAIM_PROOF` citing the strongest independent sources, opposing sources and confidence; where material disagreement remains, weaken the title or hold the lock. Source being indexed does not mean it was actually read. A reported retrospective event must not be called an undisputed archive finding.
+- Research must distinguish document date vs event date; original investigation vs newspaper reporting vs syndicated republication; archive source vs derivative aggregation; competing named casualties and count discrepancy; official archive errors are possible. Do not infer eyewitness certainty from an article published decades later.
+- Scriptability gate checks event diversity, direct documented actions/choices, chronological payoff and source-supported emotional stakes; anti-padding check before writing. Do not fill ~45 minutes with repetitive discussions of 'the sources' if concrete biographical events cannot sustain the runtime.
+- STEP4 focuses on logic/chronology/fact attribution and Spanish orthography; optionally record NON-PATCH quality warnings for pacing, repeated boilerplate or generic rhetoric, with concrete Part/anchor. Any necessary content changes should be resolved in Step2/Step3 BEFORE freeze; do not add new stylistic rewrite rounds.
+- STEP5 single frozen patch batch; metadata corrections after STEP5 can be generated from measured files WITHOUT touching narration, but no script edit or second batch is authorized. Portable artifact re-verification must replay byte patches on actual baseline and compare the resulting bytes, not trust a JSON assertion.
+- STEP6 requires `qa-check-strict --dir <package_dir>` PASS from a V1.1 `qa-seal` output plus human-reviewed source proof. No mere self-declared PASS_READY JSON is sufficient. `audit-run` is a diagnostic: its `ok` means structural/integrity checks only. Check exact locked title, 12 SEO items, claims and thumbnail promises, license provenance and playback check before publication.
+- A manifest may carry historic absolute source paths, but a transported delivery archive must be self-contained: verify using local filenames and SHA in the package, not original `/mnt/data/...` path.

@@ -1,0 +1,23 @@
+{
+  "voice_id": "05_JP_Male_SalarymanComic_Orewadokushin_10s",
+  "topic_id": "05",
+  "topic_name_vn": "Manga Cuộc sống Đàn ông độc thân Nhật Bản",
+  "channel_name": "@Orewadokushin",
+  "channel_url": "https://www.youtube.com/@Orewadokushin",
+  "market": "Nhật Bản (Japan)",
+  "rpm_range": "$5 - $10 (Tệp xem cực trung thành)",
+  "language_code": "ja",
+  "language_name": "Japanese (Nhật Bản)",
+  "gender": "Nam (Male)",
+  "age_range": "35 - 51 tuổi",
+  "character_archetype": "Kuroda Chuichi (51 tuổi) - Nhân viên bình thường làm việc 27 năm độc thân",
+  "voice_style": "Trầm tính, tự sự đời thường, biểu cảm manga voice comic giàu chân thật",
+  "recommended_engine": "CosyVoice 2 / F5-TTS / OmniVoice (Temperature: 0.65, Speed: 1.0)",
+  "source_timestamp_start": 47.1,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "俺がこの会社に入って27年にな、51世になった今、 出世という言葉は、もう自分とは電のないものだと思っていた。"
+}

@@ -1,0 +1,14 @@
+Skill: Viết-Seo-Người-Hầu
+Slug: viet-seo-nguoi-hau
+Version: V1.3
+Status: LOCKED FOR PRODUCTION
+Title policy: LOCKED PRIMARY TITLE + EXACTLY 2 NEW/SUPPORTING TITLES (≤100 visible chars each)
+Default full output: EXACTLY 12 TOP-LEVEL SECTIONS
+Internal diagnostics visible by default: no
+Primary title scoring/rewrite: disabled by default
+Supporting title ranking/scoring: disabled by default; allowed only on explicit request
+Historical competitor title records bundled: 106
+Competitor corpus production use: disabled by default; optional explicit title-similarity audit only
+Includes source spec: yes (historical baseline)
+Includes raw scripts: no (locked classifier is embedded; no re-research required per video)
+Includes raw thumbnail PDFs: no (A visual grammar is summarized; B/C remain insufficient data)

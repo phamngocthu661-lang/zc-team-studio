@@ -1,0 +1,15 @@
+{
+  "id": "01_us_ong_gia_gus_mahoney",
+  "name": "01. Gus Mahoney — Ông Già Trả Đũa US",
+  "language": "en",
+  "description": "[Key: 01_Nhom_Ong_Gia_Tra_Dua_My_US] Gus Mahoney - Người cha già công nhân kỳ cựu Toledo, chất phác, kiên cường — Trầm ấm, khàn nhẹ (gravelly), đĩnh đạc, mộc mạc, đậm chất lão niên Mỹ",
+  "personality": "Gus Mahoney - Người cha già công nhân kỳ cựu Toledo, chất phác, kiên cường. Trầm ấm, khàn nhẹ (gravelly), đĩnh đạc, mộc mạc, đậm chất lão niên Mỹ",
+  "refText": "I didn't know how to do any of it. I didn't know how to buy a girl a winter coat, or what to say when she cried with the bathroom door locked, or how to cook anything that didn't come in a box.",
+  "channelKey": "01_Nhom_Ong_Gia_Tra_Dua_My_US",
+  "speed": 1.0,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "61600ef8",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

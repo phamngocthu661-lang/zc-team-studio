@@ -1,0 +1,15 @@
+{
+  "id": "11_us_chuyen_tinh_nam_romance",
+  "name": "11. A Man's Love Story — Chuyện Tình Đàn Ông US",
+  "language": "en",
+  "description": "[Key: 11_Chuyen_Tinh_Dan_Ong_My_US] Người đàn ông chín chắn, nội tâm sâu sắc, chung thủy — Ấm áp, thủ thỉ, chậm rãi (slow-burn), giàu cảm xúc tình cảm lãng mạn",
+  "personality": "Người đàn ông chín chắn, nội tâm sâu sắc, chung thủy. Ấm áp, thủ thỉ, chậm rãi (slow-burn), giàu cảm xúc tình cảm lãng mạn",
+  "refText": "I just need to use your phone. Maybe sit for a few minutes. I shouldn't have come here. You're standing on my porch at 11 at night in the rain with luggage.",
+  "channelKey": "11_Chuyen_Tinh_Dan_Ong_My_US",
+  "speed": 0.95,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "0000b77f",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

@@ -1,0 +1,5 @@
+Kiểm Tra Kịch Bản Người Hầu
+Version: 1.1
+Updated: 2026-09-14
+
+Workflow: SOURCE LOCK → OPB/CRB BASELINE → 2 full reads → deterministic score + exhaustive Patch Ledger → WAIT → controlled revision → Outline/Part/Authorized Diff/Length+Word/TTS regression → R/L/N/P delta audit → 2 blind reads → Stability Gate.

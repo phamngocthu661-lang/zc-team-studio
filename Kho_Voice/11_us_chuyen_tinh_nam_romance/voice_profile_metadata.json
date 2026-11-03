@@ -1,0 +1,23 @@
+{
+  "voice_id": "11_US_Male_RomanceStory_AMansLoveStory_10s",
+  "topic_id": "11",
+  "topic_name_vn": "Chuyện tình trưởng thành qua góc nhìn phái mạnh",
+  "channel_name": "A Man's Love Story",
+  "channel_url": "https://www.youtube.com/channel/UCWlnG7tQlYOlml6xc7OICAg",
+  "market": "Mỹ (US) / Toàn cầu",
+  "rpm_range": "$8 - $15",
+  "language_code": "en",
+  "language_name": "English (US)",
+  "gender": "Nam (Male)",
+  "age_range": "30 - 45 tuổi",
+  "character_archetype": "Người đàn ông chín chắn, nội tâm sâu sắc, chung thủy",
+  "voice_style": "Ấm áp, thủ thỉ, chậm rãi (slow-burn), giàu cảm xúc tình cảm lãng mạn",
+  "recommended_engine": "CosyVoice 2 / F5-TTS / OmniVoice (Temperature: 0.7, Speed: 0.95)",
+  "source_timestamp_start": 99.3,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "I just need to use your phone. Maybe sit for a few minutes. I shouldn't have come here. You're standing on my porch at 11 at night in the rain with luggage."
+}

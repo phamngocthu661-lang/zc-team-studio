@@ -1,0 +1,15 @@
+{
+  "id": "06_jp_huu_tri_izumi",
+  "name": "06. Izumi Kuchikomi — Hưu Trí Việc Làm Nhật",
+  "language": "ja",
+  "description": "[Key: 06_Huu_Tri_Viec_Lam_Japan] Izumi - Giọng đọc tâm sự hưu trí, đời sống chung cư tập thể (Danchi) — Nhẹ nhàng, mộc mạc, điềm đạm, lắng đọng, tạo sự đồng cảm sâu sắc",
+  "personality": "Izumi - Giọng đọc tâm sự hưu trí, đời sống chung cư tập thể (Danchi). Nhẹ nhàng, mộc mạc, điềm đạm, lắng đọng, tạo sự đồng cảm sâu sắc",
+  "refText": "だが、安い家に入るのに、金が掛かるとは思っていなかった。 引っ越しの日に、もう一回引っ越し台を払う家。",
+  "channelKey": "06_Huu_Tri_Viec_Lam_Japan",
+  "speed": 0.95,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "1c0782e0",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

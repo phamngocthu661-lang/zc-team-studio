@@ -1,0 +1,23 @@
+{
+  "voice_id": "04_MX_Male_SternFather_PadreImplacable_10s",
+  "topic_id": "04",
+  "topic_name_vn": "Ông già sắt đá trừng trị con bất hiếu",
+  "channel_name": "@Padre-Implacable",
+  "channel_url": "https://www.youtube.com/@Padre-Implacable",
+  "market": "Mexico / Mỹ Latinh",
+  "rpm_range": "View cực cao ($2 - $4)",
+  "language_code": "es",
+  "language_name": "Spanish (Mexico / Latin America)",
+  "gender": "Nam (Male)",
+  "age_range": "60 - 70 tuổi",
+  "character_archetype": "Người cha già sắt đá (Padre Implacable) bị con ruột đuổi ra nhà kho",
+  "voice_style": "U uất, đanh thép, nghiêm nghị, uy quyền phụ hệ không khoan nhượng",
+  "recommended_engine": "CosyVoice 2 / F5-TTS / OmniVoice (Temperature: 0.7, Speed: 1.0)",
+  "source_timestamp_start": 74.65,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "a la seis y cuarto de la mañana, mientras yo estaba tumbado en un cattre, en la cochera de la casa de mi hijo, con una tos que sonaba a tornillos sueltos dentro de una lata."
+}

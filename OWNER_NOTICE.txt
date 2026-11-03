@@ -1,0 +1,10 @@
+QUAN TRỌNG — PRIVATE KEY
+
+Thư mục admin-tools/keys có một private key DEVELOPMENT để thử luồng license.
+
+- Không gửi private key này cho khách hàng.
+- Không dùng development key cho bản thương mại.
+- Trước khi phát hành, chạy admin-tools/generate-keypair.js để tạo key production.
+- Copy public key production vào resources/license/offline-public-key.pem.
+- Giữ private key production ở máy quản trị riêng có backup mã hóa.
+- electron-builder chỉ đóng src, package, README, LICENSE và public resources; admin-tools không được đóng vào installer theo cấu hình hiện tại.

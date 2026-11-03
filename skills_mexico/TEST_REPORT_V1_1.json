@@ -1,0 +1,24 @@
+{
+  "version": "1.1.0",
+  "status": "PASS",
+  "tests": [
+    {
+      "name": "test_v1_tools.py",
+      "passed": true,
+      "cases": 22
+    },
+    {
+      "name": "test_minor_score_gate.py",
+      "passed": true,
+      "cases": 1
+    },
+    {
+      "name": "test_title_quality_gate.py",
+      "passed": true,
+      "cases": 12
+    }
+  ],
+  "total_synthetic_cases": 35,
+  "unchanged_existing_scripts": 7,
+  "qualitative_scope": "Only format, arithmetic, identity and code behavior mechanically tested; no script was written and no audience CTR or retention was measured."
+}

@@ -1,0 +1,6 @@
+# SEO / THUMBNAIL PRINCIPLES V1.1
+The user-provided 43-video channel metadata supplies topic examples, NOT reproduction rights, proof of captions/transcripts, or measured causal CTR effects. The original output must stand on its own. Search phrases naturally: highway rest stop, scary highway stories, late night horror, creepy stories, night driving, interstate rest area, realistic fictional horror. Do not keyword-stuff repeated title strings.
+
+Thumbnail: one unsettling visually legible question (empty night vehicle with an impossible duplicate plate, hallway marked closed, somebody visible only in a reflection), a character only if story supports one. Cinematic realism, no gore, no collage, high contrast, 16:9, safe zone; typography short, not cluttered. 3 variants should test different focal clues rather than palette alone.
+
+SEO field accuracy checklist: main title remains verbatim; episode number count and factual settings accurate; first 2 lines promise what is delivered; description 180–300 words unless user overrides; no invented events, false eyewitness/veracity claims or timecodes; precise source SHA of chosen current manuscript; predicted audio length clearly derived from counted words + estimated WPM; no false audience statistics.

@@ -1,0 +1,32 @@
+MASTER PROJECT
+NAME: Viết-Seo-Người-Hầu
+SLUG: viet-seo-nguoi-hau
+VERSION: V1.3
+STATUS: LOCKED FOR PRODUCTION
+
+IMMUTABLE IN NORMAL PRODUCTION:
+- PRIMARY/LOCKED TITLE is supplied externally and preserved verbatim
+- PRIMARY title source priority
+- exactly 2 NEW/SUPPORTING TITLES generated per full SEO run
+- every new/supporting title ≤100 visible characters and story-faithful
+- new/supporting titles never auto-replace/rebase CURRENT FINAL TITLE
+- no ranking/scoring of locked or new titles unless user explicitly requests it
+- A/B/C DNA definitions
+- A-FIT/B-FIT/C-FIT weights
+- DNA gates
+- confidence thresholds
+- MARKET-NATIVE fallback
+- thumbnail evidence restrictions for B/C
+- 8-second hook timeline
+- QA gates and hard-fail rules for generated SEO/packaging assets
+- DEFAULT FULL OUTPUT SURFACE = EXACTLY 12 TOP-LEVEL SECTIONS DEFINED IN PRODUCTION_OUTPUT_TEMPLATE.md
+
+OUTPUT SURFACE LOCK:
+Internal diagnosis/classifier/content-family/click-psychology/packaging-strategy/fatigue/revision reasoning MUST NOT be printed in default production. Only the 12 locked output sections are shown unless the user explicitly asks for additional diagnostics.
+
+TITLE RULE:
+PRIMARY/LOCKED TITLE is authoritative packaging input and must remain verbatim. Default SEO production MUST generate exactly two additional NEW/SUPPORTING TITLES as optional A/B alternatives. Each new title must be ≤100 visible characters, supported by story evidence, and must not overwrite the locked title.
+
+CHANGE COMMANDS:
+SYSTEM UPDATE
+BUILD NEW VERSION

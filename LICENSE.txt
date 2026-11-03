@@ -1,0 +1,4 @@
+PROPRIETARY SOFTWARE
+Copyright (c) 2026 Video Batch Studio.
+Source code is provided for evaluation and development. Configure your own commercial license terms before distribution.
+Third-party components such as Electron, FFmpeg, codecs, fonts and stock media remain subject to their respective licenses.

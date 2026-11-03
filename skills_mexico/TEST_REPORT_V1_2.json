@@ -1,0 +1,54 @@
+{
+  "version": "1.2.0",
+  "technical_tests_pass": true,
+  "test_suites": [
+    {
+      "name": "legacy_pipeline",
+      "exit_code": 0,
+      "stdout": "{\n  \"passed\": true,\n  \"cases\": 22,\n  \"fixture_type\": \"synthetic structural source, NOT a completed literary QA\",\n  \"body_chars\": 74547,\n  \"draft_manifest\": \"v2 title+outline bound\",\n  \"qa_checkpoint_unfilled_rejected\": true,\n  \"qa_scoped_windows\": \"verified\",\n  \"immutable_spans\": \"byte-identical\",\n  \"QA_readiness\": \"synthetic format validated only, NOT editorial score/approval\"\n}",
+      "stderr": ""
+    },
+    {
+      "name": "title_v11",
+      "exit_code": 0,
+      "stdout": "{\n  \"passed\": true,\n  \"cases\": 12,\n  \"tests\": [\n    {\n      \"name\": \"valid calibrated five\",\n      \"pass\": true,\n      \"errors\": []\n    },\n    {\n      \"name\": \"weak evidence-only cannot win\",\n      \"pass\": true,\n      \"errors\": [\n        \"suggested_winner not eligible\"\n      ]\n    },\n    {\n      \"name\": \"overlong must reject\",\n      \"pass\": true,\n      \"errors\": [\n        \"candidate[1]: title too long: 128/100\",\n        \"suggested_winner not eligible\"\n      ]\n    },\n    {\n      \"name\": \"fake composite rejected\",\n      \"pass\": true,\n      \"errors\": [\n        \"candidate[2]: composite must be 91\"\n      ]\n    },\n    {\n      \"name\": \"missing comparisons rejected\",\n      \"pass\": true,\n      \"errors\": [\n        \"candidate[2]: minimum 3 comparisons\"\n      ]\n    },\n    {\n      \"name\": \"duplicate title rejected\",\n      \"pass\": true,\n      \"errors\": [\n        \"candidate[2]: duplicate title\"\n      ]\n    },\n    {\n      \"name\": \"hard guard blocks winner\",\n      \"pass\": true,\n      \"errors\": [\n        \"suggested_winner not eligible\"\n      ]\n    },\n    {\n      \"name\": \"weaker benchmark cannot win\",\n      \"pass\": true,\n      \"errors\": [\n        \"suggested_winner not eligible\"\n      ]\n    },\n    {\n      \"name\": \"no-winner with editorial explanation allowed\",\n      \"pass\": true,\n      \"errors\": []\n    },\n    {\n      \"name\": \"unjustified no-winner rejected\",\n      \"pass\": true,\n      \"errors\": [\n ",
+      "stderr": ""
+    },
+    {
+      "name": "qa_98_fix",
+      "exit_code": 0,
+      "stdout": "{\n  \"synthetic_gate_pass\": true,\n  \"ready_score_98\": true,\n  \"invalid_minor_3_rejected\": true,\n  \"body_chars\": 74627,\n  \"editorial_QA_performed\": false\n}",
+      "stderr": ""
+    },
+    {
+      "name": "new_niche_gate",
+      "exit_code": 0,
+      "stdout": "{\n  \"passed\": true,\n  \"cases\": 15,\n  \"tests\": [\n    \"five older Mexican mom first-person family titles pass structure\",\n    \"child protagonist blocked\",\n    \"male narrator blocked\",\n    \"third-person narrator blocked\",\n    \"millionaire fake homeless blocked\",\n    \"unrelated public cruelty blocked\",\n    \"anonymous wedding expulsion blocked as winner\",\n    \"everyone cried generic ending blocked\",\n    \"telephone twist rejected\",\n    \"outside rescuer blocked\",\n    \"inactive mother blocked\",\n    \"runtime conflict blocked\",\n    \"invented textual span blocked\",\n    \"missing leverage metadata blocked\",\n    \"nonfamily offender blocked\"\n  ],\n  \"warning\": \"Structural regression only, not a measured click, narrative quality, or Mexican law audit.\"\n}",
+      "stderr": ""
+    },
+    {
+      "name": "combined_gate",
+      "exit_code": 0,
+      "stdout": "{\n  \"passed\": true,\n  \"cases\": 3,\n  \"old_gate_scores_good_packet\": true,\n  \"new_gate_in_niche_packet\": true,\n  \"old_gate_off_niche_false_positive_reproduced\": true,\n  \"new_gate_off_niche_rejected\": true,\n  \"old_gate_anonymous_wedding_accepted\": true,\n  \"new_gate_anonymous_wedding_rejected\": true,\n  \"warning\": \"synthetic scorecard values, no measured CTR or audience response\"\n}",
+      "stderr": ""
+    }
+  ],
+  "total_checks": 53,
+  "unchanged_v11_production_scripts": 7,
+  "production_script_paths_unchanged": [
+    "03_ESCRITOR_MEXICO/scripts/apply_authorized_patches.py",
+    "03_ESCRITOR_MEXICO/scripts/segment_workflow.py",
+    "03_ESCRITOR_MEXICO/scripts/verify_full_script.py",
+    "04_AUDITOR_MEXICO/scripts/freeze_repair_contract.py",
+    "04_AUDITOR_MEXICO/scripts/qa_checkpoint.py",
+    "04_AUDITOR_MEXICO/scripts/record_qa_lessons.py",
+    "05_SEO_MEXICO/scripts/verify_seo_ready.py"
+  ],
+  "five_skill_folders": 5,
+  "six_step_contract_retained": true,
+  "length_contract": "70,000–80,000 Unicode body characters, seven Parts",
+  "artificial_30_45_min_claim": false,
+  "editorial_competitive_superiority_proven": false,
+  "narrative_quality_test": "Manual full-script evaluation still required; synthetic validators do not infer future CTR or storytelling quality.",
+  "issues": []
+}

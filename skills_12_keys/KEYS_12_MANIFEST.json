@@ -1,0 +1,230 @@
+{
+  "01_Nhom_Ong_Gia_Tra_Dua_My_US": {
+    "label": "01_Nhom_Ong_Gia_Tra_Dua_My_US (Ông già trả đũa - Mỹ US)",
+    "short_label": "01_Nhom_Ong_Gia_Tra_Dua_My_US",
+    "lang": "en",
+    "locale": "en-US",
+    "country": "US",
+    "parts_count": 7,
+    "char_min": 70000,
+    "char_max": 80000,
+    "base_rel": "ONG_GIA_TRA_DUA_US_SKILLS_V1_1",
+    "shared_rel": "ONG_GIA_TRA_DUA_US_SKILLS_V1_1/_shared",
+    "steps": {
+      "01_TITULOS": "ONG_GIA_TRA_DUA_US_SKILLS_V1_1/SKILLS/01-viet-tieu-de-ong-gia-us",
+      "02_OUTLINE": "ONG_GIA_TRA_DUA_US_SKILLS_V1_1/SKILLS/02-viet-gian-y-ong-gia-us",
+      "03_WRITER": "ONG_GIA_TRA_DUA_US_SKILLS_V1_1/SKILLS/03-viet-kich-ban-ong-gia-us",
+      "04_AUDITOR": "ONG_GIA_TRA_DUA_US_SKILLS_V1_1/SKILLS/04-kiem-tra-kich-ban-ong-gia-us",
+      "05_SEO": "ONG_GIA_TRA_DUA_US_SKILLS_V1_1/SKILLS/05-seo-ong-gia-us"
+    }
+  },
+  "02_Nhom_Phu_Nu_Bao_Thu_My_US": {
+    "label": "02_Nhom_Phu_Nu_Bao_Thu_My_US (Phụ nữ báo thù - Mỹ US)",
+    "short_label": "02_Nhom_Phu_Nu_Bao_Thu_My_US",
+    "lang": "en",
+    "locale": "en-US",
+    "country": "US",
+    "parts_count": 7,
+    "char_min": 70000,
+    "char_max": 80000,
+    "base_rel": "WRV_US_V1_1",
+    "shared_rel": null,
+    "steps": {
+      "01_TITULOS": "WRV_US_V1_1/Viet-Tieu-De-WOMEN-REVENGE-US-V1/viral-title-rewriter-wrv",
+      "02_OUTLINE": "WRV_US_V1_1/viet-gian-y-WOMEN-REVENGE-US-V1/viet-gian-y-wrv",
+      "03_WRITER": "WRV_US_V1_1/Viet-kich-ban-WOMEN-REVENGE-US-V1-THREE-STAGE-ONE-REPAIR/viet-kich-ban-wrv",
+      "04_AUDITOR": "WRV_US_V1_1/kiem-tra-kich-ban-WOMEN-REVENGE-US-V1-AUDIT-ONLY/kiem-tra-kich-ban-wrv",
+      "05_SEO": "WRV_US_V1_1/seo-WOMEN-REVENGE-US-V1/seo-wrv-story"
+    }
+  },
+  "03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico": {
+    "label": "03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico (Bà già Drama Gia đình - Mexico)",
+    "short_label": "03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico",
+    "lang": "es",
+    "locale": "es-MX",
+    "country": "MX",
+    "parts_count": 7,
+    "char_min": 70000,
+    "char_max": 80000,
+    "base_rel": "MEXICO_FAMILY_DRAMA_SKILLS_V1_1",
+    "shared_rel": "MEXICO_FAMILY_DRAMA_SKILLS_V1_1/_shared",
+    "steps": {
+      "01_TITULOS": "MEXICO_FAMILY_DRAMA_SKILLS_V1_1/01_Tieu_De_Mexico_Dona_V1",
+      "02_OUTLINE": "MEXICO_FAMILY_DRAMA_SKILLS_V1_1/02_Gian_Y_Mexico_Dona_V1",
+      "03_WRITER": "MEXICO_FAMILY_DRAMA_SKILLS_V1_1/03_Viet_Kich_Ban_Mexico_Dona_V1",
+      "04_AUDITOR": "MEXICO_FAMILY_DRAMA_SKILLS_V1_1/04_QA_Mexico_Dona_V1",
+      "05_SEO": "MEXICO_FAMILY_DRAMA_SKILLS_V1_1/05_SEO_Thumbnail_Mexico_Dona_V1"
+    }
+  },
+  "04_Nhom_Ong_Gia_Trung_Tri_Mexico": {
+    "label": "04_Nhom_Ong_Gia_Trung_Tri_Mexico (Ông già trừng trị con bất hiếu - Mexico)",
+    "short_label": "04_Nhom_Ong_Gia_Trung_Tri_Mexico",
+    "lang": "es",
+    "locale": "es-MX",
+    "country": "MX",
+    "parts_count": 7,
+    "char_min": 70000,
+    "char_max": 80000,
+    "base_rel": "SKILLS_EXTRACTED",
+    "shared_rel": null,
+    "steps": {
+      "01_TITULOS": "SKILLS_EXTRACTED/Viet-Tieu-De-PADRE-MX-V1_1/Viet-Tieu-De-PADRE-MX-V1/viral-title-rewriter-mx",
+      "02_OUTLINE": "SKILLS_EXTRACTED/viet-gian-y-padre-mx-V1_1/viet-gian-y-padre-mx-V1/viet-gian-y-padre-mx",
+      "03_WRITER": "SKILLS_EXTRACTED/Viet-kich-ban-padre-mx-V1_1-THREE-STAGE-ONE-REPAIR/Viet-kich-ban-padre-mx-V1-THREE-STAGE-ONE-REPAIR/viet-kich-ban-padre-mx",
+      "04_AUDITOR": "SKILLS_EXTRACTED/kiem-tra-kich-ban-padre-mx-V1_1-AUDIT-ONLY/kiem-tra-kich-ban-padre-mx-V1-AUDIT-ONLY/kiem-tra-kich-ban-padre-mx",
+      "05_SEO": "SKILLS_EXTRACTED/seo-padre-mx-V1_1/seo-padre-mx-V1/seo-padre-mx-story"
+    }
+  },
+  "05_Nhom_Manga_Doc_Than_Japan": {
+    "label": "05_Nhom_Manga_Doc_Than_Japan (Manga Đàn ông Độc thân - Nhật Bản)",
+    "short_label": "05_Nhom_Manga_Doc_Than_Japan",
+    "lang": "ja",
+    "locale": "ja-JP",
+    "country": "JP",
+    "parts_count": 7,
+    "char_min": 15000,
+    "char_max": 25000,
+    "base_rel": "",
+    "shared_rel": "shared",
+    "steps": {
+      "01_TITULOS": "skills/manga-doc-than-jp-title",
+      "02_OUTLINE": "skills/manga-doc-than-jp-outline",
+      "03_WRITER": "skills/manga-doc-than-jp-writer",
+      "04_AUDITOR": "skills/manga-doc-than-jp-qa",
+      "05_SEO": "skills/manga-doc-than-jp-seo"
+    }
+  },
+  "06_Huu_Tri_Viec_Lam_Japan": {
+    "label": "06_Huu_Tri_Viec_Lam_Japan (Hưu trí & Việc làm Kuchikomi - Nhật Bản)",
+    "short_label": "06_Huu_Tri_Viec_Lam_Japan",
+    "lang": "ja",
+    "locale": "ja-JP",
+    "country": "JP",
+    "parts_count": 7,
+    "char_min": 18000,
+    "char_max": 26000,
+    "base_rel": "JAPAN_KUCHIKOMI_SKILLS_V1.1",
+    "shared_rel": "JAPAN_KUCHIKOMI_SKILLS_V1.1/_shared",
+    "steps": {
+      "01_TITULOS": "JAPAN_KUCHIKOMI_SKILLS_V1.1/viet-lai-tieu-de-japan-kuchikomi",
+      "02_OUTLINE": "JAPAN_KUCHIKOMI_SKILLS_V1.1/viet-gian-y-japan-kuchikomi",
+      "03_WRITER": "JAPAN_KUCHIKOMI_SKILLS_V1.1/viet-kich-ban-japan-kuchikomi",
+      "04_AUDITOR": "JAPAN_KUCHIKOMI_SKILLS_V1.1/kiem-tra-kich-ban-japan-kuchikomi",
+      "05_SEO": "JAPAN_KUCHIKOMI_SKILLS_V1.1/viet-seo-japan-kuchikomi"
+    }
+  },
+  "07_Dong_Que_Co_Dien_Mexico": {
+    "label": "07_Dong_Que_Co_Dien_Mexico (Truyện xưa Đồng quê Cổ điển - Mexico)",
+    "short_label": "07_Dong_Que_Co_Dien_Mexico",
+    "lang": "es",
+    "locale": "es-MX",
+    "country": "MX",
+    "parts_count": 7,
+    "char_min": 70000,
+    "char_max": 80000,
+    "base_rel": "Mexico_Rural_Story_Skills_V1_1",
+    "shared_rel": "Mexico_Rural_Story_Skills_V1_1/_shared",
+    "steps": {
+      "01_TITULOS": "Mexico_Rural_Story_Skills_V1_1/01_viet-lai-tieu-de-mexico",
+      "02_OUTLINE": "Mexico_Rural_Story_Skills_V1_1/02_viet-gian-y-mexico",
+      "03_WRITER": "Mexico_Rural_Story_Skills_V1_1/03_viet-kich-ban-mexico",
+      "04_AUDITOR": "Mexico_Rural_Story_Skills_V1_1/04_kiem-tra-kich-ban-mexico",
+      "05_SEO": "Mexico_Rural_Story_Skills_V1_1/05_seo-mexico"
+    }
+  },
+  "08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico": {
+    "label": "08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico (Tình yêu Ngoại tình Phản bội - Mexico)",
+    "short_label": "08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico",
+    "lang": "es",
+    "locale": "es-MX",
+    "country": "MX",
+    "parts_count": 7,
+    "char_min": 70000,
+    "char_max": 80000,
+    "base_rel": "MEXICO_TELENOVELA_SKILLS_V1_1",
+    "shared_rel": null,
+    "steps": {
+      "01_TITULOS": "MEXICO_TELENOVELA_SKILLS_V1_1/Viet-Lai-Tieu-De-Mexico",
+      "02_OUTLINE": "MEXICO_TELENOVELA_SKILLS_V1_1/Viet-Gian-Y-Mexico",
+      "03_WRITER": "MEXICO_TELENOVELA_SKILLS_V1_1/Viet-Kich-Ban-Mexico",
+      "04_AUDITOR": "MEXICO_TELENOVELA_SKILLS_V1_1/Kiem-Tra-Kich-Ban-Mexico",
+      "05_SEO": "MEXICO_TELENOVELA_SKILLS_V1_1/Viet-SEO-Mexico"
+    }
+  },
+  "09_Tieu_Su_Goc_Khuat_Sao_Mexico": {
+    "label": "09_Tieu_Su_Goc_Khuat_Sao_Mexico (Tiểu sử Góc khuất Sao - Mexico)",
+    "short_label": "09_Tieu_Su_Goc_Khuat_Sao_Mexico",
+    "lang": "es",
+    "locale": "es-MX",
+    "country": "MX",
+    "parts_count": 7,
+    "char_min": 42000,
+    "char_max": 48000,
+    "base_rel": "",
+    "shared_rel": "_shared",
+    "steps": {
+      "01_TITULOS": "viral-title-rewriter-mexico",
+      "02_OUTLINE": "viet-gian-y-mexico",
+      "03_WRITER": "viet-kich-ban-mexico",
+      "04_AUDITOR": "kiem-tra-kich-ban-mexico",
+      "05_SEO": "seo-mexico-celebrity"
+    }
+  },
+  "10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US": {
+    "label": "10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US (Người cha da màu CEO ngầm - Mỹ US)",
+    "short_label": "10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US",
+    "lang": "en",
+    "locale": "en-US",
+    "country": "US",
+    "parts_count": 7,
+    "char_min": 40000,
+    "char_max": 52000,
+    "base_rel": "BLACK_DAD_UNDERCOVER_CEO_US_SKILLS_V2",
+    "shared_rel": "BLACK_DAD_UNDERCOVER_CEO_US_SKILLS_V2/00_SHARED_CONTRACT",
+    "steps": {
+      "01_TITULOS": "BLACK_DAD_UNDERCOVER_CEO_US_SKILLS_V2/01_viet-lai-tieu-de-black-dad",
+      "02_OUTLINE": "BLACK_DAD_UNDERCOVER_CEO_US_SKILLS_V2/02_viet-gian-y-black-dad",
+      "03_WRITER": "BLACK_DAD_UNDERCOVER_CEO_US_SKILLS_V2/03_viet-kich-ban-black-dad",
+      "04_AUDITOR": "BLACK_DAD_UNDERCOVER_CEO_US_SKILLS_V2/04_kiem-tra-kich-ban-black-dad",
+      "05_SEO": "BLACK_DAD_UNDERCOVER_CEO_US_SKILLS_V2/05_viet-seo-black-dad"
+    }
+  },
+  "11_Chuyen_Tinh_Dan_Ong_My_US": {
+    "label": "11_Chuyen_Tinh_Dan_Ong_My_US (Chuyện tình Đàn ông POV - Mỹ US)",
+    "short_label": "11_Chuyen_Tinh_Dan_Ong_My_US",
+    "lang": "en",
+    "locale": "en-US",
+    "country": "US",
+    "parts_count": 7,
+    "char_min": 40000,
+    "char_max": 50000,
+    "base_rel": "US_Male_POV_Romance_Skills_V1",
+    "shared_rel": "US_Male_POV_Romance_Skills_V1/_shared",
+    "steps": {
+      "01_TITULOS": "US_Male_POV_Romance_Skills_V1/01_Title_Rewriter",
+      "02_OUTLINE": "US_Male_POV_Romance_Skills_V1/02_Story_Outline",
+      "03_WRITER": "US_Male_POV_Romance_Skills_V1/03_Script_Writer",
+      "04_AUDITOR": "US_Male_POV_Romance_Skills_V1/04_Script_QA_One_Repair",
+      "05_SEO": "US_Male_POV_Romance_Skills_V1/05_SEO_Publish_Pack"
+    }
+  },
+  "12_Kinh_Di_Dem_Khuya_My_US": {
+    "label": "12_Kinh_Di_Dem_Khuya_My_US (Kinh dị Đêm khuya - Mỹ US)",
+    "short_label": "12_Kinh_Di_Dem_Khuya_My_US",
+    "lang": "en",
+    "locale": "en-US",
+    "country": "US",
+    "parts_count": 7,
+    "char_min": 65000,
+    "char_max": 78000,
+    "base_rel": "US_MIDNIGHT_HORROR_V1_1",
+    "shared_rel": "US_MIDNIGHT_HORROR_V1_1/00_shared_contracts",
+    "steps": {
+      "01_TITULOS": "US_MIDNIGHT_HORROR_V1_1/01_title_rewriter",
+      "02_OUTLINE": "US_MIDNIGHT_HORROR_V1_1/02_outline_engine",
+      "03_WRITER": "US_MIDNIGHT_HORROR_V1_1/03_script_writer",
+      "04_AUDITOR": "US_MIDNIGHT_HORROR_V1_1/04_script_auditor",
+      "05_SEO": "US_MIDNIGHT_HORROR_V1_1/05_seo_publish"
+    }
+  }
+}

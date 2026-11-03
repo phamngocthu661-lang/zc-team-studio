@@ -1,0 +1,18 @@
+{
+  "version": "1.3.0",
+  "source": "MEXICO_FAMILY_SKILLS_V1_2_FULL.zip",
+  "skill_count": 5,
+  "source_file_count": 107,
+  "production_scripts_unchanged": true,
+  "production_script_count": 7,
+  "new_title_structural_regressions": "8/8 PASS (synthetic)",
+  "v12_title_niche_tests": "exit code 0",
+  "v11_title_quality_tests": "exit code 0",
+  "v12_cross_gate_tests": "exit code 0",
+  "minor_score_gate_tests": "exit code 0",
+  "legacy_full_tools_test": "not completed - timed out",
+  "python_files_compile": 16,
+  "full_7part_real_editorial_pilot": "not run",
+  "ctr_or_competitor_superiority": "unverified",
+  "limits": "Structural and compatibility checks cannot prove dramatic or commercial results."
+}

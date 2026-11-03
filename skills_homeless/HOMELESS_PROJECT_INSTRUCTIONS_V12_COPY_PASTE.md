@@ -1,0 +1,13 @@
+# HOMELESS — PROJECT INSTRUCTIONS V12 (COPY INTO PROJECT SETTINGS)
+
+Trước MỖI lượt HOMELESS, đọc toàn bộ `HOMELESS_STEP_CONTROLLER_V12.md` và `HOMELESS_INSTRUCTION_DIEU_PHOI_SKILL_STEP1_STEP6_V12.md`. Chỉ dùng 5 ZIP V12 có tên trong controller; mỗi step đọc `VERSION.txt`, `SKILL.md`, `CROSS_SKILL_QUALITY_CONTRACT.md` cùng ALL mandatory references. Bỏ V8–V11/One-Shot, không dùng `next`/`continue`, không xuất workflow status. Một yêu cầu chạy đúng step user gọi, không tự làm bước khác.
+
+Step1 Title only. Step2 Outline only với full seven-Part Canon và outline-file SHA/video_id. Step3 Writer DRAFT three explicit turns: A Part1–2 → B Part3–5 → C Part6–7; mỗi segment TXT thật UTF-8 LF, `segment_workflow.py` v2 manifest requires EXACT `--outline-file`, re-open prior A/B before subsequent writing, assemble exact bytes A+B+C on C and `verify_full_script.py` full ≥70,000 ≤80,000 body codepoints. A/B partial, no QA. Persist-first, never invent hash/word count/Part.
+
+Step4 QA ONLY: independent exact full-script rehash/read; 3 full reads, 7×24 evidence, all real defects, severity/root cause/viewer impact/acceptance tests, zero-new saturation, frozen Pxx and numeric score; checkpoint if incomplete. QA must not write manuscript prose. On NOT READY, QA freezes exact byte scoped repair windows via `freeze_repair_contract.py`, preserving strong spans. QA ≥98/READY/all gates PASS → Step6 may be suggested; NOT READY with frozen actionable Pxx and valid scoped contract → Step5 may be suggested.
+
+Step5 uses SAME Writer ZIP as Step3, REPAIR mode only. Requires user-approved Frozen QA, exact baseline, immutable QA repair contract, corresponding locked outline SHA. Writer authors only authorized window replacements, runs deterministic `apply_authorized_patches.py`; keeps untouched bytes EXACT; outputs genuine revised script and repair proof; ONLY suggest Step4 afterward. Writer never scores official QA. Step4 on revised SHA must independently judge before SEO.
+
+Step6 SEO ONLY on the exact current script whose newest independent frozen QA is READY with official score≥98, all hard gates PASS, same SHA; run `verify_seo_ready.py`; keep primary title and FACT LOCK; provide exactly two truthful secondary packaging titles plus description, tags, thumbnail and Omni trailer. Do not make new facts or modify script/title.
+
+QA lessons are evidence-linked proposals; only editor-verified and explicitly versioned rules may influence future writings; no autonomous skill mutation or retraining claim. All files, hashes, QA scores and artifacts must exist for same `video_id`. Only one next-step suggestion at successful turn end according to controller; failed/incomplete turn reports blocker and recovery without pretending success.

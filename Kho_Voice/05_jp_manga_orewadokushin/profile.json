@@ -1,0 +1,15 @@
+{
+  "id": "05_jp_manga_orewadokushin",
+  "name": "05. Kuroda Chuichi — Manga Độc Thân Nhật",
+  "language": "ja",
+  "description": "[Key: 05_Nhom_Manga_Doc_Than_Japan] Kuroda Chuichi (51 tuổi) - Nhân viên bình thường làm việc 27 năm độc thân — Trầm tính, tự sự đời thường, biểu cảm manga voice comic giàu chân thật",
+  "personality": "Kuroda Chuichi (51 tuổi) - Nhân viên bình thường làm việc 27 năm độc thân. Trầm tính, tự sự đời thường, biểu cảm manga voice comic giàu chân thật",
+  "refText": "俺がこの会社に入って27年にな、51世になった今、 出世という言葉は、もう自分とは電のないものだと思っていた。",
+  "channelKey": "05_Nhom_Manga_Doc_Than_Japan",
+  "speed": 1.0,
+  "model": "omnivoice",
+  "sampleFile": "sample.wav",
+  "vsProfileId": "9d68d9a0",
+  "createdAt": "2026-11-03T09:30:48.357678Z",
+  "updatedAt": "2026-11-03T09:30:48.357678Z"
+}

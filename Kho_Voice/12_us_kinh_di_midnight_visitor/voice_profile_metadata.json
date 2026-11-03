@@ -1,0 +1,23 @@
+{
+  "voice_id": "12_US_Male_MidnightHorror_MidnightVisitor_10s",
+  "topic_id": "12",
+  "topic_name_vn": "Truyện kinh dị đêm khuya đời thực",
+  "channel_name": "@MidnightVisitor-i4i",
+  "channel_url": "https://www.youtube.com/@MidnightVisitor-i4i",
+  "market": "Mỹ (US) / Toàn cầu",
+  "rpm_range": "$8 - $16",
+  "language_code": "en",
+  "language_name": "English (US)",
+  "gender": "Nam (Male)",
+  "age_range": "25 - 40 tuổi",
+  "character_archetype": "Người kể chuyện đêm khuya rùng rợn (Midnight Visitor)",
+  "voice_style": "Trầm tối, thì thào, ma mị, hồi hộp rùng rợn, tạo không khí đêm khuya",
+  "recommended_engine": "CosyVoice 2 / F5-TTS / OmniVoice (Temperature: 0.75, Speed: 0.95)",
+  "source_timestamp_start": 36.8,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "Most tired in that specific way where your eyelids get heavy at red lights and your head starts to dip and snap back up. I kept the windows cracked to let the cold air keep me sharp."
+}

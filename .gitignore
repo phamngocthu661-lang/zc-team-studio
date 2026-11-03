@@ -1,0 +1,47 @@
+# Node & Electron Build Binaries
+node_modules/
+release/
+dist/
+Ban-Giao-Khach-Hang-EXE/
+resources/
+tools/
+
+# Customer Local Data, Databases & Browser Profiles (Protected during OTA)
+data/
+BROWSER_PROFILE/
+BROWSER_PROFILE_*/
+PROJECTS/
+PROJECTS_*/
+TONG HOP/
+Kho_Green/
+Kho_Voice_12_Topics_Master/
+sample-data/output/*
+!sample-data/output/.gitkeep
+
+# Private Admin License Secrets (NEVER push private signing keys)
+admin-tools/keys-production/
+admin-tools/*.key
+admin-tools/*.key.json
+ADMIN_MASTER_SECRET.json
+ADMIN_LICENSE_DB.json
+VBS-License-Admin/
+MO_UNG_DUNG_CAP_KEY.bat
+Mo-Ung-Dung-Quan-Ly-Key-Admin.bat
+vbs_interactive_log.txt
+*.key
+
+# Logs, Temp, Databases & Heavy Archives/Videos
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.zip
+*.rar
+*.7z
+*.asar
+*.mp4
+*.mkv
+*.mov
+*.avi
+__pycache__/
+*.pyc

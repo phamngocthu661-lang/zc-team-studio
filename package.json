@@ -1,0 +1,28 @@
+{
+  "name": "zc-team-studio",
+  "productName": "ZC TEAM",
+  "version": "1.0.0",
+  "description": "ZC TEAM — GPU AI Video & Script Production Studio",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "test:unit": "node --test tests/*.test.js",
+    "test:all": "node --test tests/*.test.js"
+  },
+  "author": "ZC TEAM",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
+  "dependencies": {
+    "@electron/asar": "3.4.1",
+    "edge-tts-universal": "^1.4.0"
+  },
+  "devDependencies": {
+    "electron": "43.1.0"
+  }
+}

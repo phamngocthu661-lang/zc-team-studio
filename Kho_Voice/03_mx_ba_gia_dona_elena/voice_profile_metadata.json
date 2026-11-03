@@ -1,0 +1,23 @@
+{
+  "voice_id": "03_MX_Female_ElderlyMatriarch_DonaElena_10s",
+  "topic_id": "03",
+  "topic_name_vn": "Bà già vạch trần con dâu & Bí mật gia đình",
+  "channel_name": "@DonaElenaHistorias",
+  "channel_url": "https://www.youtube.com/@DonaElenaHistorias",
+  "market": "Mexico / Mỹ Latinh",
+  "rpm_range": "View cực khủng ($2 - $4, hàng triệu view)",
+  "language_code": "es",
+  "language_name": "Spanish (Mexico / Latin America)",
+  "gender": "Nữ (Female)",
+  "age_range": "65 - 75 tuổi",
+  "character_archetype": "Doña Alicia (Veracruz, 70 tuổi) - Bà mẹ già hiền hậu nhưng giữ vững chủ quyền",
+  "voice_style": "Ấm áp, truyền cảm, có chiều sâu hoài niệm, ngắt nhịp tự sự truyền thống Latinh",
+  "recommended_engine": "CosyVoice 2 / IndexTTS 2 / OmniVoice (Temperature: 0.75, Speed: 0.95)",
+  "source_timestamp_start": 69.5,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "Mi cumpleaños número 70, me desperté temprano como de costumbre. La edad puede cambiar, pero los hábitos no."
+}

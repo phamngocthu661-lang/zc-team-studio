@@ -1,0 +1,23 @@
+{
+  "voice_id": "02_US_Female_MilitaryRevenge_TheIronRose_10s",
+  "topic_id": "02",
+  "topic_name_vn": "Phụ nữ phục thù & Đòi lại công lý",
+  "channel_name": "@TheIronRose2",
+  "channel_url": "https://www.youtube.com/@TheIronRose2",
+  "market": "Mỹ (US) / Tier 1",
+  "rpm_range": "$12 - $25",
+  "language_code": "en",
+  "language_name": "English (US)",
+  "gender": "Nữ (Female)",
+  "age_range": "35 - 45 tuổi",
+  "character_archetype": "Nữ quân nhân cựu binh / Người mẹ bị con gái ruồng rẫy theo mẹ kế",
+  "voice_style": "Điềm tĩnh, sắc bén, kiểm soát cảm xúc tuyệt đối, nội lực thâm trầm",
+  "recommended_engine": "CosyVoice 2 / F5-TTS / OmniVoice (Temperature: 0.7, Speed: 1.0)",
+  "source_timestamp_start": 64.3,
+  "duration_seconds": 10.0,
+  "sample_rate_hz": 24000,
+  "channels": 1,
+  "format": "PCM 16-bit WAV",
+  "audio_standard": "EBU R128 (-16 LUFS, True Peak -1.0 dBFS, 70Hz Highpass filtered, Micro-faded)",
+  "reference_transcript": "Her name is Emily, she's 22, married to a good young man named Nathan Brooks, and living about 15 minutes from me. We talked about Christmas dinner the previous Sunday."
+}

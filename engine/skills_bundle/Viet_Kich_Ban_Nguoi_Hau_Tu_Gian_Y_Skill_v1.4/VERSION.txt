@@ -1,0 +1,4 @@
+Skill: Viết Kịch Bản Người Hầu Từ Giàn Ý
+Version: 1.4
+Status: SYNCED FOR PRODUCTION
+Contract: 44,000–48,000 chars; 7,400–7,650 words; soft caution 7,750; strict TOTAL_WORDS <8,000; hard max 55,000; exact Beat→Part; zero bracket TTS.

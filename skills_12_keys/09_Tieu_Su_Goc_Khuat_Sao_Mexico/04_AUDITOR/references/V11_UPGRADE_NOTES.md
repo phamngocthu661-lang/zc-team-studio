@@ -1,0 +1,8 @@
+# V1.1 STEP 4 — QA INTEGRITY + ONE-SHOT REVIEW
+- Before scoring: verify exact part order, baseline hash, facts, claim/source coverage and conflict matrix; read ALL narration for chronology, causal overclaim, Mexican Spanish accent, punctuation, grammar, named identities, unanswered headline promises. State human/AI editorial judgment honestly. Independent research must compare conflicting source wording without manufacturing consensus.
+- Scope one defect ledger and one repair batch. Select only evidence-backed logic/fact attribution and objective Spanish mistakes for patching. Non-blocking stylistic observations go into `NON_PATCH_QUALITY_NOTES` to improve subsequent episodes upstream, NOT into a second script rewrite.
+- After Step5: read-only verification adjacent contexts and source changes, then generate EXACT `QA_VERDICT_INPUT.json` score breakdown (`factual` max35, `chronology` max30, `spanish` max25, `title_structure` max10), `editor_review_confirmed=true`, `blocking_issues`, `resolved_issue_ids`, `evidence_limitations`.
+- Ensure QA_FINAL_REPORT includes the actual final SHA and exact `body_chars`, then run:
+  `python scripts/mexico_tools.py qa-seal --dir DELIVERY_FOLDER --verdict QA_VERDICT_INPUT.json --out DELIVERY_FOLDER/QA_FINAL.json`
+  The command REFUSES score summation mismatches, missing evidence, wrong counts, multiple repair edits; it does not certify human historical assessment. Do not manually fabricate QA_FINAL fields.
+- If no actual source review, set review_confirmed false and BLOCK; a 98/100 text file alone never authorizes SEO. Do not reopen editing after one batch even if FINAL fails.
