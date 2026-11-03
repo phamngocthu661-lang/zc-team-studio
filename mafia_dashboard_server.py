@@ -138,6 +138,8 @@ from mafia_chatgpt_pipeline import (
     export_to_tong_hop_folder,
     resolve_project_export_prefix,
     rename_project_custom_name,
+    update_project_title_and_name,
+    update_or_replace_queue_titles_batch,
     strip_part_headers_for_tts,
     get_niche_config,
     set_active_niche,
@@ -1956,6 +1958,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
     <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
       <button class="btn btn-green btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #34d399;" onclick="openChatGPTWebLogin('acc_1')" title="Mở trình duyệt Chrome để đăng nhập tài khoản ChatGPT">🔑 Đăng Nhập ChatGPT</button>
       <button class="btn btn-blue btn-sm" style="padding:6px 10px; font-size:11.8px; font-weight:700;" onclick="addTitlesOnly()">📥 Lưu Tiêu Đề &amp; Mã</button>
+      <button id="btnUpdateTitlesMain" class="btn btn-dark btn-sm" style="padding:6px 11px; font-size:11.8px; font-weight:800; border:1px solid #38bdf8; color:#38bdf8; background:rgba(14,165,233,0.14);" onclick="updateTitlesFromComposerNow()" title="Cập nhật lại Tiêu đề & Mã kịch bản cho danh sách hiện tại (Nếu ô nhập đang trống, bấm lần 1 để nạp danh sách Tiêu đề hiện tại lên ô nhập, sửa xong bấm lần 2 để lưu đè!)">🔄 Cập Nhật Tiêu Đề</button>
       <button class="btn btn-gold btn-sm" style="padding:6px 12px; font-size:11.8px; font-weight:800; background:linear-gradient(135deg,#00ff88,#10b981); color:#04130b; border-color:#00ff88;" onclick="addAndRunWithAutoVideoNow()" title="Lưu Tiêu đề + Mã kịch bản, tự động viết kịch bản qua 9 Bàn AI rồi tự động Tạo Voice + Phụ đề + Render Video MP4 luôn!">🎬 Viết Kịch Bản ➔ Làm Video Luôn</button>
       <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
       <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
@@ -2003,15 +2006,19 @@ HTML_PAGE = r"""<!DOCTYPE html>
           placeholder="VD:&#10;KB01&#10;KB02"></textarea>
       </div>
       <div style="display:flex; flex-direction:column;">
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; font-weight:700; color:var(--gold); margin-bottom:4px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; font-weight:700; color:var(--gold); margin-bottom:4px; gap:6px; flex-wrap:wrap;">
           <span id="titlesInputHeaderLabel">🎯 DANH SÁCH TIÊU ĐỀ GỐC TIẾNG ANH / TÂY BAN NHA MEXICO (Mỗi dòng 1 tiêu đề — Hỗ trợ dán 2 cột từ Excel)</span>
-          <button type="button" class="btn btn-dark btn-sm" style="padding:1px 7px; font-size:10.5px;" onclick="autoSplitMergedInputNow()">🪄 Tự Tách 2 Cột</button>
+          <div style="display:flex; gap:5px; align-items:center;">
+            <button type="button" class="btn btn-dark btn-sm" style="padding:2px 8px; font-size:10.5px; border-color:#38bdf8; color:#38bdf8;" onclick="loadQueueTitlesToComposer()" title="Nạp danh sách Tiêu đề & Mã đang có trong hàng đợi lên 2 ô này để chỉnh sửa rồi bấm Cập Nhật Tiêu Đề">📥 Nạp Tiêu Đề Đang Có Lên Sửa</button>
+            <button type="button" class="btn btn-dark btn-sm" style="padding:2px 7px; font-size:10.5px;" onclick="autoSplitMergedInputNow()">🪄 Tự Tách 2 Cột</button>
+            <button type="button" class="btn btn-dark btn-sm" style="padding:2px 7px; font-size:10.5px; border-color:rgba(239,68,68,0.5); color:#fca5a5;" onclick="clearComposerInputsNow()" title="Xóa trắng 2 ô nhập Mã & Tiêu đề">🧹 Xóa Ô Nhập</button>
+          </div>
         </div>
         <textarea id="titlesInput"
           onscroll="syncTwoColScroll(this, 'customNamesInput')"
           onpaste="handleSmartTwoColPaste(event)"
           style="height:74px; padding:7px 9px; font-size:12px; white-space:pre;"
-          placeholder="Dán danh sách Tiêu đề gốc (US-English hoặc Español Mexicano es-MX) vào đây rồi bấm [🚀 Lưu & Chạy Ngay]..."></textarea>
+          placeholder="Dán danh sách Tiêu đề gốc vào đây rồi bấm [📥 Lưu Tiêu Đề & Mã] hoặc [🔄 Cập Nhật Tiêu Đề] hoặc [🎬 Viết Kịch Bản ➔ Làm Video Luôn]..."></textarea>
       </div>
     </div>
   </div>
@@ -2034,8 +2041,14 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <span>Chọn tất cả</span>
       </label>
       <span style="font-size:13.5px;">📋 DANH SÁCH KỊCH BẢN (<span id="projChannelBadge" style="color:#38bdf8;">🎩 BÊN MAFIA</span>: <span id="projCount">0</span>)</span>
+      <button class="btn btn-dark btn-sm" style="padding:4px 10px; font-size:11.5px; border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="loadQueueTitlesToComposer()" title="Nạp toàn bộ Tiêu đề & Mã của danh sách bên dưới lên ô nhập phía trên để sửa hàng loạt rồi bấm Cập Nhật Tiêu Đề">
+        🔄 Cập Nhật Tiêu Đề Hàng Loạt
+      </button>
       <button id="btnBulkDeleteSelected" class="btn btn-dark btn-sm" style="padding:4px 10px; font-size:11.5px; border-color:rgba(239,68,68,0.5); color:#fca5a5;" onclick="bulkDeleteSelectedProjects()" title="Xóa toàn bộ các kịch bản đã tích chọn và xóa vĩnh viễn luôn cả Folder chứa kịch bản + file trong TONG HOP">
         🗑️ Xóa Đã Chọn (<span id="selectedProjCount">0</span>) &amp; Xóa Folder
+      </button>
+      <button class="btn btn-red btn-sm" style="padding:4px 10px; font-size:11.5px; font-weight:700;" onclick="deleteAllProjectsInChannel()" title="Xóa sạch toàn bộ Tiêu đề & Folder kịch bản đang có trong danh sách của Key này chỉ với 1 click">
+        🗑️ Xóa Tất Cả Tiêu Đề
       </button>
       <button id="btnClearSelection" class="btn btn-dark btn-sm" style="display:none; padding:4px 8px; font-size:11px;" onclick="clearSelectedProjects()">✖ Bỏ chọn</button>
     </div>
@@ -2067,6 +2080,42 @@ HTML_PAGE = r"""<!DOCTYPE html>
       </div>
     </div>
     <div id="modalBody" class="modal-body"></div>
+  </div>
+</div>
+
+<!-- Modal Cập Nhật Tiêu Đề & Mã Kịch Bản (Thay thế hoàn toàn window.prompt / window.confirm bị chặn trong Electron) -->
+<div id="editTitleModal" class="modal-backdrop" onclick="if(event.target===this) closeEditTitleModal()">
+  <div class="modal" style="max-width:740px; height:auto; max-height:88vh;">
+    <div class="modal-header">
+      <b id="editTitleModalHeader" style="color:#38bdf8; font-size:15px;">🔄 Cập Nhật Tiêu Đề &amp; Mã Kịch Bản</b>
+      <button class="btn btn-red btn-sm" onclick="closeEditTitleModal()">✖ Đóng</button>
+    </div>
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; font-family:inherit; white-space:normal;">
+      <input type="hidden" id="editModalProjectId" value="" />
+      <div>
+        <label style="display:block; font-size:12px; font-weight:700; color:#38bdf8; margin-bottom:5px;">🏷️ Mã / Tên Kịch Bản Xuất File (Tùy chọn — VD: KB01, Video_01; để trống = lấy mặc định 001, 002...):</label>
+        <input type="text" id="editModalCustomName" style="width:100%; padding:8px 11px; border-radius:7px; border:1px solid #334155; background:#090d14; color:#fde68a; font-size:13px; font-weight:700; font-family:Consolas, monospace;" placeholder="VD: KB01" />
+      </div>
+      <div>
+        <label style="display:block; font-size:12px; font-weight:700; color:var(--gold); margin-bottom:5px;">🎯 Tiêu Đề Gốc (Source Title):</label>
+        <textarea id="editModalSourceTitle" rows="3" style="width:100%; padding:8px 11px; border-radius:7px; border:1px solid #334155; background:#090d14; color:#f8fafc; font-size:13px; white-space:pre-wrap;" placeholder="Nhập tiêu đề gốc mới..."></textarea>
+      </div>
+      <div>
+        <label style="display:block; font-size:12px; font-weight:700; color:#34d399; margin-bottom:5px;">🏆 Tiêu Đề Chính Thức Đã Chốt (Winner Title — Để trống nếu muốn Bàn #1 tự viết lại):</label>
+        <textarea id="editModalWinnerTitle" rows="2" style="width:100%; padding:8px 11px; border-radius:7px; border:1px solid #334155; background:#090d14; color:#6ee7b7; font-size:13px; white-space:pre-wrap;" placeholder="Tiêu đề chính thức dùng cho Giàn ý & SEO..."></textarea>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:8px 11px; border-radius:7px; background:rgba(15,23,42,0.85); border:1px solid #334155;">
+        <input type="checkbox" id="editModalSkipStep1" style="width:16px; height:16px; accent-color:#10b981; cursor:pointer;" />
+        <label for="editModalSkipStep1" style="font-size:12.2px; font-weight:700; color:#e2e8f0; cursor:pointer;">🎯 Dùng luôn Tiêu đề này — Không viết lại ở Bàn #1 (Chạy thẳng Bàn #1.5 &amp; Bàn #2)</label>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:4px; padding-top:10px; border-top:1px solid #1e293b;">
+        <button type="button" class="btn btn-red btn-sm" style="padding:7px 13px; font-size:12px; font-weight:700;" onclick="deleteProjectFromEditModal()">🗑️ Xóa Luôn Tiêu Đề Này</button>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn btn-dark btn-sm" style="padding:7px 14px; font-size:12px;" onclick="closeEditTitleModal()">Hủy</button>
+          <button type="button" class="btn btn-blue btn-sm" style="padding:7px 16px; font-size:12.5px; font-weight:800; background:linear-gradient(135deg,#0284c7,#2563eb); color:#fff;" onclick="saveEditProjectTitleModal()">💾 Lưu Cập Nhật Tiêu Đề</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2522,13 +2571,137 @@ function downloadProjectFile(project_id, file_type) {
   window.location.href = `/api/download_file?niche=${encodeURIComponent(niche)}&project_id=${encodeURIComponent(project_id)}&type=${encodeURIComponent(file_type)}`;
 }
 
-async function promptRenameProject(project_id, current_name) {
+function clearComposerInputsNow() {
+  const tEl = document.getElementById('titlesInput');
+  const cEl = document.getElementById('customNamesInput');
+  if (tEl) tEl.value = '';
+  if (cEl) cEl.value = '';
+  const btnUpd = document.getElementById('btnUpdateTitlesMain');
+  if (btnUpd) btnUpd.innerHTML = '🔄 Cập Nhật Tiêu Đề';
+  showMsg('🧹 Đã xóa trắng 2 ô nhập Mã & Tiêu đề!', false);
+}
+
+function loadQueueTitlesToComposer() {
+  const list = (window.LAST_PROJECTS_LIST || []).filter(p => !p.completed);
+  const targetList = list.length > 0 ? list : (window.LAST_PROJECTS_LIST || []);
+  if (!targetList || targetList.length === 0) {
+    showMsg('⚠️ Hiện chưa có tiêu đề nào trong danh sách để nạp lên sửa!', true);
+    return;
+  }
+  if (window.COMPOSER_COLLAPSED) {
+    toggleComposerBody();
+  }
+  const namesArr = [];
+  const titlesArr = [];
+  for (const p of targetList) {
+    const fallbackCode = String(p.project_id || '').split('_')[0] || '';
+    namesArr.push(String(p.custom_name || fallbackCode).trim());
+    titlesArr.push(String(p.source_title || p.winner_title || '').trim());
+  }
+  const cEl = document.getElementById('customNamesInput');
+  const tEl = document.getElementById('titlesInput');
+  if (cEl) cEl.value = namesArr.join('\n');
+  if (tEl) {
+    tEl.value = titlesArr.join('\n');
+    tEl.focus();
+  }
+  const btnUpd = document.getElementById('btnUpdateTitlesMain');
+  if (btnUpd) btnUpd.innerHTML = '💾 Lưu Cập Nhật Tiêu Đề';
+  showMsg(`✏️ Đã nạp ${targetList.length} tiêu đề từ danh sách lên ô nhập! Hãy sửa nội dung rồi bấm [💾 Lưu Cập Nhật Tiêu Đề]!`, false);
+}
+
+async function updateTitlesFromComposerNow() {
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
-  const inp = prompt(`Nhập Tên Kịch Bản muốn đặt khi tải về / xuất vào TONG HOP cho dự án [${project_id}]\n(Để trống nếu muốn quay về mặc định 001, 002...):`, current_name || '');
-  if (inp === null) return;
-  const r = await apiPost('/api/rename_project', {project_id, custom_name: inp.trim(), niche});
-  showMsg(r.message, !r.ok);
-  fetchStatus();
+  const skip_title_rewrite = getSelectedTitlePasteMode() === 'keep_original';
+  const rawTitles = (document.getElementById('titlesInput')?.value || '').trim();
+  if (!rawTitles) {
+    // Nếu chỉ tích chọn đúng 1 dự án, mở thẳng bảng sửa chi tiết cho dự án đó; nếu không thì nạp toàn bộ danh sách lên ô nhập
+    if (window.SELECTED_PROJECTS && window.SELECTED_PROJECTS.size === 1) {
+      const onlyPid = Array.from(window.SELECTED_PROJECTS)[0];
+      openEditProjectModal(onlyPid);
+      return;
+    }
+    loadQueueTitlesToComposer();
+    return;
+  }
+  const { titles, custom_names } = collectTwoColumnInputs();
+  if (!titles || titles.length === 0) {
+    showMsg('⚠️ Không tìm thấy dòng tiêu đề hợp lệ nào để cập nhật!', true);
+    return;
+  }
+  showMsg('🔄 Đang cập nhật danh sách Tiêu đề & Mã kịch bản...', false);
+  const r = await apiPost('/api/update_titles_batch', {
+    titles,
+    custom_names,
+    niche,
+    skip_title_rewrite
+  });
+  showMsg(r.message || (r.ok ? '✅ Đã cập nhật tiêu đề thành công!' : (r.error || 'Lỗi cập nhật tiêu đề')), !r.ok);
+  if (r && r.ok) {
+    document.getElementById('titlesInput').value = '';
+    document.getElementById('customNamesInput').value = '';
+    const btnUpd = document.getElementById('btnUpdateTitlesMain');
+    if (btnUpd) btnUpd.innerHTML = '🔄 Cập Nhật Tiêu Đề';
+  }
+  await fetchStatus();
+}
+
+function openEditProjectModal(project_id) {
+  const list = window.LAST_PROJECTS_LIST || [];
+  const p = list.find(x => x.project_id === project_id);
+  if (!p) {
+    showMsg(`⚠️ Không tìm thấy dữ liệu của dự án [${project_id}]`, true);
+    return;
+  }
+  document.getElementById('editModalProjectId').value = p.project_id;
+  document.getElementById('editTitleModalHeader').innerText = `🔄 Cập Nhật Tiêu Đề & Mã — [${p.project_id}]`;
+  document.getElementById('editModalCustomName').value = p.custom_name || '';
+  document.getElementById('editModalSourceTitle').value = p.source_title || '';
+  document.getElementById('editModalWinnerTitle').value = p.winner_title || '';
+  document.getElementById('editModalSkipStep1').checked = !!p.skip_title_rewrite;
+  document.getElementById('editTitleModal').style.display = 'flex';
+}
+
+function closeEditTitleModal() {
+  const m = document.getElementById('editTitleModal');
+  if (m) m.style.display = 'none';
+}
+
+async function saveEditProjectTitleModal() {
+  const project_id = document.getElementById('editModalProjectId').value;
+  if (!project_id) return;
+  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
+  const custom_name = (document.getElementById('editModalCustomName').value || '').trim();
+  const source_title = (document.getElementById('editModalSourceTitle').value || '').trim();
+  const winner_title = (document.getElementById('editModalWinnerTitle').value || '').trim();
+  const skip_title_rewrite = !!document.getElementById('editModalSkipStep1').checked;
+  if (!source_title) {
+    showMsg('⚠️ Tiêu đề gốc không được để trống!', true);
+    return;
+  }
+  const r = await apiPost('/api/update_project_title', {
+    project_id,
+    niche,
+    custom_name,
+    source_title,
+    winner_title,
+    skip_title_rewrite
+  });
+  closeEditTitleModal();
+  showMsg(r.message || '✅ Đã cập nhật tiêu đề!', !r.ok);
+  await fetchStatus();
+}
+
+async function deleteProjectFromEditModal() {
+  const project_id = document.getElementById('editModalProjectId').value;
+  closeEditTitleModal();
+  if (project_id) {
+    await deleteProject(project_id);
+  }
+}
+
+async function promptRenameProject(project_id, current_name) {
+  openEditProjectModal(project_id);
 }
 
 async function runQueueNow() {
@@ -2549,12 +2722,28 @@ async function runSingleProject(project_dir) {
 }
 
 async function deleteProject(project_id) {
+  if (!project_id) return;
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
-  if (!confirm(`⚠️ XÁC NHẬN XÓA VĨNH VIỄN:\nBạn có chắc muốn xóa kịch bản [${project_id}] và XÓA LUÔN FOLDER CHỨA KỊCH BẢN (cùng file xuất trong TONG HOP)?`)) return;
+  showMsg(`🗑️ Đang xóa kịch bản [${project_id}] & xóa Folder trên ổ cứng...`, false);
   const r = await apiPost('/api/delete_project', {project_id, niche, delete_folder: true});
   if (window.SELECTED_PROJECTS) window.SELECTED_PROJECTS.delete(project_id);
-  showMsg(r.message, !r.ok);
-  fetchStatus();
+  showMsg(r.message || `🗑️ Đã xóa kịch bản [${project_id}]!`, !r.ok);
+  await fetchStatus();
+}
+
+async function deleteAllProjectsInChannel() {
+  const allIds = (window.LAST_PROJECTS_LIST || []).map(p => p.project_id).filter(Boolean);
+  if (allIds.length === 0) {
+    showMsg('ℹ️ Danh sách kịch bản hiện đang trống!', false);
+    return;
+  }
+  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
+  showMsg(`🗑️ Đang xóa toàn bộ ${allIds.length} tiêu đề & folder kịch bản của kênh [${niche.toUpperCase()}]...`, false);
+  const r = await apiPost('/api/bulk_delete_projects', {project_ids: allIds, niche, delete_folder: true});
+  if (window.SELECTED_PROJECTS) window.SELECTED_PROJECTS.clear();
+  window.LAST_CHECKED_PROJECT_ID = '';
+  showMsg(r.message || `🗑️ Đã xóa sạch ${allIds.length} tiêu đề!`, !r.ok);
+  await fetchStatus();
 }
 
 window.SELECTED_PROJECTS = new Set();
@@ -2632,22 +2821,19 @@ function clearSelectedProjects() {
 
 async function bulkDeleteSelectedProjects() {
   if (!window.SELECTED_PROJECTS || window.SELECTED_PROJECTS.size === 0) {
-    showMsg('⚠️ Hãy tích chọn ít nhất 1 kịch bản ở đầu dòng (hoặc tích "Chọn tất cả") trước khi bấm Xóa!', true);
+    showMsg('⚠️ Hãy tích chọn ít nhất 1 kịch bản ở đầu dòng (hoặc bấm nút "🗑️ Xóa Tất Cả Tiêu Đề" bên cạnh)!', true);
     return;
   }
   const ids = Array.from(window.SELECTED_PROJECTS);
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
-  const previewList = ids.slice(0, 8).join('\n• ') + (ids.length > 8 ? `\n... và ${ids.length - 8} kịch bản khác` : '');
-  if (!confirm(`⚠️ XÁC NHẬN XÓA HÀNG LOẠT (${ids.length} KỊCH BẢN):\n\nBạn có chắc chắn muốn XÓA VĨNH VIỄN ${ids.length} kịch bản đã chọn VÀ XÓA LUÔN TOÀN BỘ FOLDER CHỨA KỊCH BẢN (cùng các file trong TONG HOP) trên ổ cứng?\n\n• ${previewList}`)) {
-    return;
-  }
+  showMsg(`🗑️ Đang xóa ${ids.length} kịch bản đã chọn & xóa Folder trên ổ cứng...`, false);
   const r = await apiPost('/api/bulk_delete_projects', {project_ids: ids, niche, delete_folder: true});
   if (r && r.ok) {
     window.SELECTED_PROJECTS.clear();
     window.LAST_CHECKED_PROJECT_ID = '';
   }
-  showMsg(r.message || `Đã xóa ${ids.length} kịch bản và toàn bộ folder chứa kịch bản!`, !r.ok);
-  fetchStatus();
+  showMsg(r.message || `🗑️ Đã xóa ${ids.length} kịch bản và toàn bộ folder chứa kịch bản!`, !r.ok);
+  await fetchStatus();
 }
 
 async function stopWorker() {
@@ -3214,8 +3400,9 @@ async function fetchStatus() {
               ${p.has_script ? `<button class="btn btn-green btn-sm" style="padding:3px 8px; font-size:11px;" onclick="downloadProjectFile('${p.project_id}', 'kb')" title="Tải Kịch bản sạch TTS (${exportPrefix}_KB.txt)">⬇️ KB</button>` : ''}
               ${p.has_seo ? `<button class="btn btn-blue btn-sm" style="padding:3px 8px; font-size:11px;" onclick="downloadProjectFile('${p.project_id}', 'seo')" title="Tải gói SEO (${exportPrefix}_SEO.txt)">⬇️ SEO</button>` : ''}
               ${p.has_script ? `<button class="btn btn-blue btn-sm" style="padding:3px 8px; font-size:11px; background:linear-gradient(135deg,#0284c7,#2563eb); color:#fff;" onclick="sendProjectToVideoStudio('${p.project_id}')" title="Đẩy sang Bàn #7 tạo Voice & Video">🎬 Video</button>` : ''}
+              <button class="btn btn-dark btn-sm" style="padding:3px 8px; font-size:11px; border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="openEditProjectModal('${p.project_id}')" title="Cập nhật / sửa lại Tiêu đề &amp; Mã kịch bản cho dự án này (${p.project_id})">🔄 Cập Nhật Tiêu Đề</button>
               <button class="btn btn-dark btn-sm" style="padding:3px 7px; font-size:11px; border-color:var(--gold); color:var(--gold);" onclick="openProjectFolder('${p.project_id}')" title="Mở thư mục chứa kịch bản này (${p.project_id})">📂 Folder</button>
-              <button class="btn btn-dark btn-sm" style="padding:3px 7px; font-size:11px; border-color:rgba(239,68,68,0.5); color:#fca5a5;" onclick="deleteProject('${p.project_id}')" title="Xóa kịch bản này & xóa luôn Folder chứa kịch bản (${p.project_id})">🗑️</button>
+              <button class="btn btn-red btn-sm" style="padding:3px 8px; font-size:11px; font-weight:700;" onclick="deleteProject('${p.project_id}')" title="Xóa kịch bản này &amp; xóa luôn Folder chứa kịch bản (${p.project_id})">🗑️ Xóa</button>
               ${!p.completed ? `<button class="btn btn-gold btn-sm" style="padding:3px 8px; font-size:11px;" onclick="runSingleProject('${p.project_dir.replace(/\\/g, '\\\\')}')">▶️ Chạy</button>` : ''}
               <button class="btn btn-dark btn-sm" style="padding:3px 8px; font-size:11px; border-color:${isExpanded ? 'var(--gold)' : 'var(--border)'}; color:${isExpanded ? 'var(--gold)' : '#cbd5e1'};" onclick="toggleProjectDetail('${p.project_id}')">
                 ${isExpanded ? '🔼 Thu gọn' : '🔍 Chi tiết'}
@@ -3242,11 +3429,11 @@ async function fetchStatus() {
                 <div class="proj-sub" style="color:#a7f3d0;">📌 <b>Note hiện tại:</b> ${p.live_note}</div>
               </div>
               <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button class="btn btn-dark btn-sm" style="border-color:var(--gold); color:var(--gold);" onclick="promptRenameProject('${p.project_id}', '${(p.custom_name || '').replace(/'/g, "\\'")}')">✏️ Đặt / Đổi Tên Kịch Bản</button>
+                <button class="btn btn-dark btn-sm" style="border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="openEditProjectModal('${p.project_id}')">🔄 Cập Nhật Tiêu Đề &amp; Mã</button>
                 <button class="btn btn-gold btn-sm" onclick="openProjectFolder('${p.project_id}')">📂 Mở Thư Mục Chứa Kịch Bản</button>
                 ${p.has_script ? `<button class="btn btn-blue btn-sm" style="background:linear-gradient(135deg,#0284c7,#2563eb); color:#fff; font-weight:700;" onclick="sendProjectToVideoStudio('${p.project_id}')">🎬 Đẩy Sang Bàn #7 Tạo Video</button>` : ''}
                 ${!p.completed ? `<button class="btn btn-green btn-sm" onclick="runSingleProject('${p.project_dir.replace(/\\/g, '\\\\')}')">▶️ Chạy / Tiếp tục dự án này</button>` : ''}
-                <button class="btn btn-dark btn-sm" style="border-color:rgba(239,68,68,0.5); color:#fca5a5;" onclick="deleteProject('${p.project_id}')">🗑️ Xóa Kịch Bản &amp; Xóa Folder</button>
+                <button class="btn btn-red btn-sm" style="font-weight:700;" onclick="deleteProject('${p.project_id}')">🗑️ Xóa Kịch Bản &amp; Xóa Folder</button>
               </div>
             </div>
 
@@ -3581,6 +3768,46 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             )
             self._send_json({"ok": ok, "message": msg})
 
+        elif self.path == "/api/update_project_title":
+            niche = _norm_niche(body.get("niche", SELECTED_NICHE))
+            SELECTED_NICHE = niche
+            pid = str(body.get("project_id", "")).strip()
+            if not pid:
+                self._send_json({"ok": False, "message": "Thiếu mã dự án (project_id)."})
+                return
+            new_src = body.get("source_title")
+            new_win = body.get("winner_title")
+            new_cname = body.get("custom_name")
+            skip_s1 = body.get("skip_title_rewrite")
+            ok, msg, updated_st = update_project_title_and_name(
+                project_id=pid,
+                new_source_title=str(new_src).strip() if new_src is not None else None,
+                new_winner_title=str(new_win).strip() if new_win is not None else None,
+                new_custom_name=str(new_cname).strip() if new_cname is not None else None,
+                niche=niche,
+                skip_title_rewrite=bool(skip_s1) if skip_s1 is not None else None,
+            )
+            append_studio_log(f"🔄 [UPDATE-TITLE - {niche.upper()}] {msg}")
+            self._send_json({"ok": ok, "message": msg, "state": updated_st})
+
+        elif self.path == "/api/update_titles_batch":
+            niche = _norm_niche(body.get("niche", SELECTED_NICHE))
+            SELECTED_NICHE = niche
+            raw_lines = [str(t).strip() for t in body.get("titles", []) if str(t).strip()]
+            custom_names = [str(n).strip() for n in body.get("custom_names", [])]
+            skip_title_rewrite = bool(body.get("skip_title_rewrite", False))
+            if is_worker_running() and ACTIVE_WORKER_NICHE == niche:
+                stop_worker_command()
+            res = update_or_replace_queue_titles_batch(
+                titles=raw_lines,
+                custom_names=custom_names,
+                niche=niche,
+                skip_title_rewrite=skip_title_rewrite,
+            )
+            if res.get("ok"):
+                append_studio_log(f"🔄 [BATCH-UPDATE-TITLES - {niche.upper()}] {res.get('message', '')}")
+            self._send_json(res)
+
         elif self.path in ("/api/delete_project", "/api/bulk_delete_projects"):
             import stat
             import re as _re
@@ -3603,16 +3830,25 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "message": "Chưa chọn kịch bản nào để xóa."})
                 return
 
+            # Nếu tiến trình Worker đang chạy trên kênh này, dừng ngay trước khi xóa để Worker không ghi đè lại STATE.json
+            if is_worker_running() and (not ACTIVE_WORKER_NICHE or ACTIVE_WORKER_NICHE == niche):
+                try:
+                    stop_worker_command()
+                    time.sleep(0.25)
+                except Exception:
+                    pass
+
             cfg = get_niche_config(niche)
             backlog_filename = os.path.basename(cfg["BACKLOG_PATH"])
             projects_dirname = os.path.basename(cfg["PROJECTS_ROOT"])
-            tong_hop_dirname = os.path.basename(cfg["TONG_HOP_ROOT"])
 
-            # Quét thư mục hiện tại (STUDIO_ROOT: D:\ZC_TEAM\TOOL_ZC_TEAM)
+            # Quét tất cả thư mục gốc có thể chứa dự án (STUDIO_ROOT, _CODE_ROOT, D:\ZC_TEAM\TOOL_ZC_TEAM)
             candidate_roots = [STUDIO_ROOT]
-            for alt_root in (r"D:\ZC_TEAM\TOOL_ZC_TEAM",):
-                if os.path.isdir(alt_root) and os.path.normcase(os.path.abspath(alt_root)) != os.path.normcase(os.path.abspath(STUDIO_ROOT)):
-                    candidate_roots.append(alt_root)
+            for alt_root in (_CODE_ROOT, r"D:\ZC_TEAM\TOOL_ZC_TEAM"):
+                if alt_root and os.path.isdir(alt_root):
+                    norm_alt = os.path.normcase(os.path.abspath(alt_root))
+                    if all(norm_alt != os.path.normcase(os.path.abspath(r)) for r in candidate_roots):
+                        candidate_roots.append(alt_root)
 
             candidate_pdirs = set()
             export_prefixes = set()
@@ -3638,7 +3874,7 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                         for it in old_items:
                             it_pid = str(it.get("project_id", "")).strip()
                             if it_pid in seen_ids:
-                                if root_dir == STUDIO_ROOT:
+                                if os.path.normcase(os.path.abspath(root_dir)) == os.path.normcase(os.path.abspath(STUDIO_ROOT)):
                                     removed_backlog_count += 1
                                 it_pdir = str(it.get("project_dir", "")).strip()
                                 if it_pdir:
@@ -3677,7 +3913,6 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             failed_folders = []
             for pdir in sorted(candidate_pdirs):
                 if os.path.exists(pdir) and os.path.isdir(pdir):
-                    # Đảm bảo an toàn: chỉ xóa thư mục nằm trong PROJECTS / PROJECTS_HOMELESS
                     parent_name = os.path.basename(os.path.dirname(pdir)).upper()
                     if not parent_name.startswith("PROJECTS"):
                         continue
@@ -3702,8 +3937,10 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
 
             # 3. Xóa luôn các file xuất của kịch bản trong thư mục TONG HOP (_KB.txt, _SEO.txt, .wav, .srt, .mp4)
             deleted_tong_hop_files = 0
+            candidate_th_dirs = {os.path.abspath(cfg["TONG_HOP_ROOT"])}
             for root_dir in candidate_roots:
-                th_dir = os.path.join(root_dir, tong_hop_dirname)
+                candidate_th_dirs.add(os.path.abspath(os.path.join(root_dir, projects_dirname, "TONG HOP")))
+            for th_dir in candidate_th_dirs:
                 if os.path.isdir(th_dir):
                     for pref in export_prefixes:
                         if not pref:
@@ -3939,7 +4176,7 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             self._send_json({
                 "ok": True,
                 "engine": "python_real",
-                "build_number": 108,
+                "build_number": 109,
                 "studio_root": STUDIO_ROOT,
             })
         else:

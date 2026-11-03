@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 108,
-  "released_at": "2026-11-03 23:30:00",
+  "build_number": 109,
+  "released_at": "2026-11-03 23:52:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản V1.0.0 (Build #108): Sửa triệt để lỗi bấm [🎬 Viết Kịch Bản ➔ Làm Video Luôn] làm mất tiêu đề và không chạy viết kịch bản (chống reload iframe khi đồng bộ chế độ Bàn #7, thống nhất STUDIO_ROOT giữa exeDir và resources/app, giữ nguyên từ đầu tiêu đề có số như 68-Year-Old/$10,000, ngăn vòng lặp dọn tab đóng nhầm tab đang mở của 12 Key & Mexico, và tự động chạy thẳng vào Bàn #1)."
+  "changelog": "Phiên bản V1.0.0 (Build #109): Sửa triệt để lỗi không xóa được tiêu đề trong Electron (gỡ bỏ confirm/prompt bị chặn trong iframe, tự dừng Worker trước khi xóa để không tạo lại STATE.json, thêm nút [🗑️ Xóa Tất Cả Tiêu Đề] & [🧹 Xóa Ô Nhập]) và bổ sung nút [🔄 Cập Nhật Tiêu Đề] trên thanh công cụ + trên từng dòng kịch bản (hỗ trợ cả nạp danh sách tiêu đề lên 2 ô nhập để sửa hàng loạt và mở bảng cập nhật từng tiêu đề/mã)."
 }

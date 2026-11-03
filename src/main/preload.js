@@ -83,7 +83,7 @@ function checkIsRealPythonServer(port, timeoutMs = 1000) {
         res.on('end', () => {
           try {
             const data = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-            resolve(Boolean(data && data.engine === 'python_real' && Number(data.build_number || 0) >= 108));
+            resolve(Boolean(data && data.engine === 'python_real' && Number(data.build_number || 0) >= 109));
           } catch {
             resolve(false);
           }
@@ -717,6 +717,130 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
                   message: body.run_now
                     ? `🚀 Đã lưu ${addedOnDisk.length} kịch bản & khởi chạy Pipeline Viết Kịch Bản ➔ Làm Video (${_nodeSelectedNiche})!`
                     : `✅ Đã lưu ${addedOnDisk.length} tiêu đề & mã vào danh sách kịch bản (${_nodeSelectedNiche})!`
+                }), 'utf8');
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+                res.end(out);
+                return;
+              }
+
+              if (u.pathname === '/api/delete_project' || u.pathname === '/api/bulk_delete_projects') {
+                const rawIds = u.pathname === '/api/delete_project' ? [body.project_id] : (body.project_ids || []);
+                const targetIds = Array.from(new Set(rawIds.map((x) => String(x || '').trim()).filter(Boolean)));
+                const { backlogPath, projectsRoot } = resolveBacklogAndProjectsDirsNode(rootDir, _nodeSelectedNiche);
+                try {
+                  if (fs.existsSync(backlogPath)) {
+                    const bdata = JSON.parse(fs.readFileSync(backlogPath, 'utf8') || '{}');
+                    if (Array.isArray(bdata.items)) {
+                      bdata.items = bdata.items.filter((it) => !targetIds.includes(String(it.project_id || '').trim()));
+                      fs.writeFileSync(backlogPath, JSON.stringify(bdata, null, 2), 'utf8');
+                    }
+                  }
+                } catch {}
+                for (const pid of targetIds) {
+                  if (pid.includes('/') || pid.includes('\\') || pid === '.' || pid === '..') continue;
+                  const pdir = path.join(projectsRoot, pid);
+                  try {
+                    if (fs.existsSync(pdir)) {
+                      fs.rmSync(pdir, { recursive: true, force: true });
+                    }
+                  } catch {}
+                }
+                if (curSt && Array.isArray(curSt.projects)) {
+                  curSt.projects = curSt.projects.filter((p) => !targetIds.includes(String(p.project_id || '').trim()));
+                }
+                const out = Buffer.from(JSON.stringify({
+                  ok: true,
+                  deleted_count: targetIds.length,
+                  message: `🗑️ Đã xóa vĩnh viễn ${targetIds.length} kịch bản & xóa Folder trên ổ cứng!`
+                }), 'utf8');
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+                res.end(out);
+                return;
+              }
+
+              if (u.pathname === '/api/update_project_title' || u.pathname === '/api/rename_project') {
+                const pid = String(body.project_id || '').trim();
+                const newSrc = body.source_title !== undefined ? String(body.source_title || '').trim() : undefined;
+                const newWin = body.winner_title !== undefined ? String(body.winner_title || '').trim() : undefined;
+                const newCname = body.custom_name !== undefined ? String(body.custom_name || '').trim().replace(/[\\/:*?"<>|\s]+/g, '_') : undefined;
+                const skipS1 = body.skip_title_rewrite !== undefined ? Boolean(body.skip_title_rewrite) : undefined;
+                const { backlogPath, projectsRoot } = resolveBacklogAndProjectsDirsNode(rootDir, _nodeSelectedNiche);
+                try {
+                  if (fs.existsSync(backlogPath)) {
+                    const bdata = JSON.parse(fs.readFileSync(backlogPath, 'utf8') || '{}');
+                    if (Array.isArray(bdata.items)) {
+                      for (const it of bdata.items) {
+                        if (String(it.project_id || '') === pid) {
+                          if (newSrc) it.source_title = newSrc;
+                          if (newWin !== undefined) it.winner_title = newWin;
+                          if (newCname !== undefined) it.custom_name = newCname;
+                          if (skipS1 !== undefined) it.skip_title_rewrite = skipS1;
+                        }
+                      }
+                      fs.writeFileSync(backlogPath, JSON.stringify(bdata, null, 2), 'utf8');
+                    }
+                  }
+                } catch {}
+                const stPath = path.join(projectsRoot, pid, 'STATE.json');
+                try {
+                  if (fs.existsSync(stPath)) {
+                    const stData = JSON.parse(fs.readFileSync(stPath, 'utf8') || '{}');
+                    if (newSrc) stData.source_title = newSrc;
+                    if (newWin !== undefined) stData.winner_title = newWin;
+                    if (newCname !== undefined) stData.custom_name = newCname;
+                    if (skipS1 !== undefined) stData.skip_title_rewrite = skipS1;
+                    fs.writeFileSync(stPath, JSON.stringify(stData, null, 2), 'utf8');
+                  }
+                } catch {}
+                if (curSt && Array.isArray(curSt.projects)) {
+                  for (const p of curSt.projects) {
+                    if (String(p.project_id || '') === pid) {
+                      if (newSrc) p.source_title = newSrc;
+                      if (newWin !== undefined) p.winner_title = newWin;
+                      if (newCname !== undefined) {
+                        p.custom_name = newCname;
+                        p.export_prefix = newCname || pid.slice(0, 3);
+                      }
+                      if (skipS1 !== undefined) p.skip_title_rewrite = skipS1;
+                    }
+                  }
+                }
+                const out = Buffer.from(JSON.stringify({
+                  ok: true,
+                  message: `🔄 Đã cập nhật tiêu đề & mã kịch bản cho [${pid}]!`
+                }), 'utf8');
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+                res.end(out);
+                return;
+              }
+
+              if (u.pathname === '/api/update_titles_batch') {
+                const parsed = parseTitlesPayloadNode(body);
+                if (!parsed.length) {
+                  const out = Buffer.from(JSON.stringify({ ok: false, message: '⚠️ Chưa có tiêu đề hợp lệ để cập nhật.' }), 'utf8');
+                  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+                  res.end(out);
+                  return;
+                }
+                const { backlogPath, projectsRoot } = resolveBacklogAndProjectsDirsNode(rootDir, _nodeSelectedNiche);
+                try {
+                  if (fs.existsSync(backlogPath)) {
+                    const bdata = JSON.parse(fs.readFileSync(backlogPath, 'utf8') || '{}');
+                    for (const it of (bdata.items || [])) {
+                      if (it.status !== 'COMPLETED' && it.project_dir && fs.existsSync(it.project_dir)) {
+                        try { fs.rmSync(it.project_dir, { recursive: true, force: true }); } catch {}
+                      }
+                    }
+                    bdata.items = (bdata.items || []).filter((it) => it.status === 'COMPLETED');
+                    fs.writeFileSync(backlogPath, JSON.stringify(bdata, null, 2), 'utf8');
+                  }
+                } catch {}
+                const skipRewrite = Boolean(body.skip_title_rewrite);
+                const addedOnDisk = persistTitlesToDiskNode(rootDir, _nodeSelectedNiche, parsed, skipRewrite);
+                const out = Buffer.from(JSON.stringify({
+                  ok: true,
+                  updated_count: addedOnDisk.length,
+                  message: `🔄 Đã cập nhật ${addedOnDisk.length} tiêu đề thành công!`
                 }), 'utf8');
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
                 res.end(out);

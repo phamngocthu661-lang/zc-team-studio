@@ -3330,6 +3330,8 @@ def _run_single_project_pipeline_inner(
     # các Turn đã hoàn thành trên ChatGPT mà không gửi trùng lại!
 
     def save_state(status_label: str):
+        if not os.path.exists(project_dir):
+            raise RuntimeError(f"Dự án [{project_id}] đã bị xóa khỏi danh sách.")
         state["current_step_status"] = status_label
         state["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         write_json_file(state_path, state)
@@ -3482,6 +3484,8 @@ def _run_single_project_pipeline_inner(
         state["active_agent_desk"] = desk_role
         state["active_agent_label"] = entry["agent_label"]
         state["active_agent_chat"] = entry
+        if not os.path.exists(project_dir):
+            raise RuntimeError(f"Dự án [{project_id}] đã bị xóa khỏi danh sách.")
         write_json_file(state_path, state)
 
     def switch_to_isolated_desk_thread(desk_role: str, reason_desc: str):
@@ -6359,6 +6363,324 @@ def rename_project_custom_name(project_id: str, new_custom_name: str, niche: str
     return True, new_prefix, f"Đã cập nhật tên xuất file cho [{project_id}] thành: {new_prefix}_KB.txt & {new_prefix}_SEO.txt"
 
 
+def update_project_title_and_name(
+    project_id: str,
+    new_source_title: str = None,
+    new_winner_title: str = None,
+    new_custom_name: str = None,
+    niche: str = None,
+    skip_title_rewrite: bool = None,
+) -> tuple[bool, str, dict]:
+    """
+    Cập nhật Tiêu đề gốc (`source_title`), Tiêu đề đã chốt (`winner_title`), Mã định danh (`custom_name`)
+    và chế độ bỏ qua Bàn #1 (`skip_title_rewrite`) cho một dự án đã có trong danh sách.
+    """
+    if niche:
+        set_active_niche(niche)
+    cfg = get_niche_config(niche or ACTIVE_KEY_ID or ACTIVE_NICHE)
+    p_root = cfg["projects_root"]
+    b_path = cfg["backlog_path"]
+    th_dir = cfg["tong_hop_dir"]
+    pdir = os.path.join(p_root, project_id)
+    old_prefix = resolve_project_export_prefix(project_id, pdir)
+
+    cleaned_src = clean_title_prefix(new_source_title) if new_source_title is not None else None
+    cleaned_win = clean_title_prefix(new_winner_title) if new_winner_title is not None else None
+    cname = sanitize_custom_script_name(new_custom_name) if new_custom_name is not None else None
+
+    updated_item = {}
+    with BACKLOG_LOCK:
+        if os.path.exists(b_path):
+            try:
+                bdata = json.load(open(b_path, encoding="utf-8"))
+                for it in bdata.get("items", []):
+                    if it.get("project_id") == project_id:
+                        if it.get("project_dir"):
+                            pdir = it["project_dir"]
+                        if cleaned_src is not None and cleaned_src:
+                            it["source_title"] = cleaned_src
+                        if cname is not None:
+                            it["custom_name"] = cname
+                        if skip_title_rewrite is not None:
+                            it["skip_title_rewrite"] = bool(skip_title_rewrite)
+                        if cleaned_win is not None:
+                            it["winner_title"] = cleaned_win
+                        elif it.get("skip_title_rewrite") and cleaned_src:
+                            it["winner_title"] = cleaned_src
+                        updated_item = dict(it)
+                        break
+                write_json_file(b_path, bdata)
+            except Exception:
+                pass
+
+    st_path = os.path.join(pdir, "STATE.json")
+    st_data = {}
+    if os.path.exists(st_path):
+        try:
+            st_data = json.load(open(st_path, encoding="utf-8"))
+        except Exception:
+            st_data = {}
+    if not st_data and os.path.exists(pdir):
+        st_data = {
+            "project_id": project_id,
+            "project_dir": pdir,
+            "source_title": cleaned_src or updated_item.get("source_title", ""),
+            "custom_name": cname if cname is not None else updated_item.get("custom_name", ""),
+            "skip_title_rewrite": bool(skip_title_rewrite) if skip_title_rewrite is not None else bool(updated_item.get("skip_title_rewrite")),
+            "winner_title": cleaned_win or (cleaned_src if skip_title_rewrite else ""),
+            "winner_title_score": 100 if skip_title_rewrite else 0,
+            "completed_steps": ["STEP_1_DONE"] if skip_title_rewrite else [],
+            "current_step_status": "QUEUED_SKIP_STEP_1" if skip_title_rewrite else "QUEUED",
+            "completed": False,
+        }
+    if st_data:
+        if cleaned_src is not None and cleaned_src:
+            st_data["source_title"] = cleaned_src
+        if cname is not None:
+            st_data["custom_name"] = cname
+        if skip_title_rewrite is not None:
+            st_data["skip_title_rewrite"] = bool(skip_title_rewrite)
+        if cleaned_win is not None:
+            st_data["winner_title"] = cleaned_win
+            if cleaned_win and not st_data.get("winner_title_score"):
+                st_data["winner_title_score"] = 100
+        elif st_data.get("skip_title_rewrite") and cleaned_src:
+            st_data["winner_title"] = cleaned_src
+            st_data["winner_title_score"] = 100
+        st_data["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if os.path.exists(pdir):
+            write_json_file(st_path, st_data)
+            if st_data.get("skip_title_rewrite") and st_data.get("winner_title"):
+                ckpt_dir = os.path.join(pdir, "checkpoints")
+                os.makedirs(ckpt_dir, exist_ok=True)
+                write_text_file(
+                    os.path.join(ckpt_dir, "01_TITLE_REWRITE.md"),
+                    f"# BƯỚC 1: SỬ DỤNG LUÔN TIÊU ĐỀ GỐC (ĐÃ CẬP NHẬT TIÊU ĐỀ)\n\n"
+                    f"- **SOURCE TITLE:** {st_data.get('source_title', '')}\n\n"
+                    f"🏆 WINNER: {st_data.get('winner_title', '')} — 100/100\n",
+                )
+
+    new_prefix = resolve_project_export_prefix(project_id, pdir, state=st_data or updated_item)
+    if old_prefix and old_prefix != new_prefix:
+        for suf in ("_KB.txt", "_SEO.txt"):
+            old_f = os.path.join(th_dir, f"{old_prefix}{suf}")
+            if os.path.exists(old_f):
+                try:
+                    os.remove(old_f)
+                except Exception:
+                    pass
+    if os.path.exists(pdir):
+        export_to_tong_hop_folder(project_id, pdir, niche=cfg["niche"])
+    update_progress_markdown(cfg["niche"])
+    final_title = (st_data.get("winner_title") or st_data.get("source_title") or updated_item.get("source_title") or "").strip()
+    return True, f"✅ Đã cập nhật tiêu đề & mã cho [{project_id}] (Mã xuất: {new_prefix}_KB.txt | Tiêu đề: \"{final_title[:75]}\")", st_data or updated_item
+
+
+def update_or_replace_queue_titles_batch(
+    titles: list[str],
+    custom_names: list[str] = None,
+    niche: str = None,
+    skip_title_rewrite: bool = False,
+) -> dict:
+    """
+    Cập nhật hàng loạt danh sách tiêu đề & mã kịch bản từ Ô nhập 2 cột vào hàng đợi hiện tại:
+    - Các dự án chưa hoàn thành (`completed=False`) được cập nhật trực tiếp Tiêu đề gốc (`source_title`),
+      Tiêu đề khóa (`winner_title` nếu `skip_title_rewrite` hoặc đang ở Bước 1) và Mã kịch bản (`custom_name`).
+    - Nếu danh sách mới nhiều dòng hơn số dự án đang chờ: tự động tạo thêm dự án mới cho các dòng dư.
+    - Nếu danh sách mới ít dòng hơn số dự án đang chờ: tự động xóa gọn các dự án thừa ở cuối hàng đợi.
+    """
+    import shutil
+    if niche:
+        set_active_niche(niche)
+    cfg = get_niche_config(niche or ACTIVE_KEY_ID or ACTIVE_NICHE)
+    p_root = cfg["projects_root"]
+    b_path = cfg["backlog_path"]
+    th_dir = cfg["tong_hop_dir"]
+
+    valid_entries, _ = split_titles_and_commands(titles, custom_names=custom_names)
+    if not valid_entries:
+        return {"ok": False, "error": "Chưa có dòng tiêu đề hợp lệ nào trong ô nhập để cập nhật."}
+
+    os.makedirs(p_root, exist_ok=True)
+    updated_cnt = 0
+    added_cnt = 0
+    removed_cnt = 0
+
+    with BACKLOG_LOCK:
+        backlog = {"max_parallel_threads": 3, "thinking_effort": "medium", "niche": cfg["niche"], "items": []}
+        if os.path.exists(b_path):
+            try:
+                backlog = json.load(open(b_path, encoding="utf-8"))
+            except Exception:
+                pass
+
+        items = backlog.get("items", [])
+        completed_items = []
+        pending_items = []
+        for it in items:
+            pid = it.get("project_id", "")
+            pdir = os.path.join(p_root, pid) if pid else it.get("project_dir", "")
+            st_p = os.path.join(pdir, "STATE.json") if pdir else ""
+            is_comp = str(it.get("status", "")).upper() == "COMPLETED"
+            if st_p and os.path.exists(st_p):
+                try:
+                    st_d = json.load(open(st_p, encoding="utf-8"))
+                    if st_d.get("completed"):
+                        is_comp = True
+                except Exception:
+                    pass
+            if is_comp:
+                completed_items.append(it)
+            else:
+                pending_items.append(it)
+
+        new_pending_items = []
+        for idx, entry in enumerate(valid_entries):
+            t = entry["title"]
+            cname = sanitize_custom_script_name(entry.get("custom_name", ""))
+            skip_s1 = bool(skip_title_rewrite)
+            if idx < len(pending_items):
+                it = pending_items[idx]
+                pid = it.get("project_id", "")
+                pdir = os.path.join(p_root, pid) if pid else it.get("project_dir", "")
+                os.makedirs(pdir, exist_ok=True)
+                old_prefix = resolve_project_export_prefix(pid, pdir)
+                it["source_title"] = t
+                if cname:
+                    it["custom_name"] = cname
+                it["skip_title_rewrite"] = skip_s1
+                if skip_s1:
+                    it["winner_title"] = t
+                    it["winner_title_score"] = 100
+                st_p = os.path.join(pdir, "STATE.json")
+                st_d = {}
+                if os.path.exists(st_p):
+                    try:
+                        st_d = json.load(open(st_p, encoding="utf-8"))
+                    except Exception:
+                        st_d = {}
+                st_d["project_id"] = pid
+                st_d["project_dir"] = pdir
+                st_d["source_title"] = t
+                if cname:
+                    st_d["custom_name"] = cname
+                st_d["skip_title_rewrite"] = skip_s1
+                comp_steps = st_d.get("completed_steps") or []
+                if skip_s1 or "STEP_2_DONE" not in comp_steps:
+                    st_d["winner_title"] = t if skip_s1 else ""
+                    st_d["winner_title_score"] = 100 if skip_s1 else 0
+                if skip_s1:
+                    if "STEP_1_DONE" not in comp_steps:
+                        comp_steps.append("STEP_1_DONE")
+                    st_d["completed_steps"] = comp_steps
+                    ckpt_dir = os.path.join(pdir, "checkpoints")
+                    os.makedirs(ckpt_dir, exist_ok=True)
+                    write_text_file(
+                        os.path.join(ckpt_dir, "01_TITLE_REWRITE.md"),
+                        f"# BƯỚC 1: SỬ DỤNG LUÔN TIÊU ĐỀ GỐC (ĐÃ CẬP NHẬT TIÊU ĐỀ)\n\n"
+                        f"- **SOURCE TITLE:** {t}\n\n"
+                        f"🏆 WINNER: {t} — 100/100\n",
+                    )
+                st_d["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                write_json_file(st_p, st_d)
+                new_prefix = resolve_project_export_prefix(pid, pdir, state=st_d)
+                if old_prefix and old_prefix != new_prefix:
+                    for suf in ("_KB.txt", "_SEO.txt"):
+                        old_f = os.path.join(th_dir, f"{old_prefix}{suf}")
+                        if os.path.exists(old_f):
+                            try:
+                                os.remove(old_f)
+                            except Exception:
+                                pass
+                new_pending_items.append(it)
+                updated_cnt += 1
+            else:
+                # Tạo thêm dự án mới nếu người dùng thêm dòng mới vào ô nhập
+                all_ids = [x.get("project_id", "") for x in (completed_items + new_pending_items)]
+                max_num = 0
+                for eid in all_ids:
+                    m = re.match(r"^(\d+)_", eid)
+                    if m:
+                        max_num = max(max_num, int(m.group(1)))
+                next_num = max_num + 1
+                pid = f"{next_num:03d}_{cname}_{slugify_title(t)[:28]}" if cname else f"{next_num:03d}_{slugify_title(t)}"
+                pdir = os.path.join(p_root, pid)
+                os.makedirs(pdir, exist_ok=True)
+                if skip_s1:
+                    ckpt_dir = os.path.join(pdir, "checkpoints")
+                    os.makedirs(ckpt_dir, exist_ok=True)
+                    write_text_file(
+                        os.path.join(ckpt_dir, "01_TITLE_REWRITE.md"),
+                        f"# BƯỚC 1: SỬ DỤNG LUÔN TIÊU ĐỀ GỐC (BỎ QUA BÀN #1 — CHẠY THẲNG BÀN #1.5)\n\n"
+                        f"- **SOURCE TITLE:** {t}\n\n"
+                        f"🏆 WINNER: {t} — 100/100\n",
+                    )
+                new_it = {
+                    "project_id": pid,
+                    "project_dir": pdir,
+                    "source_title": t,
+                    "custom_name": cname,
+                    "niche": cfg["niche"],
+                    "skip_title_rewrite": skip_s1,
+                    "winner_title": t if skip_s1 else "",
+                    "winner_title_score": 100 if skip_s1 else 0,
+                    "status": "QUEUED_SKIP_STEP_1" if skip_s1 else "QUEUED",
+                    "added_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                write_json_file(
+                    os.path.join(pdir, "STATE.json"),
+                    {
+                        "project_id": pid,
+                        "project_dir": pdir,
+                        "source_title": t,
+                        "custom_name": cname,
+                        "skip_title_rewrite": skip_s1,
+                        "winner_title": t if skip_s1 else "",
+                        "winner_title_score": 100 if skip_s1 else 0,
+                        "thinking_effort": "medium",
+                        "thread_id": "",
+                        "host_id": "chatgpt_web",
+                        "completed_steps": ["STEP_1_DONE"] if skip_s1 else [],
+                        "current_step_status": "QUEUED_SKIP_STEP_1" if skip_s1 else "QUEUED",
+                        "live_note": "🎯 Đã cập nhật tiêu đề mới ➔ Sẵn sàng chạy!",
+                        "completed": False,
+                        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
+                new_pending_items.append(new_it)
+                added_cnt += 1
+
+        # Xóa gọn các dự án thừa nếu người dùng đã xóa bớt dòng trong ô nhập khi ấn Cập Nhật Tiêu Đề
+        if len(pending_items) > len(valid_entries):
+            for extra_it in pending_items[len(valid_entries):]:
+                epid = extra_it.get("project_id", "")
+                epdir = os.path.join(p_root, epid) if epid else extra_it.get("project_dir", "")
+                if epdir and os.path.exists(epdir):
+                    try:
+                        shutil.rmtree(epdir, ignore_errors=True)
+                    except Exception:
+                        pass
+                removed_cnt += 1
+
+        backlog["items"] = completed_items + new_pending_items
+        write_json_file(b_path, backlog)
+
+    update_progress_markdown(cfg["niche"])
+    return {
+        "ok": True,
+        "updated_count": updated_cnt,
+        "added_count": added_cnt,
+        "removed_count": removed_cnt,
+        "total_active": len(valid_entries),
+        "message": (
+            f"🔄 Đã cập nhật tiêu đề thành công: Sửa {updated_cnt} bài"
+            + (f", Thêm mới {added_cnt} bài" if added_cnt else "")
+            + (f", Xóa bớt {removed_cnt} bài thừa" if removed_cnt else "")
+            + "!"
+        ),
+    }
+
+
 def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_projects: int = 0, niche: str = None):
     """
     Chạy tự động các dự án đang chờ hoặc đang dở dang trong kho hàng đợi của kênh đã chọn (`mafia` hoặc `homeless`)
@@ -6537,12 +6859,13 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
                     update_progress_markdown(cfg["niche"])
                 except Exception as e:
                     log_msg(pid, f"❌ Lỗi khi xử lý dự án {pid}: {e}")
-                    with BACKLOG_LOCK:
-                        bdata = json.load(open(b_path, encoding="utf-8"))
-                        for bit in bdata.get("items", []):
-                            if bit["project_id"] == pid:
-                                bit["status"] = f"ERROR_PAUSED_AT_CHECKPOINT: {str(e)[:80]}"
-                        write_json_file(b_path, bdata)
+                    if os.path.exists(item.get("project_dir", "")):
+                        with BACKLOG_LOCK:
+                            bdata = json.load(open(b_path, encoding="utf-8"))
+                            for bit in bdata.get("items", []):
+                                if bit["project_id"] == pid:
+                                    bit["status"] = f"ERROR_PAUSED_AT_CHECKPOINT: {str(e)[:80]}"
+                            write_json_file(b_path, bdata)
                     update_progress_markdown(cfg["niche"])
     finally:
         client.close()
