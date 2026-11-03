@@ -2819,12 +2819,15 @@ function settingsFromBridgeModeValue(modeValue) {
 }
 
 let _wasScriptServerOnline = false;
+let _lastScriptServerUrl = '';
 let _autoEnsureServerTimer = null;
 
 function renderScriptBridgeState(st) {
   if (!st) return;
-  const becameOnline = Boolean(st.scriptServerOnline) && !_wasScriptServerOnline;
+  const targetUrl = String(st.scriptServerUrl || 'http://127.0.0.1:8098').replace(/\/+$/, '');
+  const becameOnline = Boolean(st.scriptServerOnline) && (!_wasScriptServerOnline || (_lastScriptServerUrl && _lastScriptServerUrl !== targetUrl));
   _wasScriptServerOnline = Boolean(st.scriptServerOnline);
+  if (st.scriptServerOnline) _lastScriptServerUrl = targetUrl;
   _lastBridgeState = st;
 
   const badge = $('scriptStudioServerBadge');
@@ -2842,7 +2845,7 @@ function renderScriptBridgeState(st) {
               iframe.contentWindow?.postMessage({ type: 'ZC_SWITCH_CHANNEL_KEY', channel: curChan }, '*');
             } catch {}
           };
-          iframe.src = 'http://127.0.0.1:8098/?embedded=1&t=' + Date.now();
+          iframe.src = targetUrl + '/?embedded=1&t=' + Date.now();
         }
       }
     } else {
@@ -3054,16 +3057,18 @@ async function loadScriptStudioPage() {
     }
     const iframe = $('scriptStudioIframe');
     if (iframe && st?.scriptServerOnline) {
+      const targetUrl = String(st.scriptServerUrl || _lastScriptServerUrl || 'http://127.0.0.1:8098').replace(/\/+$/, '');
       const savedChan = $('topGlobalKeySelect')?.value || localStorage.getItem('zc_active_channel_key') || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
-      if (!window._vbsScriptIframeRefreshed) {
+      if (!window._vbsScriptIframeRefreshed || (_lastScriptServerUrl && _lastScriptServerUrl !== targetUrl)) {
         window._vbsScriptIframeRefreshed = true;
+        _lastScriptServerUrl = targetUrl;
         iframe.onload = () => {
           try {
             const curChan = $('topGlobalKeySelect')?.value || localStorage.getItem('zc_active_channel_key') || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
             iframe.contentWindow?.postMessage({ type: 'ZC_SWITCH_CHANNEL_KEY', channel: curChan }, '*');
           } catch {}
         };
-        iframe.src = 'http://127.0.0.1:8098/?embedded=1&t=' + Date.now();
+        iframe.src = targetUrl + '/?embedded=1&t=' + Date.now();
       } else {
         try {
           iframe.contentWindow?.postMessage({ type: 'ZC_SWITCH_CHANNEL_KEY', channel: savedChan }, '*');
@@ -3110,6 +3115,18 @@ function setupScriptBridgeEvents() {
       toast('Đã cập nhật chế độ tự động chuyển tiếp Kịch bản ➔ Video.');
     };
   }
+
+  window.addEventListener('message', async (ev) => {
+    if (ev?.data?.type === 'ZC_SET_BRIDGE_MODE' && ev.data.mode) {
+      if ($('bridgeModeSelect')) {
+        $('bridgeModeSelect').value = ev.data.mode;
+      }
+      const nextSettings = settingsFromBridgeModeValue(ev.data.mode);
+      const st = await api.scriptBridge?.saveSettings?.(nextSettings);
+      if (st) renderScriptBridgeState(st);
+      await syncBatchConfigToBridge({ silent: true });
+    }
+  });
 
   if ($('bridgeKeyProjectSelect')) {
     $('bridgeKeyProjectSelect').onchange = async () => {
@@ -3168,12 +3185,13 @@ function setupScriptBridgeEvents() {
   if ($('btnReloadScriptStudioFrame')) {
     $('btnReloadScriptStudioFrame').onclick = async () => {
       toast('Đang kiểm tra và làm mới giao diện Viết Kịch Bản AI...');
-      await api.scriptBridge?.ensureScriptServer?.();
+      const res = await api.scriptBridge?.ensureScriptServer?.();
+      const st = await api.scriptBridge?.status?.();
+      const targetUrl = String(res?.url || st?.scriptServerUrl || _lastScriptServerUrl || 'http://127.0.0.1:8098').replace(/\/+$/, '');
       const iframe = $('scriptStudioIframe');
       if (iframe) {
-        iframe.src = 'http://127.0.0.1:8098/?embedded=1&t=' + Date.now();
+        iframe.src = targetUrl + '/?embedded=1&t=' + Date.now();
       }
-      const st = await api.scriptBridge?.status?.();
       if (st) renderScriptBridgeState(st);
     };
   }

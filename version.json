@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 104,
-  "released_at": "2026-11-03 18:55:00",
+  "build_number": 105,
+  "released_at": "2026-11-03 20:40:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản chính thức V1.0.0 (Build #104): Tối ưu gói cập nhật OTA siêu nhẹ (~6.6MB, tải trong 4 giây) & tích hợp trực tiếp Server Node.js Port 8098 ngay trong Electron/Preload, giúp mọi máy khách hiển thị 9 Bàn AI Agent tức thì ngay sau khi bấm Cập Nhật."
+  "changelog": "Phiên bản V1.0.0 (Build #105): (1) Mở sẵn khung 3 Tài khoản ChatGPT Web & nút [🔑 Đăng Nhập ChatGPT] ngay trên thanh Giao Việc để mở Chrome/Edge đăng nhập; (2) Khắc phục 100% nút [📥 Lưu Tiêu Đề & Mã] và tự động nạp Portable Python 3.14 thật (7.8MB CDN) cho máy khách; (3) Thêm nút [🎬 Viết Kịch Bản ➔ Làm Video Luôn] và thanh chọn chế độ Bàn #7 ngay trong ô Giao Việc."
 }

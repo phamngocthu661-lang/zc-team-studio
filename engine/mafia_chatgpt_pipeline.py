@@ -6139,16 +6139,11 @@ def split_titles_and_commands(raw_lines: list[str], custom_names: list[str] = No
         if lower_clean in ("tiêu đề gốc", "tieu de goc", "source title", "title", "tiêu đề"):
             continue
 
-        has_vn_chars = bool(VIETNAMESE_DIACRITIC_RE.search(cleaned))
-        has_cmd_kw = any(kw in lower_clean for kw in VIETNAMESE_CMD_KEYWORDS)
-
-        if has_vn_chars or has_cmd_kw:
+        exact_cmds = ("chạy tiếp", "chạy tiếp hàng đợi", "dừng lại", "tạm dừng", "run queue", "stop")
+        if not cname and lower_clean in exact_cmds:
             user_commands.append(line)
-        else:
-            if len(cleaned) >= 12:
-                valid_entries.append({"title": cleaned, "custom_name": cname})
-            else:
-                user_commands.append(line)
+        elif len(cleaned) >= 1:
+            valid_entries.append({"title": cleaned, "custom_name": cname})
 
     return valid_entries, user_commands
 

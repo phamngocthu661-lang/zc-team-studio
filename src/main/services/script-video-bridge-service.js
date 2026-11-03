@@ -215,11 +215,37 @@ class ScriptVideoBridgeService {
     });
   }
 
+  async _ensurePortablePythonReady(preferredRoot = null) {
+    const existing = this._resolvePythonExecutable(preferredRoot);
+    if (existing && existing !== 'python') return existing;
+    try {
+      const appDir = path.resolve(__dirname, '..', '..', '..');
+      const targetRuntimeDir = path.join(preferredRoot || appDir, 'python_runtime');
+      const tmpZip = path.join(os.tmpdir(), `zc_main_py_${Date.now()}.zip`);
+      fs.mkdirSync(targetRuntimeDir, { recursive: true });
+      const { execFileSync } = require('node:child_process');
+      execFileSync('curl.exe', [
+        '-sL', '--connect-timeout', '15', '--max-time', '90',
+        'https://github.com/phamngocthu661-lang/zc-team-studio/releases/download/V1.0.0/python_runtime_win64.zip',
+        '-o', tmpZip
+      ], { windowsHide: true });
+      if (fs.existsSync(tmpZip) && fs.statSync(tmpZip).size > 1000000) {
+        execFileSync('tar.exe', ['-xf', tmpZip, '-C', targetRuntimeDir], { windowsHide: true });
+        try { fs.unlinkSync(tmpZip); } catch {}
+      }
+    } catch {}
+    return this._resolvePythonExecutable(preferredRoot);
+  }
+
   async ensureScriptServerRunning() {
     const alreadyUp = await this.checkScriptServerHealth(1500);
-    if (alreadyUp) {
+    if (alreadyUp && !this._nodeFallback8098Server) {
       this._emitBridgeState();
       return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`, spawned: false };
+    }
+    if (this._nodeFallback8098Server) {
+      try { this._nodeFallback8098Server.close(); } catch {}
+      this._nodeFallback8098Server = null;
     }
 
     let rootDir = this.settings.scriptStudioRoot;
@@ -239,7 +265,7 @@ class ScriptVideoBridgeService {
     }
 
     try {
-      const pyExe = this._resolvePythonExecutable(rootDir);
+      const pyExe = await this._ensurePortablePythonReady(rootDir);
       this.scriptServerProcess = spawn(pyExe, [serverScript, '--no-browser'], {
         cwd: rootDir,
         windowsHide: true,

@@ -1707,8 +1707,8 @@ HTML_PAGE = r"""<!DOCTYPE html>
   </div>
 
   <div class="nav-right">
-    <button id="btnDrawerAccounts" class="drawer-toggle-btn" onclick="toggleTopDrawer('Accounts')" title="Bấm để mở/đóng bảng Quản lý 3 Tài khoản ChatGPT (Acc #1, #2, #3) & Môi trường">
-      🌐 3 Tài khoản ChatGPT <span id="navAccSummary" class="badge" style="padding:1px 6px; font-size:10.5px; color:#00ff88; border-color:rgba(0,255,136,0.4);">...</span> <span id="chevAccounts">▾</span>
+    <button id="btnDrawerAccounts" class="drawer-toggle-btn active" onclick="toggleTopDrawer('Accounts')" title="Bấm để mở/đóng bảng Quản lý 3 Tài khoản ChatGPT (Acc #1, #2, #3) & Môi trường">
+      🔑 Đăng Nhập 3 Tài Khoản ChatGPT <span id="navAccSummary" class="badge" style="padding:1px 6px; font-size:10.5px; color:#00ff88; border-color:rgba(0,255,136,0.4);">Acc #1..#3</span> <span id="chevAccounts">▴</span>
     </button>
     <button id="btnDrawerMonitor" class="drawer-toggle-btn active" onclick="toggleTopDrawer('Monitor')" title="Bấm để mở/đóng Sơ đồ 9 Bàn Nhân Viên Agent AI & Các Khe Luồng Song Song">
       🤖 9 Agent AI &amp; Luồng <span id="navMonitorSummary" class="badge" style="padding:1px 6px; font-size:10.5px; color:#00ff88; border-color:rgba(0,255,136,0.4);">9 Agent</span> <span id="chevMonitor">▴</span>
@@ -1744,27 +1744,53 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
 <div id="mainStudioWorkspace">
 
-<!-- NGĂN KÉO 1 (THU GỌN MẶC ĐỊNH): QUẢN LÝ 3 TÀI KHOẢN CHATGPT WEB & MÔI TRƯỜNG -->
-<div id="drawerAccounts" class="top-drawer">
+<!-- NGĂN KÉO 1 (MỞ SẴN MẶC ĐỊNH): QUẢN LÝ & ĐĂNG NHẬP 3 TÀI KHOẢN CHATGPT WEB -->
+<div id="drawerAccounts" class="top-drawer open">
   <div id="portabilityBanner" class="portability-banner" style="flex-direction:column; align-items:stretch; gap:8px; margin-bottom:0; padding:10px 14px;">
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <div style="font-size:12px; color:var(--text);">
-        <b style="color:#38bdf8;">🌐 Quản lý 3 Tài khoản ChatGPT Web (Giới hạn &le; 3 Kịch bản/Acc &amp; &le; 5 Tab/Acc):</b>
+        <b style="color:#38bdf8;">🌐 ĐĂNG NHẬP &amp; QUẢN LÝ 3 TÀI KHOẢN CHATGPT WEB (Giới hạn &le; 3 Kịch bản/Acc &amp; &le; 5 Tab/Acc):</b>
         Kho lưu: <b id="activeStorageInfo" style="color:var(--gold);">D:\ZC_TEAM\TOOL_ZC_TEAM\PROJECTS</b>
         <div id="envErrorDetails" style="font-size:11.5px; color:#fca5a5; margin-top:4px; font-weight:600; display:none;"></div>
       </div>
       <div class="env-pills">
-        <span id="agyStatusPill" class="env-pill" style="font-size:11px; padding:3px 8px;">🔍 Antigravity...</span>
+        <span id="agyStatusPill" class="env-pill" style="font-size:11px; padding:3px 8px;">✅ 12 Key Skills: SẴN SÀNG</span>
         <span id="chatgptStatusPill" class="env-pill" style="font-size:11px; padding:3px 8px;">🔍 3 Acc ChatGPT...</span>
+        <button class="btn btn-green btn-sm" onclick="openChatGPTWebLogin('acc_1')">🔑 Mở Chrome Đăng Nhập Acc #1</button>
+        <button class="btn btn-dark btn-sm" onclick="setChromeVisibility(true)" style="border-color:#10b981; color:#34d399;">👁️ Hiện Chrome</button>
         <button class="btn btn-dark btn-sm" onclick="setChromeVisibility(false)" style="border-color:#38bdf8; color:#38bdf8;">👻 Ẩn Tất Cả Chrome</button>
-        <button class="btn btn-dark btn-sm" onclick="syncNewMachine()">🔧 Đồng bộ 17 Skill</button>
+        <button class="btn btn-dark btn-sm" onclick="syncNewMachine()">🔧 Đồng bộ Skill</button>
         <button class="btn btn-dark btn-sm" onclick="toggleTopDrawer('Accounts')">✖ Thu gọn</button>
       </div>
     </div>
     <div id="multiAccountsGrid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; padding-top:6px; border-top:1px solid var(--border);">
-      <div class="slot-card">🔍 Đang tải trạng thái Acc #1 (Port 9222)...</div>
-      <div class="slot-card">🔍 Đang tải trạng thái Acc #2 (Port 9223)...</div>
-      <div class="slot-card">🔍 Đang tải trạng thái Acc #3 (Port 9224)...</div>
+      <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+          <b style="color:var(--gold); font-size:12.8px;">👤 Acc #1 (Port 9222)</b>
+          <span style="color:#fde68a; font-weight:700;">⚪ Bấm nút dưới để Đăng nhập</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+          <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_1')">🔑 Đăng Nhập Acc #1</button>
+        </div>
+      </div>
+      <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+          <b style="color:var(--gold); font-size:12.8px;">👤 Acc #2 (Port 9223)</b>
+          <span style="color:#94a3b8;">⚪ Tùy chọn (Chạy 6 luồng)</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+          <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_2')">🔑 Đăng Nhập Acc #2</button>
+        </div>
+      </div>
+      <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+          <b style="color:var(--gold); font-size:12.8px;">👤 Acc #3 (Port 9224)</b>
+          <span style="color:#94a3b8;">⚪ Tùy chọn (Chạy 9 luồng)</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+          <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_3')">🔑 Đăng Nhập Acc #3</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1840,7 +1866,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
     </div>
 
     <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-      <button class="btn btn-blue btn-sm" style="padding:6px 10px; font-size:11.8px;" onclick="addTitlesOnly()">📥 Lưu Hàng Đợi</button>
+      <button class="btn btn-green btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #34d399;" onclick="openChatGPTWebLogin('acc_1')" title="Mở trình duyệt Chrome để đăng nhập tài khoản ChatGPT">🔑 Đăng Nhập ChatGPT</button>
+      <button class="btn btn-blue btn-sm" style="padding:6px 10px; font-size:11.8px; font-weight:700;" onclick="addTitlesOnly()">📥 Lưu Tiêu Đề &amp; Mã</button>
+      <button class="btn btn-gold btn-sm" style="padding:6px 12px; font-size:11.8px; font-weight:800; background:linear-gradient(135deg,#00ff88,#10b981); color:#04130b; border-color:#00ff88;" onclick="addAndRunWithAutoVideoNow()" title="Lưu Tiêu đề + Mã kịch bản, tự động viết kịch bản qua 9 Bàn AI rồi tự động Tạo Voice + Phụ đề + Render Video MP4 luôn!">🎬 Viết Kịch Bản ➔ Làm Video Luôn</button>
       <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
       <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
       <button class="btn btn-red btn-sm" style="padding:6px 10px; font-size:11.8px;" onclick="stopWorker()">⏹️ Dừng</button>
@@ -1849,20 +1877,29 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
   <!-- KHUNG 2 Ô NHẬP TIÊU ĐỀ + CHỌN CHẾ ĐỘ TIÊU ĐỀ KHI DÁN (CÓ THỂ THU NHỎ BẰNG NÚT TRÊN) -->
   <div id="composerBody" style="margin-top:8px; padding-top:8px; border-top:1px solid #1e293b;">
-    <!-- THANH CHỌN NHANH CHẾ ĐỘ TIÊU ĐỀ NGAY KHI DÁN -->
+    <!-- THANH CHỌN NHANH CHẾ ĐỘ TIÊU ĐỀ NGAY KHI DÁN + CHẾ ĐỘ TỰ ĐỘNG LÀM VIDEO LUÔN -->
     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px; padding:7px 10px; border-radius:8px; background:rgba(15,23,42,0.85); border:1px solid #334155;">
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <span style="font-size:12px; font-weight:700; color:#f8fafc;">⚡ Chế độ xử lý khi dán Tiêu đề:</span>
+        <span style="font-size:12px; font-weight:700; color:#f8fafc;">⚡ Chế độ Tiêu đề:</span>
         <label id="lblModeRewrite" onclick="syncTitleModeSelection('rewrite')" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; cursor:pointer; font-size:11.8px; font-weight:700; border:1px solid var(--gold); background:rgba(245,185,66,0.18); color:#fde68a; transition:all 0.15s;">
           <input type="radio" name="titlePasteModeRadio" id="radioModeRewrite" value="rewrite" checked onchange="syncTitleModeSelection('rewrite')" style="accent-color:#f5b942; cursor:pointer;" />
-          <span>🔥 Viết lại &amp; Chấm điểm Tiêu đề (Chạy từ Bàn #1)</span>
+          <span>🔥 Viết lại Tiêu đề (Bàn #1)</span>
         </label>
         <label id="lblModeKeepOriginal" onclick="syncTitleModeSelection('keep_original')" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; cursor:pointer; font-size:11.8px; font-weight:700; border:1px solid #334155; background:#0f172a; color:#94a3b8; transition:all 0.15s;">
           <input type="radio" name="titlePasteModeRadio" id="radioModeKeepOriginal" value="keep_original" onchange="syncTitleModeSelection('keep_original')" style="accent-color:#10b981; cursor:pointer;" />
-          <span>🎯 Sử dụng luôn Tiêu đề đã dán — Không viết lại (Bỏ qua Bàn #1 ➔ Chạy thẳng Bàn #1.5)</span>
+          <span>🎯 Dùng luôn Tiêu đề đã dán (Chạy thẳng Bàn #1.5)</span>
         </label>
       </div>
-      <span id="titleModeHintBadge" style="font-size:11px; color:#fde68a; font-weight:600;">📌 Đang chọn: Viết lại 5 tiêu đề mới tại Bàn #1 (&ge;97đ)</span>
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <span style="font-size:11.5px; font-weight:800; color:#00ff88;">🎬 Sau khi viết xong (Bàn #7):</span>
+        <select id="embeddedAutoVideoMode" onchange="syncEmbeddedBridgeMode(this.value)" style="padding:4px 9px; font-size:11.5px; font-weight:800; color:#00ff88; background:#06281e; border:1px solid #00ff88; border-radius:6px; cursor:pointer;">
+          <option value="STREAMING_VIDEO" selected>⚡ Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn</option>
+          <option value="BATCH_VIDEO">📦 Đợi viết xong cả lô ➔ Tạo Voice + Làm Video 1 lượt</option>
+          <option value="STREAMING_VOICE">🎙️ Viết Kịch Bản Xong ➔ Chỉ Tạo Voice (.wav)</option>
+          <option value="DISABLED">📝 Chỉ Viết Kịch Bản (.txt) — Không tự tạo Video</option>
+        </select>
+      </div>
+      <span id="titleModeHintBadge" style="display:none;">📌 Đang chọn: Viết lại 5 tiêu đề mới tại Bàn #1 (&ge;97đ)</span>
     </div>
 
     <div style="display:grid; grid-template-columns: 0.28fr 0.72fr; gap:8px;">
@@ -1947,7 +1984,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
 <script>
 let CURRENT_NICHE = '';
-window.OPEN_TOP_DRAWERS = new Set(['Monitor']);
+window.OPEN_TOP_DRAWERS = new Set(['Accounts', 'Monitor']);
 window.COMPOSER_COLLAPSED = false;
 
 function toggleTopDrawer(name) {
@@ -2308,6 +2345,15 @@ function syncTitleModeSelection(modeVal) {
   }
 }
 
+function syncEmbeddedBridgeMode(modeVal) {
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'ZC_SET_BRIDGE_MODE', mode: modeVal }, '*');
+    }
+  } catch (e) {}
+  showMsg(`🎬 Đã đặt chế độ Bàn #7: ${modeVal === 'STREAMING_VIDEO' ? 'Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn!' : modeVal}`);
+}
+
 async function addTitlesOnly() {
   const {titles, custom_names} = collectTitlesAndCustomNamesFromUI();
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
@@ -2320,6 +2366,13 @@ async function addTitlesOnly() {
     document.getElementById('customNamesInput').value = '';
   }
   fetchStatus();
+}
+
+async function addAndRunWithAutoVideoNow() {
+  const embMode = document.getElementById('embeddedAutoVideoMode');
+  if (embMode) embMode.value = 'STREAMING_VIDEO';
+  syncEmbeddedBridgeMode('STREAMING_VIDEO');
+  await addAndRunNow();
 }
 
 async function addAndRunNow() {
@@ -3728,6 +3781,8 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "message": f"📂 Đã mở thư mục: {target_dir}"})
             else:
                 self._send_json({"ok": False, "message": f"Thư mục chưa tồn tại: {target_dir}"})
+        elif self.path == "/api/is_real_python_server":
+            self._send_json({"ok": True, "engine": "python_real"})
         else:
             self.send_error(404)
 
@@ -3749,6 +3804,12 @@ def _tong_hop_auto_sync_loop():
 
 
 if __name__ == "__main__":
+    for idx, arg in enumerate(sys.argv):
+        if arg == "--port" and idx + 1 < len(sys.argv):
+            try:
+                PORT = int(sys.argv[idx + 1])
+            except Exception:
+                pass
     print(f"==================================================================")
     print(f"PHIÊN BẢN 2 — CHATGPT WEB MULTI-ACCOUNT & MULTI-TAB STUDIO: http://127.0.0.1:{PORT}")
     print(f"==================================================================")
