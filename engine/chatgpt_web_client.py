@@ -7,7 +7,10 @@ import subprocess
 import threading
 import urllib.request
 from datetime import datetime
-import websocket
+try:
+    import websocket
+except Exception:
+    websocket = None
 
 STUDIO_WEB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if STUDIO_WEB_ROOT not in sys.path:

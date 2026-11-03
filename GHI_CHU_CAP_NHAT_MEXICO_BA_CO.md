@@ -193,3 +193,28 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
 | **14** | `mafia` | `daden` | — | **DADEN (Giọng Kể Chuyện Mafia US)** | 🇺🇸 `en` · `1.0x` |
 
 - **Tự động 100% khi chọn Key:** Mỗi khi bạn chọn bất kỳ Key nào ở ô **`🔑 CHỌN KEY`** (góc trên bên trái), ô **`🎙️ Voice của Key`** và cấu hình xuất video Bàn #7 sẽ **tự động nhảy sang đúng giọng Clone tương ứng của Key đó**!
+
+---
+
+## 7. CẬP NHẬT MỚI (03/11/2026): PHÁT HÀNH BẢN `V1.0.0` LÊN GITHUB & HỆ THỐNG CẬP NHẬT TỰ ĐỘNG OTA CHO MÁY KHÁCH
+
+1. **Kho GitHub Chính Thức (`V1.0.0` · `Build #100`):**
+   - Địa chỉ Repository: `https://github.com/phamngocthu661-lang/zc-team-studio` (Tài khoản: `phamngocthu661-lang`, nhánh `main`).
+   - File quản lý phiên bản: [`D:\ZC_TEAM\TOOL_ZC_TEAM\version.json`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/version.json) (`"version": "V1.0.0"`, `"build_number": 100`).
+   - Bảo mật tuyệt đối: Các file bí mật cấp Key của Admin (`ADMIN_MASTER_SECRET.json`, `ADMIN_LICENSE_DB.json`, `VBS-License-Admin/`) và dữ liệu riêng của máy khách (`data/`, `license.key`, `video-batch-studio.db`, `PROJECTS*`, `BROWSER_PROFILE*`) đã được khóa chặt trong [`.gitignore`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/.gitignore) và danh sách bảo vệ `PROTECTED_CUSTOMER_NAMES` của [`UpdaterService`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/updater-service.js).
+
+2. **Cơ Chế Cập Nhật Tự Động Trên Máy Khách (`🚀 Cập Nhật Ngay` hoặc `⏳ Để Sau`):**
+   - Khi mở ứng dụng (hoặc bấm nút **`🔄 Kiểm tra cập nhật`** / nhãn **`V1.0.0`** trên thanh Topbar), ứng dụng tự động kiểm tra phiên bản mới nhất trên GitHub.
+   - Nếu có bản mới (`build_number` trên GitHub lớn hơn bản trên máy khách):
+     - Thanh Topbar tự động hiện nút nổi bật **`🚀 Có bản cập nhật mới: V1.x.x — Ấn để Cập Nhật`**.
+     - Hộp thoại Cập nhật hiển thị rõ Phiên bản hiện tại, Phiên bản mới, Thời gian phát hành và Nội dung thay đổi (`Changelog`) kèm **2 lựa chọn rõ ràng cho khách hàng**:
+       1. **`🚀 Cập Nhật Ngay (Tự động tải & cài đặt)`**: Tự động tải gói cập nhật từ GitHub (~6 MB), giải nén, nâng cấp toàn bộ giao diện, Engine 9 Bàn, 12 Key Skills & `Kho_Voice` (giữ nguyên 100% Bản quyền `license.key`, Project, Template, Kho Green và Kịch bản của khách), khởi động lại Server `:8098` và làm mới ứng dụng lên bản mới nhất.
+       2. **`⏳ Để Sau (Không cập nhật lúc này)`**: Đóng hộp thoại để khách tiếp tục làm việc bình thường; nút **`🚀 Có bản cập nhật mới`** vẫn giữ trên thanh Topbar để khách bấm cập nhật bất cứ lúc nào muốn.
+
+3. **Quy Tắc Đẩy Bản Cập Nhật Lên GitHub Trong Tương Lai:**
+   - Khi sửa code hoặc nâng cấp tính năng trên máy của bạn, hệ thống **chỉ lưu cục bộ trên máy của bạn** (không tự ý đẩy lên GitHub).
+   - **Chỉ khi nào bạn nhắn yêu cầu `"cập nhật lên github"`** (hoặc bạn chạy [`DAY_CAP_NHAT_LEN_GITHUB.bat`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/DAY_CAP_NHAT_LEN_GITHUB.bat) / [`push_update_github.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/push_update_github.py)), hệ thống mới tự động tăng số phiên bản (`V1.0.1`, `V1.0.2`...) và đẩy lên GitHub để các máy khách hiện nút cập nhật.
+
+4. **Gói File `.ZIP` Bàn Giao Cho Khách Hàng (`V1.0.0`):**
+   - Đường dẫn file ZIP: [`D:\ZC_TEAM\TOOL_ZC_TEAM\ZC_TEAM_Studio_V1.0.0_Khach_Hang.zip`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/ZC_TEAM_Studio_V1.0.0_Khach_Hang.zip)
+   - Đã tích hợp sẵn toàn bộ Runtime `Video Batch Studio.exe`, `CHAY_UNG_DUNG_ZC_TEAM.bat`, `HUONG_DAN_KHACH_HANG.txt`, `FFmpeg/FFprobe`, `12 Key & 60 Skill`, `12 Giọng Clone Kho_Voice`, `Kho_Green`, `Engine 9 Bàn AI` và bộ tự động cập nhật OTA từ GitHub (đã loại bỏ `license.key` của máy chủ và toàn bộ khóa bí mật Admin).

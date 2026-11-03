@@ -59,6 +59,8 @@ class UpdaterService {
     const candidates = [
       this.scriptBridgeService?.settings?.scriptStudioRoot,
       'D:\\ZC_TEAM\\TOOL_ZC_TEAM',
+      path.dirname(process.execPath),
+      path.resolve(path.dirname(process.execPath), '..'),
       this.appDir
     ].filter(Boolean);
     for (const c of candidates) {
@@ -68,7 +70,7 @@ class UpdaterService {
         }
       } catch {}
     }
-    return this.appDir;
+    return path.dirname(process.execPath) || this.appDir;
   }
 
   _resolveExeDir() {
@@ -84,10 +86,17 @@ class UpdaterService {
   }
 
   _resolvePythonExe() {
+    const exeDir = path.dirname(process.execPath);
+    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
     const candidates = [
+      path.join(this.studioRoot || '', 'python_runtime', 'python.exe'),
+      path.join(exeDir, 'python_runtime', 'python.exe'),
+      path.join(this.appDir || '', 'python_runtime', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python314', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python313', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python312', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python311', 'python.exe'),
       'C:\\Users\\hungp\\AppData\\Local\\Programs\\Python\\Python314\\python.exe',
-      'C:\\Users\\hungp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
-      'C:\\Users\\hungp\\AppData\\Local\\Programs\\Python\\Python311\\python.exe',
       'C:\\Python314\\python.exe',
       'python'
     ];
@@ -393,6 +402,7 @@ class UpdaterService {
         'src',
         'assets',
         'engine',
+        'python_runtime',
         'skills_12_keys',
         'skills_mexico',
         'skills_homeless',
@@ -431,24 +441,30 @@ class UpdaterService {
         const resolved = path.resolve(targetAppDir);
         if (visitedAppDirs.has(resolved) || !fs.existsSync(resolved)) continue;
         visitedAppDirs.add(resolved);
-        for (const sub of ['src', 'assets']) {
+        for (const sub of ['src', 'assets', 'engine', 'skills_12_keys', 'skills_mexico', 'skills_homeless', 'DOCSMOI', '.agents']) {
           if (fs.existsSync(path.join(srcRoot, sub))) {
             copyRecursiveCount(path.join(srcRoot, sub), path.join(resolved, sub));
           }
         }
-        for (const f of ['package.json', 'version.json']) {
+        for (const f of ['package.json', 'version.json', 'mafia_dashboard_server.py', 'organize_12_keys_skills.py']) {
           if (fs.existsSync(path.join(srcRoot, f))) {
             try { fs.copyFileSync(path.join(srcRoot, f), path.join(resolved, f)); } catch {}
           }
         }
       }
 
-      // Đồng bộ Kho_Voice & version.json vào exeDir
-      if (fs.existsSync(path.join(srcRoot, 'Kho_Voice')) && fs.existsSync(this.exeDir)) {
-        copyRecursiveCount(path.join(srcRoot, 'Kho_Voice'), path.join(this.exeDir, 'Kho_Voice'));
-      }
-      if (fs.existsSync(path.join(srcRoot, 'version.json')) && fs.existsSync(this.exeDir)) {
-        try { fs.copyFileSync(path.join(srcRoot, 'version.json'), path.join(this.exeDir, 'version.json')); } catch {}
+      // Đồng bộ Kho_Voice, python_runtime, engine, skills & version.json vào exeDir (cho máy khách chạy trực tiếp từ thư mục giải nén ZIP)
+      if (this.exeDir && path.resolve(this.exeDir) !== path.resolve(this.studioRoot) && fs.existsSync(this.exeDir)) {
+        for (const sub of ['Kho_Voice', 'python_runtime', 'engine', 'skills_12_keys', 'skills_mexico', 'skills_homeless', 'DOCSMOI', '.agents']) {
+          if (fs.existsSync(path.join(srcRoot, sub))) {
+            copyRecursiveCount(path.join(srcRoot, sub), path.join(this.exeDir, sub));
+          }
+        }
+        for (const f of ['version.json', 'mafia_dashboard_server.py', 'organize_12_keys_skills.py']) {
+          if (fs.existsSync(path.join(srcRoot, f))) {
+            try { fs.copyFileSync(path.join(srcRoot, f), path.join(this.exeDir, f)); } catch {}
+          }
+        }
       }
 
       // 4. Nếu có script đồng bộ 12 Key Skills vào ~/.gemini/config/skills thì chạy ngầm

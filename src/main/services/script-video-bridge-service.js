@@ -6,11 +6,17 @@ const http = require('node:http');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 
+const os = require('node:os');
 const BRIDGE_PORT = 3999;
 const SCRIPT_STUDIO_PORT = 8098;
 const DEFAULT_SCRIPT_STUDIO_DIRS = [
-  'D:\\ZC_TEAM\\TOOL_ZC_TEAM',
+  path.dirname(process.execPath),
+  path.resolve(path.dirname(process.execPath), 'resources', 'app'),
   path.resolve(__dirname, '..', '..', '..'),
+  path.resolve(__dirname, '..', '..', '..', '..'),
+  path.resolve(__dirname, '..', '..', '..', '..', '..'),
+  'D:\\ZC_TEAM\\TOOL_ZC_TEAM',
+  path.resolve(path.dirname(process.execPath), '..'),
   'D:\\ZC_TEAM'
 ];
 
@@ -75,14 +81,28 @@ class ScriptVideoBridgeService {
     this.activeJob = null;
   }
 
-  _resolvePythonExecutable() {
+  _resolvePythonExecutable(preferredRoot = null) {
+    const exeDir = path.dirname(process.execPath);
+    const appDir = path.resolve(__dirname, '..', '..', '..');
+    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
     const candidates = [
+      preferredRoot ? path.join(preferredRoot, 'python_runtime', 'python.exe') : null,
+      path.join(exeDir, 'python_runtime', 'python.exe'),
+      path.join(exeDir, 'resources', 'app', 'python_runtime', 'python.exe'),
+      path.join(appDir, 'python_runtime', 'python.exe'),
+      path.join(path.resolve(appDir, '..', '..'), 'python_runtime', 'python.exe'),
+      'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\python_runtime\\python.exe',
+      path.join(localAppData, 'Programs', 'Python', 'Python314', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python313', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python312', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python311', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python310', 'python.exe'),
       'C:\\Users\\hungp\\AppData\\Local\\Programs\\Python\\Python314\\python.exe',
-      'C:\\Users\\hungp\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
-      'C:\\Users\\hungp\\AppData\\Local\\Programs\\Python\\Python311\\python.exe',
       'C:\\Python314\\python.exe',
+      'C:\\Python313\\python.exe',
+      'C:\\Python312\\python.exe',
       'C:\\Python311\\python.exe'
-    ];
+    ].filter(Boolean);
     for (const exe of candidates) {
       try {
         if (fs.existsSync(exe)) return exe;
@@ -184,7 +204,14 @@ class ScriptVideoBridgeService {
       return { online: true, url: `http://127.0.0.1:${SCRIPT_STUDIO_PORT}`, spawned: false };
     }
 
-    const rootDir = this.settings.scriptStudioRoot || this._detectScriptStudioRoot();
+    let rootDir = this.settings.scriptStudioRoot;
+    if (!rootDir || !fs.existsSync(path.join(rootDir, 'mafia_dashboard_server.py'))) {
+      rootDir = this._detectScriptStudioRoot();
+      this.settings.scriptStudioRoot = rootDir;
+      try {
+        this.database?.setSetting?.('script_video_bridge_settings', this.settings);
+      } catch {}
+    }
     const serverScript = path.join(rootDir, 'mafia_dashboard_server.py');
     if (!fs.existsSync(serverScript)) {
       return {
@@ -194,7 +221,7 @@ class ScriptVideoBridgeService {
     }
 
     try {
-      const pyExe = this._resolvePythonExecutable();
+      const pyExe = this._resolvePythonExecutable(rootDir);
       this.scriptServerProcess = spawn(pyExe, [serverScript, '--no-browser'], {
         cwd: rootDir,
         windowsHide: true,

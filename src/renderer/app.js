@@ -2818,8 +2818,13 @@ function settingsFromBridgeModeValue(modeValue) {
   }
 }
 
+let _wasScriptServerOnline = false;
+let _autoEnsureServerTimer = null;
+
 function renderScriptBridgeState(st) {
   if (!st) return;
+  const becameOnline = Boolean(st.scriptServerOnline) && !_wasScriptServerOnline;
+  _wasScriptServerOnline = Boolean(st.scriptServerOnline);
   _lastBridgeState = st;
 
   const badge = $('scriptStudioServerBadge');
@@ -2828,10 +2833,34 @@ function renderScriptBridgeState(st) {
       badge.style.background = '#065f46';
       badge.style.color = '#34d399';
       badge.textContent = '🟢 Engine Kịch Bản: Đang hoạt động (8098)';
+      if (becameOnline) {
+        const iframe = $('scriptStudioIframe');
+        if (iframe) {
+          iframe.onload = () => {
+            try {
+              const curChan = $('topGlobalKeySelect')?.value || localStorage.getItem('zc_active_channel_key') || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+              iframe.contentWindow?.postMessage({ type: 'ZC_SWITCH_CHANNEL_KEY', channel: curChan }, '*');
+            } catch {}
+          };
+          iframe.src = 'http://127.0.0.1:8098/?embedded=1&t=' + Date.now();
+        }
+      }
     } else {
       badge.style.background = '#854d0e';
       badge.style.color = '#fde047';
       badge.textContent = '🟠 Engine Kịch Bản: Đang khởi động...';
+      if (!_autoEnsureServerTimer) {
+        _autoEnsureServerTimer = setTimeout(async () => {
+          _autoEnsureServerTimer = null;
+          try {
+            const res = await api.scriptBridge?.ensureScriptServer?.();
+            if (res?.online) {
+              const nextSt = await api.scriptBridge?.status?.();
+              if (nextSt) renderScriptBridgeState(nextSt);
+            }
+          } catch {}
+        }, 2000);
+      }
     }
   }
 

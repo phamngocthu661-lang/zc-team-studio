@@ -36,6 +36,8 @@ vbs_interactive_log.txt
 *.db-shm
 *.db-wal
 *.zip
+!python_runtime/python314.zip
+!python_runtime/**
 *.rar
 *.7z
 *.asar

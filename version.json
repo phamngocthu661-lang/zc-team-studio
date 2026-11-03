@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 100,
-  "released_at": "2026-11-03 17:35:00",
+  "build_number": 101,
+  "released_at": "2026-11-03 18:28:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản chính thức V1.0.0: Giao diện ZC TEAM Cyber Terminal Studio Matrix, tích hợp trọn bộ 12 Key & 60 Skill chuẩn theo tên thư mục, 12 Giọng Clone VoiceStudio GPU (Port 3900) khớp tự động 1-1 với từng Key, 9 Bàn AI Agent viết kịch bản nối thẳng Bàn #7 Render Video NVENC, và Hệ thống Tự động Cập nhật OTA qua GitHub."
+  "changelog": "Phiên bản chính thức V1.0.0 (Build #101): Tích hợp sẵn Portable Python 3.14 (python_runtime) & thư viện websocket độc lập ngay trong ứng dụng giúp máy khách không cần cài đặt Python vẫn tự động khởi chạy tức thì Engine Kịch Bản 9 Bàn AI Agent (Port 8098) ở mọi ổ đĩa."
 }
