@@ -34,7 +34,10 @@ function syncIframeToRealPythonUrl(port) {
     if (iframe) {
       const curSrc = String(iframe.getAttribute('src') || '');
       if (!curSrc.startsWith(targetBase)) {
-        iframe.src = `${targetBase}/?embedded=1&t=${Date.now()}`;
+        const curChan = document.getElementById('topGlobalKeySelect')?.value
+          || (typeof localStorage !== 'undefined' && localStorage.getItem('zc_active_channel_key'))
+          || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+        iframe.src = `${targetBase}/?embedded=1&channel=${encodeURIComponent(curChan)}&t=${Date.now()}`;
       }
     }
     const badge = document.getElementById('scriptStudioServerBadge');
@@ -80,7 +83,7 @@ function checkIsRealPythonServer(port, timeoutMs = 1000) {
         res.on('end', () => {
           try {
             const data = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-            resolve(Boolean(data && data.engine === 'python_real'));
+            resolve(Boolean(data && data.engine === 'python_real' && Number(data.build_number || 0) >= 108));
           } catch {
             resolve(false);
           }
@@ -576,6 +579,46 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
               _nodeSelectedNiche = rawNiche;
             }
             const baseSt = statusMap[_nodeSelectedNiche] || statusMap.mafia || Object.values(statusMap)[0] || {};
+            try {
+              const { backlogPath } = resolveBacklogAndProjectsDirsNode(rootDir, _nodeSelectedNiche);
+              if (fs.existsSync(backlogPath)) {
+                const diskBacklog = JSON.parse(fs.readFileSync(backlogPath, 'utf8') || '{}');
+                const items = Array.isArray(diskBacklog.items) ? diskBacklog.items : [];
+                if (items.length > 0) {
+                  baseSt.projects = items.slice().reverse().map((it) => {
+                    const pid = it.project_id || '001_Story';
+                    let stObj = {};
+                    try {
+                      if (it.project_dir && fs.existsSync(path.join(it.project_dir, 'STATE.json'))) {
+                        stObj = JSON.parse(fs.readFileSync(path.join(it.project_dir, 'STATE.json'), 'utf8') || '{}');
+                      }
+                    } catch {}
+                    return {
+                      project_id: pid,
+                      project_dir: it.project_dir || '',
+                      custom_name: it.custom_name || stObj.custom_name || '',
+                      export_prefix: it.custom_name || stObj.custom_name || pid.slice(0, 3),
+                      account_id: stObj.account_id || 'acc_1',
+                      account_label: stObj.account_label || 'Acc #1',
+                      source_title: it.source_title || stObj.source_title || pid,
+                      winner_title: stObj.winner_title || it.winner_title || '',
+                      winner_title_score: stObj.winner_title_score || it.winner_title_score || 0,
+                      skip_title_rewrite: Boolean(it.skip_title_rewrite || stObj.skip_title_rewrite),
+                      completed_steps: Array.isArray(stObj.completed_steps) ? stObj.completed_steps : [],
+                      current_step_status: stObj.current_step_status || it.status || 'QUEUED',
+                      active_stage: stObj. current_step_status && stObj.current_step_status.includes('RUNNING') ? 1 : 0,
+                      progress_pct: stObj.completed ? 100 : 10,
+                      live_note: stObj.live_note || '📥 Đã lưu tiêu đề & mã vào danh sách kịch bản.',
+                      completed: Boolean(stObj.completed),
+                      script_metrics: stObj.script_metrics || {},
+                      audit_history: Array.isArray(stObj.audit_history) ? stObj.audit_history : [],
+                      agent_chat_registry: stObj.agent_chat_registry || {},
+                      updated_at: stObj.updated_at || it.added_at || new Date().toLocaleTimeString('vi-VN')
+                    };
+                  });
+                }
+              }
+            } catch {}
             const payload = Buffer.from(JSON.stringify({
               ...baseSt,
               selected_niche: _nodeSelectedNiche,
@@ -758,10 +801,18 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
           _nodeFallbackServer = null;
         }
 
+        // Dọn tiến trình mafia_dashboard_server.py bản cũ (nếu đang giữ cổng 8098) để luôn chạy bản mới nhất trên cổng 8098
+        try {
+          execFileSync('powershell.exe', [
+            '-NoProfile', '-WindowStyle', 'Hidden', '-Command',
+            "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*mafia_dashboard_server.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+          ], { windowsHide: true, timeout: 4000 });
+        } catch {}
+
         let targetPort = SCRIPT_STUDIO_PORT;
         for (const p of CANDIDATE_STUDIO_PORTS) {
-          const occupied = await checkPortQuick(p, 450);
-          if (!occupied || await checkIsRealPythonServer(p, 500)) {
+          const occupied = await checkPortQuick(p, 350);
+          if (!occupied || await checkIsRealPythonServer(p, 450)) {
             targetPort = p;
             break;
           }
@@ -866,6 +917,10 @@ function writeCustomLinkedFolders(partial = {}) {
 function enrichBridgeStateWithLinkedFolders(st) {
   if (!st || typeof st !== 'object') return st;
   try {
+    if (_realPythonOnline || _nodeFallbackServer || st.scriptServerOnline) {
+      st.scriptServerOnline = true;
+      st.scriptServerUrl = `http://127.0.0.1:${_activeScriptStudioPort}`;
+    }
     const { primaryRoot } = getStudioBaseDirs();
     const linked = readCustomLinkedFolders();
     const cfg = st.lockedVideoConfig || {};

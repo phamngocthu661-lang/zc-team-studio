@@ -1011,7 +1011,8 @@
 </div>
 
 <script>
-let CURRENT_NICHE = '';
+let CURRENT_NICHE = (new URLSearchParams(window.location.search).get('channel') || '').trim();
+let _nicheSwitchSeq = 0;
 window.OPEN_TOP_DRAWERS = new Set(['Accounts', 'Monitor']);
 window.COMPOSER_COLLAPSED = false;
 
@@ -1057,7 +1058,10 @@ function showMsg(txt, isErr=false) {
 }
 
 async function switchChannel(niche, fromParent = false) {
-  CURRENT_NICHE = String(niche || 'mafia').trim();
+  const nextNiche = String(niche || 'mafia').trim();
+  _nicheSwitchSeq += 1;
+  const mySeq = _nicheSwitchSeq;
+  CURRENT_NICHE = nextNiche;
   if (window.SELECTED_PROJECTS) window.SELECTED_PROJECTS.clear();
   window._lastClickedProjId = null;
   const sel = document.getElementById('nicheSelector');
@@ -1072,8 +1076,9 @@ async function switchChannel(niche, fromParent = false) {
     } catch (e) {}
   }
   const r = await apiPost('/api/select_niche', {niche: CURRENT_NICHE});
+  if (mySeq !== _nicheSwitchSeq) return;
   if (r && r.message) showMsg(r.message, false);
-  fetchStatus();
+  await fetchStatus();
 }
 
 window.addEventListener('message', (ev) => {
@@ -1224,8 +1229,9 @@ function splitSingleRowTwoCol(line) {
     const rest = mSingle[2].trim();
     const cleanTok1 = tok1.replace(/^[\[\](){}:,\-]+|[\[\](){}:,\-]+$/g, '').toLowerCase();
     const isListNum = /^\d+[\.\)]$/.test(tok1);
-    const hasCodePattern = /\d/.test(tok1) || tok1.includes('_') || /[a-z][A-Z]/.test(tok1) || /(kichban|kb|video|tap|bai|ep|part)/i.test(cleanTok1);
-    if (!isListNum && !COMMON_EN_STARTERS_JS.has(cleanTok1) && hasCodePattern) {
+    const isTitleNumWord = /^(\$|\d+[,\.]\d+|\d+%|\d+(st|nd|rd|th|yo|yr|yrs|am|pm)\b|\d+\-(year|yr|month|day|week|hour|minute|second|star|million|billion|dollar))/i.test(cleanTok1);
+    const hasCodePattern = tok1.includes('_') || /^[a-zA-Z]+\d+[a-zA-Z0-9_-]*$/.test(tok1) || /^\d{1,4}$/.test(tok1) || /[a-z][A-Z]/.test(tok1) || /(kichban|kb|video|tap|bai|ep|part)/i.test(cleanTok1);
+    if (!isListNum && !isTitleNumWord && !COMMON_EN_STARTERS_JS.has(cleanTok1) && hasCodePattern) {
       return {name: tok1, title: rest};
     }
   }
@@ -1287,16 +1293,41 @@ function autoSplitMergedInputNow() {
 }
 
 function collectTitlesAndCustomNamesFromUI() {
-  const rawTitleLines = document.getElementById('titlesInput').value.split(/\r?\n/);
-  const rawNameLines = document.getElementById('customNamesInput').value.split(/\r?\n/);
+  const titleEl = document.getElementById('titlesInput');
+  const nameEl = document.getElementById('customNamesInput');
+  const rawTitleLines = (titleEl ? titleEl.value : '').split(/\r?\n/);
+  const rawNameLines = (nameEl ? nameEl.value : '').split(/\r?\n/);
   const titles = [];
   const custom_names = [];
   for (let i = 0; i < rawTitleLines.length; i++) {
     const t = (rawTitleLines[i] || '').trim();
     if (!t) continue;
     const n = (rawNameLines[i] || '').trim();
+    if (!n) {
+      const sp = splitSingleRowTwoCol(t);
+      if (sp.name && sp.title) {
+        titles.push(sp.title);
+        custom_names.push(sp.name);
+        continue;
+      }
+    }
     titles.push(t);
     custom_names.push(n);
+  }
+  // Phòng trường hợp người dùng dán nhầm toàn bộ Tiêu đề vào Cột 1 (customNamesInput) khi Cột 2 đang trống
+  if (titles.length === 0) {
+    for (let i = 0; i < rawNameLines.length; i++) {
+      const ln = (rawNameLines[i] || '').trim();
+      if (!ln) continue;
+      const sp = splitSingleRowTwoCol(ln);
+      if (sp.name && sp.title) {
+        titles.push(sp.title);
+        custom_names.push(sp.name);
+      } else if (ln.length >= 12 && /\s/.test(ln)) {
+        titles.push(ln);
+        custom_names.push('');
+      }
+    }
   }
   return {titles, custom_names};
 }
@@ -1384,38 +1415,46 @@ function syncEmbeddedBridgeMode(modeVal) {
 
 async function addTitlesOnly() {
   const {titles, custom_names} = collectTitlesAndCustomNamesFromUI();
-  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
+  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE || 'mafia';
+  CURRENT_NICHE = niche;
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
-  if (titles.length === 0) { showMsg('Vui lòng nhập ít nhất 1 tiêu đề vào Cột 2!', true); return; }
+  if (titles.length === 0) { showMsg('⚠️ Vui lòng nhập ít nhất 1 tiêu đề vào Cột 2 (Danh sách Tiêu đề)!', true); return; }
+  showMsg(`⏳ Đang lưu ${titles.length} tiêu đề & mã vào hàng đợi (${niche})...`);
   const r = await apiPost('/api/add_titles', {titles, custom_names, run_now: false, niche, skip_title_rewrite});
   showMsg(r.message, !r.ok);
-  if (r.ok) {
+  if (r.ok && Number(r.added_count) > 0) {
     document.getElementById('titlesInput').value = '';
     document.getElementById('customNamesInput').value = '';
   }
-  fetchStatus();
+  await fetchStatus();
 }
 
 async function addAndRunWithAutoVideoNow() {
   const embMode = document.getElementById('embeddedAutoVideoMode');
   if (embMode) embMode.value = 'STREAMING_VIDEO';
+  await addAndRunNow(true);
   syncEmbeddedBridgeMode('STREAMING_VIDEO');
-  await addAndRunNow();
 }
 
-async function addAndRunNow() {
+async function addAndRunNow(isAutoVideo = false) {
   const {titles, custom_names} = collectTitlesAndCustomNamesFromUI();
-  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
+  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE || 'mafia';
+  CURRENT_NICHE = niche;
   const max_workers = parseInt(document.getElementById('maxWorkers').value || '3');
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
+  showMsg(
+    titles.length > 0
+      ? `🚀 Đang lưu ${titles.length} tiêu đề & khởi chạy Pipeline 9 Bàn AI (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
+      : `🚀 Đang khởi chạy Hàng đợi kịch bản (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
+  );
   const r = await apiPost('/api/add_titles', {titles, custom_names, run_now: true, max_workers, thinking, niche, skip_title_rewrite});
   showMsg(r.message, !r.ok);
-  if ((r.ok || r.added_count > 0) && titles.length > 0) {
+  if (Number(r.added_count) > 0 && titles.length > 0) {
     document.getElementById('titlesInput').value = '';
     document.getElementById('customNamesInput').value = '';
   }
-  fetchStatus();
+  await fetchStatus();
 }
 
 function downloadProjectFile(project_id, file_type) {
@@ -1908,8 +1947,10 @@ function renderLicenseUI(lic) {
 
 async function fetchStatus() {
   try {
+    const reqSeq = _nicheSwitchSeq;
     const res = await fetch(`/api/status?niche=${encodeURIComponent(CURRENT_NICHE)}`);
     const data = await res.json();
+    if (reqSeq !== _nicheSwitchSeq) return;
 
     updateChannelTabsUI(data);
     renderLicenseUI(data.license_status);

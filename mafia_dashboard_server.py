@@ -51,13 +51,81 @@ except Exception:
         pass
 
 # Tự động nhận diện thư mục gốc theo vị trí thực tế của file (hỗ trợ copy sang bất kỳ ổ đĩa/thư mục nào trên máy mới)
-STUDIO_ROOT = os.path.dirname(os.path.abspath(__file__))
-ENGINE_DIR = os.path.join(STUDIO_ROOT, "engine")
+_CODE_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
+def _resolve_unified_studio_root(base_dir: str) -> str:
+    norm = os.path.abspath(base_dir)
+    if os.path.basename(norm).lower() == "app" and os.path.basename(os.path.dirname(norm)).lower() == "resources":
+        outer = os.path.dirname(os.path.dirname(norm))
+        if (
+            os.path.exists(os.path.join(outer, "mafia_dashboard_server.py"))
+            or os.path.exists(os.path.join(outer, "Kho_Green"))
+            or os.path.exists(os.path.join(outer, "Video Batch Studio.exe"))
+        ):
+            return outer
+    return norm
+
+
+STUDIO_ROOT = _resolve_unified_studio_root(_CODE_ROOT)
+ENGINE_DIR = (
+    os.path.join(_CODE_ROOT, "engine")
+    if os.path.exists(os.path.join(_CODE_ROOT, "engine", "mafia_chatgpt_pipeline.py"))
+    else os.path.join(STUDIO_ROOT, "engine")
+)
 ENGINE_SCRIPT = os.path.join(ENGINE_DIR, "mafia_chatgpt_pipeline.py")
 PROJECTS_ROOT = os.path.join(STUDIO_ROOT, "PROJECTS")
 BACKLOG_PATH = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG.json")
 LIVE_LOG_PATH = os.path.join(STUDIO_ROOT, "LIVE_STUDIO_LOG.txt")
 PORT = 8098
+
+
+def _migrate_backlog_and_projects_if_split():
+    """Nếu trước đó server từng chạy trong resources/app (_CODE_ROOT) khác với STUDIO_ROOT (exeDir), gộp toàn bộ QUEUE_BACKLOG*.json và PROJECTS* về STUDIO_ROOT."""
+    if os.path.normcase(os.path.abspath(_CODE_ROOT)) == os.path.normcase(os.path.abspath(STUDIO_ROOT)):
+        return
+    try:
+        for entry in os.listdir(_CODE_ROOT):
+            if entry.startswith("QUEUE_BACKLOG") and entry.endswith(".json"):
+                src_b = os.path.join(_CODE_ROOT, entry)
+                dst_b = os.path.join(STUDIO_ROOT, entry)
+                try:
+                    src_data = json.load(open(src_b, encoding="utf-8"))
+                    src_items = src_data.get("items") or []
+                    if not src_items:
+                        continue
+                    dst_data = {"max_parallel_threads": 3, "thinking_effort": "medium", "items": []}
+                    if os.path.exists(dst_b):
+                        try:
+                            dst_data = json.load(open(dst_b, encoding="utf-8"))
+                        except Exception:
+                            pass
+                    existing_pids = {x.get("project_id") for x in (dst_data.get("items") or [])}
+                    changed = False
+                    for it in src_items:
+                        pid = it.get("project_id")
+                        if pid and pid not in existing_pids:
+                            old_pdir = it.get("project_dir") or ""
+                            if old_pdir and os.path.normcase(_CODE_ROOT) in os.path.normcase(old_pdir):
+                                rel_pdir = os.path.relpath(old_pdir, _CODE_ROOT)
+                                new_pdir = os.path.join(STUDIO_ROOT, rel_pdir)
+                                if os.path.exists(old_pdir) and not os.path.exists(new_pdir):
+                                    os.makedirs(os.path.dirname(new_pdir), exist_ok=True)
+                                    shutil.copytree(old_pdir, new_pdir, dirs_exist_ok=True)
+                                it["project_dir"] = new_pdir
+                            dst_data.setdefault("items", []).append(it)
+                            existing_pids.add(pid)
+                            changed = True
+                    if changed:
+                        with open(dst_b, "w", encoding="utf-8") as f:
+                            json.dump(dst_data, f, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+_migrate_backlog_and_projects_if_split()
 
 if ENGINE_DIR not in sys.path:
     sys.path.insert(0, ENGINE_DIR)
@@ -134,54 +202,51 @@ def is_worker_running() -> bool:
 
 def start_worker_command(args_list: list[str], mode_desc: str, max_workers: int = 3, niche: str = "mafia") -> tuple[bool, str]:
     global ACTIVE_PROCESS, ACTIVE_MODE, ACTIVE_MAX_WORKERS, ACTIVE_WORKER_NICHE, SELECTED_NICHE
-    lic_check = verify_current_machine_license(force_cloud_check=True)
+    lic_check = verify_current_machine_license(force_cloud_check=False)
     if not lic_check.get("valid", False):
         lic_msg = lic_check.get("message") or "Chưa kích hoạt Key bản quyền!"
         append_studio_log(f"⛔ TỪ CHỐI CHẠY DO BẢN QUYỀN: {lic_msg}")
         return False, f"⛔ BẢN QUYỀN CHƯA HỢP LỆ: {lic_msg}"
 
+    niche_key = _norm_niche(niche, default=SELECTED_NICHE)
     if is_worker_running():
-        return False, f"Hệ thống đang chạy tiến trình ({ACTIVE_MODE}). Vui lòng chờ hoặc bấm Dừng trước khi chạy lệnh mới."
+        if ACTIVE_WORKER_NICHE != niche_key or "--run_queue" in args_list:
+            stop_worker_command()
+        else:
+            return True, f"Hệ thống đang chạy tiến trình ({ACTIVE_MODE}) — Kịch bản mới đã được nạp vào hàng đợi chạy tiếp!"
 
-    # Kiểm tra môi trường ChatGPT Web trước khi chạy; nếu trình duyệt chưa mở thì tự động mở ngay!
-    env_check = check_environment_requirements()
-    if not env_check.get("chatgpt", {}).get("ok", False):
+    # Khởi động trình duyệt Chrome ChatGPT ngầm ngay lập tức (không chặn việc bật tiến trình Worker!)
+    def _bg_ensure_chrome_ready():
         try:
-            from engine.chatgpt_web_client import (
-                ensure_all_initialized_browsers_open,
-                ensure_chrome_debug_browser_open,
-            )
-            ensure_all_initialized_browsers_open(run_hidden=True)
-            time.sleep(1.2)
             env_check = check_environment_requirements()
             if not env_check.get("chatgpt", {}).get("ok", False):
-                ensure_chrome_debug_browser_open(
-                    open_chatgpt_home=True,
-                    force_bring_to_front=True,
-                    run_hidden=False,
-                    acc_id="acc_1",
+                from engine.chatgpt_web_client import (
+                    ensure_all_initialized_browsers_open,
+                    ensure_chrome_debug_browser_open,
                 )
-                time.sleep(1.5)
+                ensure_all_initialized_browsers_open(run_hidden=True)
+                time.sleep(2.0)
                 env_check = check_environment_requirements()
+                if not env_check.get("chatgpt", {}).get("ok", False):
+                    ensure_chrome_debug_browser_open(
+                        open_chatgpt_home=True,
+                        force_bring_to_front=True,
+                        run_hidden=False,
+                        acc_id="acc_1",
+                    )
         except Exception:
             pass
-    if not env_check.get("chatgpt", {}).get("ok", False):
-        err_msg = (
-            "🌐 Đã tự động mở cửa sổ Chrome (Acc #1 - Port 9222)! "
-            "Vui lòng đăng nhập tài khoản ChatGPT trên cửa sổ Chrome vừa hiện ra, sau đó bấm [▶️ Chạy tiếp Hàng đợi] hoặc [🎬 Viết Kịch Bản ➔ Làm Video Luôn]."
-        )
-        append_studio_log(f"⚠️ CHỜ ĐĂNG NHẬP CHATGPT WEB: {err_msg}")
-        return False, err_msg
 
-    niche_key = _norm_niche(niche, default=SELECTED_NICHE)
+    threading.Thread(target=_bg_ensure_chrome_ready, daemon=True).start()
+
     SELECTED_NICHE = niche_key
     ACTIVE_WORKER_NICHE = niche_key
     set_active_niche(niche_key)
 
     with WORKER_LOCK:
-        cmd = [sys.executable, ENGINE_SCRIPT, "--niche", niche_key] + args_list
+        cmd = [sys.executable, "-u", ENGINE_SCRIPT, "--niche", niche_key] + args_list
         append_studio_log(f"🚀 Khởi chạy lệnh [{niche_key.upper()}]: {' '.join(cmd)}")
-        log_f = open(LIVE_LOG_PATH, "a", encoding="utf-8")
+        log_f = open(LIVE_LOG_PATH, "a", encoding="utf-8", buffering=1)
         ACTIVE_PROCESS = subprocess.Popen(
             cmd,
             cwd=STUDIO_ROOT,
@@ -191,7 +256,7 @@ def start_worker_command(args_list: list[str], mode_desc: str, max_workers: int 
         )
         ACTIVE_MODE = f"[{niche_key.upper()}] {mode_desc}"
         ACTIVE_MAX_WORKERS = max_workers
-        return True, f"Đã khởi chạy [{niche_key.upper()}]: {mode_desc} (PID={ACTIVE_PROCESS.pid})"
+        return True, f"🚀 Đã khởi chạy [{niche_key.upper()}]: {mode_desc} (PID={ACTIVE_PROCESS.pid})"
 
 
 def stop_worker_command() -> str:
@@ -2006,7 +2071,8 @@ HTML_PAGE = r"""<!DOCTYPE html>
 </div>
 
 <script>
-let CURRENT_NICHE = '';
+let CURRENT_NICHE = (new URLSearchParams(window.location.search).get('channel') || '').trim();
+let _nicheSwitchSeq = 0;
 window.OPEN_TOP_DRAWERS = new Set(['Accounts', 'Monitor']);
 window.COMPOSER_COLLAPSED = false;
 
@@ -2052,7 +2118,10 @@ function showMsg(txt, isErr=false) {
 }
 
 async function switchChannel(niche, fromParent = false) {
-  CURRENT_NICHE = String(niche || 'mafia').trim();
+  const nextNiche = String(niche || 'mafia').trim();
+  _nicheSwitchSeq += 1;
+  const mySeq = _nicheSwitchSeq;
+  CURRENT_NICHE = nextNiche;
   if (window.SELECTED_PROJECTS) window.SELECTED_PROJECTS.clear();
   window._lastClickedProjId = null;
   const sel = document.getElementById('nicheSelector');
@@ -2067,8 +2136,9 @@ async function switchChannel(niche, fromParent = false) {
     } catch (e) {}
   }
   const r = await apiPost('/api/select_niche', {niche: CURRENT_NICHE});
+  if (mySeq !== _nicheSwitchSeq) return;
   if (r && r.message) showMsg(r.message, false);
-  fetchStatus();
+  await fetchStatus();
 }
 
 window.addEventListener('message', (ev) => {
@@ -2219,8 +2289,9 @@ function splitSingleRowTwoCol(line) {
     const rest = mSingle[2].trim();
     const cleanTok1 = tok1.replace(/^[\[\](){}:,\-]+|[\[\](){}:,\-]+$/g, '').toLowerCase();
     const isListNum = /^\d+[\.\)]$/.test(tok1);
-    const hasCodePattern = /\d/.test(tok1) || tok1.includes('_') || /[a-z][A-Z]/.test(tok1) || /(kichban|kb|video|tap|bai|ep|part)/i.test(cleanTok1);
-    if (!isListNum && !COMMON_EN_STARTERS_JS.has(cleanTok1) && hasCodePattern) {
+    const isTitleNumWord = /^(\$|\d+[,\.]\d+|\d+%|\d+(st|nd|rd|th|yo|yr|yrs|am|pm)\b|\d+\-(year|yr|month|day|week|hour|minute|second|star|million|billion|dollar))/i.test(cleanTok1);
+    const hasCodePattern = tok1.includes('_') || /^[a-zA-Z]+\d+[a-zA-Z0-9_-]*$/.test(tok1) || /^\d{1,4}$/.test(tok1) || /[a-z][A-Z]/.test(tok1) || /(kichban|kb|video|tap|bai|ep|part)/i.test(cleanTok1);
+    if (!isListNum && !isTitleNumWord && !COMMON_EN_STARTERS_JS.has(cleanTok1) && hasCodePattern) {
       return {name: tok1, title: rest};
     }
   }
@@ -2282,16 +2353,41 @@ function autoSplitMergedInputNow() {
 }
 
 function collectTitlesAndCustomNamesFromUI() {
-  const rawTitleLines = document.getElementById('titlesInput').value.split(/\r?\n/);
-  const rawNameLines = document.getElementById('customNamesInput').value.split(/\r?\n/);
+  const titleEl = document.getElementById('titlesInput');
+  const nameEl = document.getElementById('customNamesInput');
+  const rawTitleLines = (titleEl ? titleEl.value : '').split(/\r?\n/);
+  const rawNameLines = (nameEl ? nameEl.value : '').split(/\r?\n/);
   const titles = [];
   const custom_names = [];
   for (let i = 0; i < rawTitleLines.length; i++) {
     const t = (rawTitleLines[i] || '').trim();
     if (!t) continue;
     const n = (rawNameLines[i] || '').trim();
+    if (!n) {
+      const sp = splitSingleRowTwoCol(t);
+      if (sp.name && sp.title) {
+        titles.push(sp.title);
+        custom_names.push(sp.name);
+        continue;
+      }
+    }
     titles.push(t);
     custom_names.push(n);
+  }
+  // Phòng trường hợp người dùng dán nhầm toàn bộ Tiêu đề vào Cột 1 (customNamesInput) khi Cột 2 đang trống
+  if (titles.length === 0) {
+    for (let i = 0; i < rawNameLines.length; i++) {
+      const ln = (rawNameLines[i] || '').trim();
+      if (!ln) continue;
+      const sp = splitSingleRowTwoCol(ln);
+      if (sp.name && sp.title) {
+        titles.push(sp.title);
+        custom_names.push(sp.name);
+      } else if (ln.length >= 12 && /\s/.test(ln)) {
+        titles.push(ln);
+        custom_names.push('');
+      }
+    }
   }
   return {titles, custom_names};
 }
@@ -2379,38 +2475,46 @@ function syncEmbeddedBridgeMode(modeVal) {
 
 async function addTitlesOnly() {
   const {titles, custom_names} = collectTitlesAndCustomNamesFromUI();
-  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
+  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE || 'mafia';
+  CURRENT_NICHE = niche;
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
-  if (titles.length === 0) { showMsg('Vui lòng nhập ít nhất 1 tiêu đề vào Cột 2!', true); return; }
+  if (titles.length === 0) { showMsg('⚠️ Vui lòng nhập ít nhất 1 tiêu đề vào Cột 2 (Danh sách Tiêu đề)!', true); return; }
+  showMsg(`⏳ Đang lưu ${titles.length} tiêu đề & mã vào hàng đợi (${niche})...`);
   const r = await apiPost('/api/add_titles', {titles, custom_names, run_now: false, niche, skip_title_rewrite});
   showMsg(r.message, !r.ok);
-  if (r.ok) {
+  if (r.ok && Number(r.added_count) > 0) {
     document.getElementById('titlesInput').value = '';
     document.getElementById('customNamesInput').value = '';
   }
-  fetchStatus();
+  await fetchStatus();
 }
 
 async function addAndRunWithAutoVideoNow() {
   const embMode = document.getElementById('embeddedAutoVideoMode');
   if (embMode) embMode.value = 'STREAMING_VIDEO';
+  await addAndRunNow(true);
   syncEmbeddedBridgeMode('STREAMING_VIDEO');
-  await addAndRunNow();
 }
 
-async function addAndRunNow() {
+async function addAndRunNow(isAutoVideo = false) {
   const {titles, custom_names} = collectTitlesAndCustomNamesFromUI();
-  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
+  const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE || 'mafia';
+  CURRENT_NICHE = niche;
   const max_workers = parseInt(document.getElementById('maxWorkers').value || '3');
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
+  showMsg(
+    titles.length > 0
+      ? `🚀 Đang lưu ${titles.length} tiêu đề & khởi chạy Pipeline 9 Bàn AI (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
+      : `🚀 Đang khởi chạy Hàng đợi kịch bản (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
+  );
   const r = await apiPost('/api/add_titles', {titles, custom_names, run_now: true, max_workers, thinking, niche, skip_title_rewrite});
   showMsg(r.message, !r.ok);
-  if ((r.ok || r.added_count > 0) && titles.length > 0) {
+  if (Number(r.added_count) > 0 && titles.length > 0) {
     document.getElementById('titlesInput').value = '';
     document.getElementById('customNamesInput').value = '';
   }
-  fetchStatus();
+  await fetchStatus();
 }
 
 function downloadProjectFile(project_id, file_type) {
@@ -2903,8 +3007,10 @@ function renderLicenseUI(lic) {
 
 async function fetchStatus() {
   try {
+    const reqSeq = _nicheSwitchSeq;
     const res = await fetch(`/api/status?niche=${encodeURIComponent(CURRENT_NICHE)}`);
     const data = await res.json();
+    if (reqSeq !== _nicheSwitchSeq) return;
 
     updateChannelTabsUI(data);
     renderLicenseUI(data.license_status);
@@ -3406,6 +3512,20 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                     max_workers=max_workers,
                     niche=niche,
                 )
+                if ok and added:
+                    for it_a in added[:max(1, max_workers if max_workers > 0 else 3)]:
+                        st_p = os.path.join(it_a.get("project_dir", ""), "STATE.json")
+                        if os.path.exists(st_p):
+                            try:
+                                st_d = json.load(open(st_p, encoding="utf-8"))
+                                if st_d.get("current_step_status") in ("QUEUED", "QUEUED_SKIP_STEP_1", None):
+                                    skip_s1 = bool(st_d.get("skip_title_rewrite"))
+                                    st_d["current_step_status"] = "STEP_1_5_STARTING" if skip_s1 else "STEP_1_STARTING"
+                                    st_d["live_note"] = "🚀 Đang khởi động luồng AI Agent & kết nối trình duyệt ChatGPT..."
+                                    with open(st_p, "w", encoding="utf-8") as f_st:
+                                        json.dump(st_d, f_st, ensure_ascii=False, indent=2)
+                            except Exception:
+                                pass
                 self._send_json({
                     "ok": ok,
                     "added_count": len(added),
@@ -3816,22 +3936,28 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             else:
                 self._send_json({"ok": False, "message": f"Thư mục chưa tồn tại: {target_dir}"})
         elif self.path == "/api/is_real_python_server":
-            self._send_json({"ok": True, "engine": "python_real"})
+            self._send_json({
+                "ok": True,
+                "engine": "python_real",
+                "build_number": 108,
+                "studio_root": STUDIO_ROOT,
+            })
         else:
             self.send_error(404)
 
 
 def _tong_hop_auto_sync_loop():
-    """Tự động đồng bộ liên tục mọi file FULL_SCRIPT.txt -> {STT}_KB.txt và FULL_SEO.txt -> {STT}_SEO.txt vào TONG HOP của cả 3 kênh (Mafia, Homeless & Mexico Bà Cô) và tự động đóng ngay các Tab Chrome của kịch bản đã viết xong mỗi 5 giây."""
+    """Tự động đồng bộ liên tục mọi file FULL_SCRIPT.txt -> {STT}_KB.txt và FULL_SEO.txt -> {STT}_SEO.txt vào TONG HOP của các kênh và chỉ dọn Tab thừa khi không có tiến trình Worker đang khởi tạo tab."""
     while True:
         try:
             get_full_dashboard_status(niche=SELECTED_NICHE, update_selected=False)
-            from engine.chatgpt_web_client import sweep_completed_and_idle_tabs_across_all_accounts
-            res_sweep = sweep_completed_and_idle_tabs_across_all_accounts()
-            if res_sweep.get("closed_count", 0) > 0:
-                append_studio_log(
-                    f"🧹 [AUTO-CLOSE TAB] Đã tự động đóng {res_sweep['closed_count']} Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM ({', '.join(res_sweep.get('details', []))})!"
-                )
+            if not is_worker_running():
+                from engine.chatgpt_web_client import sweep_completed_and_idle_tabs_across_all_accounts
+                res_sweep = sweep_completed_and_idle_tabs_across_all_accounts()
+                if res_sweep.get("closed_count", 0) > 0:
+                    append_studio_log(
+                        f"🧹 [AUTO-CLOSE TAB] Đã tự động đóng {res_sweep['closed_count']} Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM ({', '.join(res_sweep.get('details', []))})!"
+                    )
         except Exception:
             pass
         time.sleep(5.0)

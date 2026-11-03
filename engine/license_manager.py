@@ -25,7 +25,20 @@ import subprocess
 import urllib.request
 from datetime import datetime
 
-STUDIO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def _resolve_unified_studio_root(base_dir: str) -> str:
+    norm = os.path.abspath(base_dir)
+    if os.path.basename(norm).lower() == "app" and os.path.basename(os.path.dirname(norm)).lower() == "resources":
+        outer = os.path.dirname(os.path.dirname(norm))
+        if (
+            os.path.exists(os.path.join(outer, "mafia_dashboard_server.py"))
+            or os.path.exists(os.path.join(outer, "Kho_Green"))
+            or os.path.exists(os.path.join(outer, "Video Batch Studio.exe"))
+        ):
+            return outer
+    return norm
+
+
+STUDIO_ROOT = _resolve_unified_studio_root(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 VBS_ROOT = STUDIO_ROOT if os.path.exists(os.path.join(STUDIO_ROOT, "VBS-License-Admin")) else r"D:\ZC_TEAM\TOOL_ZC_TEAM"
 VBS_ADMIN_DIR = os.path.join(VBS_ROOT, "VBS-License-Admin")
 BRIDGE_LICENSE_URL = "http://127.0.0.1:3999/api/bridge/license"
@@ -90,6 +103,8 @@ def is_admin_machine() -> bool:
 def _load_stored_vbskey() -> str:
     candidates = [
         os.path.join(_get_appdata_license_dir(), "license-active.json"),
+        os.path.join(STUDIO_ROOT, ".vbs-user-data", "license.key"),
+        os.path.join(STUDIO_ROOT, "data", "license.key"),
         os.path.join(VBS_ROOT, "data", "license.key"),
         os.path.join(VBS_ROOT, "Ban-Giao-Khach-Hang-EXE", "VideoBatchStudio", "data", "license.key"),
     ]

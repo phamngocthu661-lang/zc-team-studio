@@ -12,7 +12,25 @@ try:
 except Exception:
     websocket = None
 
-STUDIO_WEB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _CODE_ROOT not in sys.path:
+    sys.path.insert(0, _CODE_ROOT)
+
+
+def _resolve_unified_studio_root(base_dir: str) -> str:
+    norm = os.path.abspath(base_dir)
+    if os.path.basename(norm).lower() == "app" and os.path.basename(os.path.dirname(norm)).lower() == "resources":
+        outer = os.path.dirname(os.path.dirname(norm))
+        if (
+            os.path.exists(os.path.join(outer, "mafia_dashboard_server.py"))
+            or os.path.exists(os.path.join(outer, "Kho_Green"))
+            or os.path.exists(os.path.join(outer, "Video Batch Studio.exe"))
+        ):
+            return outer
+    return norm
+
+
+STUDIO_WEB_ROOT = _resolve_unified_studio_root(_CODE_ROOT)
 if STUDIO_WEB_ROOT not in sys.path:
     sys.path.insert(0, STUDIO_WEB_ROOT)
 
@@ -138,7 +156,7 @@ def _cdp_http_json(path: str, method: str = "GET", timeout: float = 5.0, port: i
 
 def is_cdp_browser_running(port: int = CDP_PORT) -> bool:
     try:
-        ver = _cdp_http_json("/json/version", timeout=1.8, port=port)
+        ver = _cdp_http_json("/json/version", timeout=0.5, port=port)
         return bool(ver and ver.get("webSocketDebuggerUrl"))
     except Exception:
         return False
@@ -359,8 +377,8 @@ def force_close_or_recycle_tab(port: int, tab_id: str, ws_url: str = "", allow_c
         cur_u = str(target_tab.get("url") or "").strip()
 
         if len(page_tabs) <= 1 and not allow_close_last:
-            if cur_u == "about:blank":
-                return "already_standby_blank"
+            if cur_u.rstrip("/") in ("https://chatgpt.com", "https://chatgpt.com/?model=auto"):
+                return "already_standby_home"
             if ws_u:
                 try:
                     ws = websocket.create_connection(ws_u, timeout=2.5)
@@ -370,7 +388,7 @@ def force_close_or_recycle_tab(port: int, tab_id: str, ws_url: str = "", allow_c
                                 "id": 1,
                                 "method": "Runtime.evaluate",
                                 "params": {
-                                    "expression": "window.onbeforeunload = null; window.location.replace('about:blank'); true;",
+                                    "expression": "window.onbeforeunload = null; window.location.replace('https://chatgpt.com/'); true;",
                                     "awaitPromise": False,
                                 },
                             }
@@ -419,18 +437,28 @@ def force_close_or_recycle_tab(port: int, tab_id: str, ws_url: str = "", allow_c
 def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[str] = None) -> dict:
     """
     Quét toàn bộ các Tab Chrome đang mở trên cả 3 Tài khoản (`Acc #1`, `Acc #2`, `Acc #3`):
-    - CHỈ giữ lại các Tab đang thực sự được điều khiển (`active_threads`).
-    - Toàn bộ các Tab không điều khiển (Tab bàn cũ, Tab dự án đã xong, Tab `about:blank` thừa) đều bị đóng ngay lập tức!
+    - CHỈ giữ lại các Tab đang thực sự được điều khiển (`active_threads`) và tối đa 1 Tab trang chủ `https://chatgpt.com/` dự phòng.
+    - Toàn bộ các Tab `/c/` của dự án đã xong đều được đóng để giải phóng RAM!
     """
     if not projects_root_list:
         projects_root_list = [
             r"D:\KEY NHẬT",
             os.path.join(STUDIO_WEB_ROOT, "PROJECTS"),
             os.path.join(STUDIO_WEB_ROOT, "PROJECTS_HOMELESS"),
+            os.path.join(STUDIO_WEB_ROOT, "PROJECTS_MEXICO"),
         ]
+        try:
+            for entry in os.listdir(STUDIO_WEB_ROOT):
+                if entry.startswith("PROJECTS"):
+                    full_p = os.path.join(STUDIO_WEB_ROOT, entry)
+                    if os.path.isdir(full_p) and full_p not in projects_root_list:
+                        projects_root_list.append(full_p)
+        except Exception:
+            pass
 
     now = time.time()
     active_threads = set()
+    has_recently_starting_project = False
     for r_dir in projects_root_list:
         if not os.path.exists(r_dir):
             continue
@@ -445,11 +473,19 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
                         is_done = bool(
                             st.get("completed")
                             or st.get("current_step") in ("COMPLETED_ALL_5_STEPS", "COMPLETED")
+                            or st.get("current_step_status") in ("COMPLETED_ALL_5_STEPS", "COMPLETED")
                             or st.get("current_stage") in ("IDLE", "COMPLETED")
                         )
-                        tid = str(st.get("thread_id") or "").strip()
-                        if not is_done and tid and mtime_age < 1800.0:
-                            active_threads.add(tid)
+                        if not is_done and mtime_age < 3600.0:
+                            tid = str(st.get("thread_id") or "").strip()
+                            if tid:
+                                active_threads.add(tid)
+                            else:
+                                if mtime_age < 180.0:
+                                    has_recently_starting_project = True
+                            for reg_v in (st.get("agent_chat_registry") or {}).values():
+                                if isinstance(reg_v, dict) and reg_v.get("thread_id"):
+                                    active_threads.add(str(reg_v["thread_id"]).strip())
                     except Exception:
                         pass
         except Exception:
@@ -472,15 +508,27 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
 
             controlled_tabs = []
             uncontrolled_tabs = []
+            home_tabs = []
             for t in page_tabs:
                 u = str(t.get("url") or "").strip()
+                u_clean = u.rstrip("/")
                 m = re.search(r"/c/([0-9a-fA-F\-]{16,})", u)
                 cid = m.group(1) if m else ""
                 is_auth_page = any(k in u.lower() for k in ("auth.openai.com", "login", "auth0", "accounts.google.com"))
-                if (cid and cid in active_threads) or is_auth_page:
+                is_home_page = u_clean in ("https://chatgpt.com", "https://chatgpt.com/?model=auto")
+                if (cid and cid in active_threads) or is_auth_page or (is_home_page and has_recently_starting_project):
                     controlled_tabs.append(t)
+                elif is_home_page:
+                    home_tabs.append(t)
                 else:
                     uncontrolled_tabs.append(t)
+
+            # Luôn giữ lại tối đa 1 tab trang chủ https://chatgpt.com để sẵn sàng nhận lệnh mới tức thì
+            if home_tabs and not controlled_tabs:
+                controlled_tabs.append(home_tabs[0])
+                uncontrolled_tabs.extend(home_tabs[1:])
+            else:
+                uncontrolled_tabs.extend(home_tabs)
 
             if len(controlled_tabs) >= 1:
                 for t in uncontrolled_tabs:
@@ -489,24 +537,12 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
                         closed_cnt += 1
                         details.append(f"{label}:closed:{str(t.get('id'))[:6]}")
             else:
-                uncontrolled_tabs.sort(key=lambda x: 1 if str(x.get("url") or "").strip() == "about:blank" else 0)
                 tabs_to_close = uncontrolled_tabs[:-1]
-                standby_tab = uncontrolled_tabs[-1] if uncontrolled_tabs else None
                 for t in tabs_to_close:
                     act = force_close_or_recycle_tab(port, t.get("id"), t.get("webSocketDebuggerUrl") or "", allow_close_last=True)
                     if act == "closed":
                         closed_cnt += 1
                         details.append(f"{label}:closed:{str(t.get('id'))[:6]}")
-                if standby_tab and str(standby_tab.get("url") or "").strip() != "about:blank":
-                    act = force_close_or_recycle_tab(
-                        port,
-                        standby_tab.get("id"),
-                        standby_tab.get("webSocketDebuggerUrl") or "",
-                        allow_close_last=False,
-                    )
-                    if act == "recycled_last_tab":
-                        recycled_cnt += 1
-                        details.append(f"{label}:standby_blank:{str(standby_tab.get('id'))[:6]}")
         except Exception:
             pass
 
@@ -629,6 +665,25 @@ def check_single_account_status(acc_cfg: dict) -> dict:
                 "active_projects": active_projs,
                 "message": f"✅ {label} ({email or 'Đã lưu phiên'}): Đang gánh {len(active_projs)}/{acc_cfg['max_threads']} luồng ({cg_tabs_cnt} tab mở)",
             }
+        if cached_login and not cached_login.get("logged_in") and (time.time() - cached_login.get("ts", 0)) < 15.0:
+            return {
+                "acc_id": acc_id,
+                "index": acc_cfg["index"],
+                "label": label,
+                "port": port,
+                "profile_dir": profile_dir,
+                "profile_initialized": initialized,
+                "browser_running": True,
+                "logged_in": False,
+                "user_email": "",
+                "plan_type": "",
+                "chatgpt_tabs": cg_tabs_cnt,
+                "active_threads": len(active_projs),
+                "max_threads": acc_cfg["max_threads"],
+                "max_open_tabs": acc_cfg.get("max_open_tabs", MAX_OPEN_TABS_PER_ACCOUNT),
+                "active_projects": active_projs,
+                "message": f"⚠️ {label} (Port {port}): Cửa sổ Chrome đang mở nhưng CHƯA ĐĂNG NHẬP.",
+            }
 
         ws_url = cg_tabs[0].get("webSocketDebuggerUrl")
         if not ws_url:
@@ -670,7 +725,7 @@ def check_single_account_status(acc_cfg: dict) -> dict:
             }
         })()
         """
-        ws = websocket.create_connection(ws_url, timeout=3.5)
+        ws = websocket.create_connection(ws_url, timeout=1.5)
         try:
             ws.send(
                 json.dumps(
@@ -714,6 +769,13 @@ def check_single_account_status(acc_cfg: dict) -> dict:
                     json.dump(new_cache, f, ensure_ascii=False)
             except Exception:
                 pass
+        else:
+            _LAST_VERIFIED_LOGIN_BY_PORT[port] = {
+                "logged_in": False,
+                "user_email": "",
+                "plan_type": "",
+                "ts": time.time(),
+            }
         return {
             "acc_id": acc_id,
             "index": acc_cfg["index"],
@@ -759,6 +821,12 @@ def check_single_account_status(acc_cfg: dict) -> dict:
                 "active_projects": active_projs,
                 "message": f"✅ {label} ({email or 'Đã lưu phiên'}): Đang gánh {len(active_projs)}/{acc_cfg['max_threads']} luồng ({cg_tabs_cnt} tab mở)",
             }
+        _LAST_VERIFIED_LOGIN_BY_PORT[port] = {
+            "logged_in": False,
+            "user_email": "",
+            "plan_type": "",
+            "ts": time.time(),
+        }
         return {
             "acc_id": acc_id,
             "index": acc_cfg["index"],
@@ -849,27 +917,38 @@ def ensure_chrome_debug_browser_open(
         except Exception:
             pass
 
+    if force_bring_to_front:
+        _LAST_VERIFIED_LOGIN_BY_PORT.pop(port, None)
     _STATUS_CACHE_TS = 0.0
     return check_single_account_status(cfg)
 
 
 def ensure_all_initialized_browsers_open(run_hidden: bool = True) -> None:
     """
-    Tự động bật ngầm tất cả các tài khoản đã từng được khởi tạo Profile (`Acc #1`, và `Acc #2`, `Acc #3` nếu đã bấm đăng nhập).
-    Luôn đảm bảo ít nhất `Acc #1` được bật sẵn.
+    Tự động bật ngầm tất cả các tài khoản đã từng đăng nhập thành công (`.studio_account_info.json` có `logged_in=True`).
+    Luôn đảm bảo ít nhất `Acc #1` được bật sẵn nếu chưa có tài khoản nào đang mở.
     """
+    any_running = any(is_cdp_browser_running(port=c["port"]) for c in WEB_ACCOUNTS_CONFIG)
     for cfg in WEB_ACCOUNTS_CONFIG:
-        if cfg["acc_id"] == "acc_1" or _has_profile_been_initialized(cfg["profile_dir"]):
-            if not is_cdp_browser_running(port=cfg["port"]):
-                try:
-                    ensure_chrome_debug_browser_open(
-                        open_chatgpt_home=True,
-                        force_bring_to_front=False,
-                        run_hidden=run_hidden,
-                        acc_id=cfg["acc_id"],
-                    )
-                except Exception:
-                    pass
+        acc_info_file = os.path.join(cfg["profile_dir"], ".studio_account_info.json")
+        has_saved_login = False
+        if os.path.exists(acc_info_file):
+            try:
+                has_saved_login = bool(json.load(open(acc_info_file, encoding="utf-8")).get("logged_in"))
+            except Exception:
+                pass
+        should_open = has_saved_login or (cfg["acc_id"] == "acc_1" and not any_running)
+        if should_open and not is_cdp_browser_running(port=cfg["port"]):
+            try:
+                ensure_chrome_debug_browser_open(
+                    open_chatgpt_home=True,
+                    force_bring_to_front=False,
+                    run_hidden=run_hidden,
+                    acc_id=cfg["acc_id"],
+                )
+                any_running = True
+            except Exception:
+                pass
 
 
 def check_all_web_accounts_status(force_refresh: bool = False) -> dict:
@@ -976,8 +1055,11 @@ class ChatGPTWebMultiTabClient:
         return False
 
     def get_logged_in_accounts(self) -> list[dict]:
-        st = check_all_web_accounts_status(force_refresh=True)
+        st = check_all_web_accounts_status(force_refresh=False)
         logged = [a for a in st.get("accounts", []) if a.get("logged_in")]
+        if not logged:
+            st = check_all_web_accounts_status(force_refresh=True)
+            logged = [a for a in st.get("accounts", []) if a.get("logged_in")]
         if not logged:
             # Nếu chưa phát hiện, thử bật lại các trình duyệt đã khởi tạo và kiểm tra lần nữa
             ensure_all_initialized_browsers_open(run_hidden=True)
@@ -1340,6 +1422,19 @@ class ChatGPTWebMultiTabClient:
                 ):
                     acc_reserved.add(t["id"])
                     self._tab_last_used_ts[t["id"]] = time.time()
+                    return t["id"], t["webSocketDebuggerUrl"]
+
+            for t in page_tabs:
+                u = str(t.get("url", "")).strip()
+                if t.get("id") not in used_tab_ids and u == "about:blank" and t.get("webSocketDebuggerUrl"):
+                    acc_reserved.add(t["id"])
+                    _eval_js_in_tab(
+                        t["webSocketDebuggerUrl"],
+                        "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                        await_promise=False,
+                    )
+                    self._tab_last_used_ts[t["id"]] = time.time()
+                    time.sleep(4.2)
                     return t["id"], t["webSocketDebuggerUrl"]
 
             # Nếu đã đạt giới hạn 5 Tab trên tài khoản (hoặc có Tab của Desk trước vừa giải phóng), tái sử dụng ngay Tab đó thay vì mở Tab mới!

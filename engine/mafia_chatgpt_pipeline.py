@@ -42,7 +42,25 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Tự động nhận diện thư mục gốc theo vị trí thực tế của file và đưa vào sys.path
-STUDIO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _CODE_ROOT not in sys.path:
+    sys.path.insert(0, _CODE_ROOT)
+
+
+def _resolve_unified_studio_root(base_dir: str) -> str:
+    norm = os.path.abspath(base_dir)
+    if os.path.basename(norm).lower() == "app" and os.path.basename(os.path.dirname(norm)).lower() == "resources":
+        outer = os.path.dirname(os.path.dirname(norm))
+        if (
+            os.path.exists(os.path.join(outer, "mafia_dashboard_server.py"))
+            or os.path.exists(os.path.join(outer, "Kho_Green"))
+            or os.path.exists(os.path.join(outer, "Video Batch Studio.exe"))
+        ):
+            return outer
+    return norm
+
+
+STUDIO_ROOT = _resolve_unified_studio_root(_CODE_ROOT)
 if STUDIO_ROOT not in sys.path:
     sys.path.insert(0, STUDIO_ROOT)
 
@@ -81,10 +99,17 @@ except Exception:
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
 
-SKILLS_ROOT = os.path.join(STUDIO_ROOT, "engine", "skills_bundle")
-HOMELESS_SKILLS_ROOT = os.path.join(STUDIO_ROOT, "skills_homeless")
-MEXICO_SKILLS_ROOT = os.path.join(STUDIO_ROOT, "skills_mexico")
-SKILLS_12_KEYS_ROOT = os.path.join(STUDIO_ROOT, "skills_12_keys")
+def _pick_resource_dir(rel_path: str) -> str:
+    cand_code = os.path.join(_CODE_ROOT, rel_path)
+    if os.path.exists(cand_code):
+        return cand_code
+    return os.path.join(STUDIO_ROOT, rel_path)
+
+
+SKILLS_ROOT = _pick_resource_dir(os.path.join("engine", "skills_bundle"))
+HOMELESS_SKILLS_ROOT = _pick_resource_dir("skills_homeless")
+MEXICO_SKILLS_ROOT = _pick_resource_dir("skills_mexico")
+SKILLS_12_KEYS_ROOT = _pick_resource_dir("skills_12_keys")
 ACTIVE_NICHE = "mafia"
 ACTIVE_KEY_ID = "mafia"
 PROJECTS_ROOT = os.path.join(STUDIO_ROOT, "PROJECTS")
@@ -288,11 +313,8 @@ def _resolve_custom_tong_hop_dir(key_id: str, default_th_dir: str) -> str:
 def get_niche_config(niche: str = None) -> dict:
     """Trả về cấu hình đường dẫn và thông số chuẩn tách biệt 100% giữa 12 Key mới và 3 Key gốc (`mafia`, `homeless`, `mexico`)."""
     raw_in = (niche or "").strip()
-    if not raw_in or raw_in.lower() == (ACTIVE_NICHE or "").lower():
-        if ACTIVE_KEY_ID in KEY_PROFILES_12:
-            raw_in = ACTIVE_KEY_ID
-        else:
-            raw_in = niche or ACTIVE_KEY_ID or ACTIVE_NICHE or "mafia"
+    if not raw_in:
+        raw_in = ACTIVE_KEY_ID or ACTIVE_NICHE or "mafia"
     low = raw_in.lower()
     if low in KEY_PROFILES_12_LOWER_MAP:
         canonical_key = KEY_PROFILES_12_LOWER_MAP[low]
@@ -2945,7 +2967,7 @@ def export_to_tong_hop_folder(project_id: str, project_dir: str, niche: str = No
 
 def update_progress_markdown(niche: str = None):
     """Cập nhật bảng theo dõi tiến độ riêng cho từng kênh (`TIEN_DO_MAFIA_STUDIO.md`, `TIEN_DO_HOMELESS_STUDIO.md`, `TIEN_DO_MEXICO_STUDIO.md`)."""
-    cfg = get_niche_config(niche or ACTIVE_NICHE)
+    cfg = get_niche_config(niche or ACTIVE_KEY_ID or ACTIVE_NICHE)
     b_path = cfg["backlog_path"]
     md_path = cfg["progress_md_path"]
     is_homeless = cfg["niche"] == "homeless"
@@ -6112,25 +6134,28 @@ def parse_title_line_with_optional_name(raw_line: str, explicit_name: str = "") 
                 if not cname:
                     cname = sanitize_custom_script_name(left_cand)
                 s = m_multi.group(2).strip()
-        else:
+        elif not cname:
             # 3. Phân tách kiểu `TenKichBan Tiêu đề gốc` (1 khoảng trắng nhưng từ đầu là mã/tên kịch bản)
             m_single = re.match(r"^(\S{1,35})\s+(.{12,})$", s)
             if m_single:
                 tok1 = m_single.group(1).strip()
                 rest = m_single.group(2).strip()
                 clean_tok1 = tok1.strip("[](){}:,-").lower()
-                # Không tách nếu tok1 là số thứ tự đơn thuần kiểu "1.", "01." hoặc từ mở đầu tiếng Anh phổ biến
+                # Không tách nếu tok1 là số thứ tự kiểu "1.", tuổi/tiền/năm/thời gian kiểu "68-Year-Old", "$10,000", "70yo", "3AM", "100%"
                 is_pure_list_num = bool(re.match(r"^\d+[\.\)]$", tok1))
+                is_title_num_word = bool(
+                    re.match(r"^(\$|\d+[,\.]\d+|\d+%|\d+(st|nd|rd|th|yo|yr|yrs|am|pm)\b|\d+\-(year|yr|month|day|week|hour|minute|second|star|million|billion|dollar))", clean_tok1)
+                )
                 has_code_pattern = bool(
-                    re.search(r"\d", tok1)
-                    or ("_" in tok1)
+                    ("_" in tok1)
+                    or re.match(r"^[a-zA-Z]+\d+[a-zA-Z0-9_-]*$", tok1)
+                    or re.match(r"^\d{1,4}$", tok1)
                     or re.search(r"[a-z][A-Z]", tok1)
                     or bool(VIETNAMESE_DIACRITIC_RE.search(tok1))
                     or any(k in clean_tok1 for k in ("kichban", "kb", "video", "tap", "bai", "ep", "part"))
                 )
-                if not is_pure_list_num and clean_tok1 not in COMMON_EN_TITLE_STARTERS and has_code_pattern:
-                    if not cname:
-                        cname = sanitize_custom_script_name(tok1)
+                if not is_pure_list_num and not is_title_num_word and clean_tok1 not in COMMON_EN_TITLE_STARTERS and has_code_pattern:
+                    cname = sanitize_custom_script_name(tok1)
                     s = rest
 
     cleaned_title = clean_title_prefix(s)
@@ -6182,7 +6207,7 @@ def add_titles_to_backlog(
     """
     if niche:
         set_active_niche(niche)
-    cfg = get_niche_config(ACTIVE_NICHE)
+    cfg = get_niche_config(niche or ACTIVE_KEY_ID or ACTIVE_NICHE)
     p_root = cfg["projects_root"]
     b_path = cfg["backlog_path"]
 
@@ -6287,7 +6312,7 @@ def rename_project_custom_name(project_id: str, new_custom_name: str, niche: str
     """
     if niche:
         set_active_niche(niche)
-    cfg = get_niche_config(ACTIVE_NICHE)
+    cfg = get_niche_config(niche or ACTIVE_KEY_ID or ACTIVE_NICHE)
     p_root = cfg["projects_root"]
     b_path = cfg["backlog_path"]
     th_dir = cfg["tong_hop_dir"]
@@ -6341,7 +6366,7 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
     """
     try:
         from engine.license_manager import verify_current_machine_license
-        lic_res = verify_current_machine_license(force_cloud_sync=True)
+        lic_res = verify_current_machine_license(force_cloud_sync=False)
         if not lic_res.get("valid"):
             log_msg("LICENSE-GUARD", f"⛔ TỪ CHỐI CHẠY PIPELINE — BẢN QUYỀN KHÔNG HỢP LỆ: {lic_res.get('message')}")
             return
@@ -6350,19 +6375,9 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
 
     if niche:
         set_active_niche(niche)
-    cfg = get_niche_config(ACTIVE_NICHE)
+    cfg = get_niche_config(niche or ACTIVE_KEY_ID or ACTIVE_NICHE)
     b_path = cfg["backlog_path"]
 
-    # PHIÊN BẢN 2 (ĐA TÀI KHOẢN CHATGPT WEB): Chia đều nhiệm vụ cho tất cả các Acc đã đăng nhập (`Acc #1..#3`),
-    # tối đa 1 Acc chạy 3 luồng (`MAX_THREADS_PER_ACCOUNT = 3`) -> Lên tới 9 luồng song song khi có 3 Acc!
-    from engine.chatgpt_web_client import check_all_web_accounts_status, MAX_THREADS_PER_ACCOUNT
-    acc_summary = check_all_web_accounts_status(force_refresh=True)
-    logged_in_count = max(1, int(acc_summary.get("logged_in_count") or 1))
-    max_allowed_by_accounts = logged_in_count * MAX_THREADS_PER_ACCOUNT
-    if max_workers <= 0:
-        max_workers = max_allowed_by_accounts
-    else:
-        max_workers = max(1, min(max_allowed_by_accounts, max_workers))
     if not os.path.exists(b_path):
         print(f"Chưa có file hàng đợi {b_path} cho kênh {cfg['label']}.")
         return
@@ -6415,6 +6430,73 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
         update_progress_markdown(cfg["niche"])
         return
 
+    def _set_pending_Connect_note(note_text: str):
+        for it_p in pending_items[:max(1, max_workers if max_workers > 0 else 3)]:
+            st_p = os.path.join(it_p["project_dir"], "STATE.json")
+            if os.path.exists(st_p):
+                try:
+                    st_d = json.load(open(st_p, encoding="utf-8"))
+                    cur_s = str(st_d.get("current_step_status") or "QUEUED")
+                    if cur_s in ("QUEUED", "QUEUED_SKIP_STEP_1", "STEP_1_STARTING", "STEP_1_5_STARTING"):
+                        skip_s1 = bool(st_d.get("skip_title_rewrite"))
+                        st_d["current_step_status"] = "STEP_1_5_STARTING" if skip_s1 else "STEP_1_STARTING"
+                        st_d["live_note"] = note_text
+                        st_d["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        write_json_file(st_p, st_d)
+                except Exception:
+                    pass
+
+    # PHIÊN BẢN 2 (ĐA TÀI KHOẢN CHATGPT WEB): Chia đều nhiệm vụ cho tất cả các Acc đã đăng nhập (`Acc #1..#3`),
+    # tối đa 1 Acc chạy 3 luồng (`MAX_THREADS_PER_ACCOUNT = 3`) -> Lên tới 9 luồng song song khi có 3 Acc!
+    from engine.chatgpt_web_client import (
+        check_all_web_accounts_status,
+        ensure_all_initialized_browsers_open,
+        ensure_chrome_debug_browser_open,
+        MAX_THREADS_PER_ACCOUNT,
+    )
+    _set_pending_Connect_note("🌐 Đang khởi động trình duyệt Chrome & kết nối tài khoản ChatGPT (Port 9222)...")
+    acc_summary = check_all_web_accounts_status(force_refresh=True)
+    if int(acc_summary.get("logged_in_count") or 0) == 0:
+        try:
+            ensure_all_initialized_browsers_open(run_hidden=True)
+        except Exception:
+            pass
+        for _ in range(4):
+            time.sleep(1.5)
+            acc_summary = check_all_web_accounts_status(force_refresh=True)
+            if int(acc_summary.get("logged_in_count") or 0) > 0:
+                break
+
+    if int(acc_summary.get("logged_in_count") or 0) == 0:
+        try:
+            ensure_chrome_debug_browser_open(
+                open_chatgpt_home=True,
+                force_bring_to_front=True,
+                run_hidden=False,
+                acc_id="acc_1",
+            )
+        except Exception:
+            pass
+        wait_msg = (
+            "🔑 Đã tự động mở cửa sổ Chrome (Acc #1 - Port 9222)! "
+            "Hãy đăng nhập tài khoản ChatGPT trên cửa sổ Chrome vừa hiện ra — Hệ thống đang chờ và sẽ TỰ ĐỘNG VIẾT NGAY khi bạn đăng nhập xong!"
+        )
+        log_msg("WEB-LOGIN-WAIT", wait_msg)
+        _set_pending_Connect_note(wait_msg)
+        for wait_idx in range(240):
+            time.sleep(2.5)
+            acc_summary = check_all_web_accounts_status(force_refresh=True)
+            if int(acc_summary.get("logged_in_count") or 0) > 0:
+                log_msg("WEB-LOGIN-OK", "✅ Đã phát hiện đăng nhập ChatGPT thành công! Bắt đầu chạy Pipeline viết kịch bản ngay lập tức!")
+                break
+
+    logged_in_count = max(1, int(acc_summary.get("logged_in_count") or 1))
+    max_allowed_by_accounts = logged_in_count * MAX_THREADS_PER_ACCOUNT
+    if max_workers <= 0:
+        max_workers = max_allowed_by_accounts
+    else:
+        max_workers = max(1, min(max_allowed_by_accounts, max_workers))
+
     print("=" * 95)
     print(
         f"=== KHỞI CHẠY PHIÊN BẢN 2 [ĐA TÀI KHOẢN CHATGPT WEB - {cfg['label']}]: "
@@ -6423,8 +6505,8 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
     )
     print("=" * 95)
 
-    # Tự động khóa cấu hình Tạo Video hiện tại trên Video Batch Studio trước khi bắt đầu chạy
-    notify_video_batch_studio_lock_config()
+    # Tự động khóa cấu hình Tạo Video hiện tại trên Video Batch Studio trước khi bắt đầu chạy (chạy bất đồng bộ không gây trễ)
+    threading.Thread(target=notify_video_batch_studio_lock_config, daemon=True).start()
 
     from engine.chatgpt_web_client import ChatGPTWebMultiTabClient
     client = ChatGPTWebMultiTabClient()
