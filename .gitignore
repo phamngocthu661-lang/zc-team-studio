@@ -38,6 +38,8 @@ vbs_interactive_log.txt
 *.zip
 !python_runtime/python314.zip
 !python_runtime/**
+!engine/python_runtime/python314.zip
+!engine/python_runtime/**
 *.rar
 *.7z
 *.asar
