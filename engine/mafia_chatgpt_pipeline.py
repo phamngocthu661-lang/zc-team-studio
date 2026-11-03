@@ -64,6 +64,54 @@ STUDIO_ROOT = _resolve_unified_studio_root(_CODE_ROOT)
 if STUDIO_ROOT not in sys.path:
     sys.path.insert(0, STUDIO_ROOT)
 
+
+def _migrate_backlog_and_projects_if_split():
+    """Nếu trước đó dữ liệu hàng đợi từng được tạo trong resources/app (_CODE_ROOT) khác với STUDIO_ROOT (exeDir), tự động gộp về STUDIO_ROOT."""
+    if os.path.normcase(os.path.abspath(_CODE_ROOT)) == os.path.normcase(os.path.abspath(STUDIO_ROOT)):
+        return
+    try:
+        for entry in os.listdir(_CODE_ROOT):
+            if entry.startswith("QUEUE_BACKLOG") and entry.endswith(".json"):
+                src_b = os.path.join(_CODE_ROOT, entry)
+                dst_b = os.path.join(STUDIO_ROOT, entry)
+                try:
+                    src_data = json.load(open(src_b, encoding="utf-8"))
+                    src_items = src_data.get("items") or []
+                    if not src_items:
+                        continue
+                    dst_data = {"max_parallel_threads": 3, "thinking_effort": "medium", "items": []}
+                    if os.path.exists(dst_b):
+                        try:
+                            dst_data = json.load(open(dst_b, encoding="utf-8"))
+                        except Exception:
+                            pass
+                    existing_pids = {x.get("project_id") for x in (dst_data.get("items") or [])}
+                    changed = False
+                    for it in src_items:
+                        pid = it.get("project_id")
+                        if pid and pid not in existing_pids:
+                            old_pdir = it.get("project_dir") or ""
+                            if old_pdir and os.path.normcase(_CODE_ROOT) in os.path.normcase(old_pdir):
+                                rel_pdir = os.path.relpath(old_pdir, _CODE_ROOT)
+                                new_pdir = os.path.join(STUDIO_ROOT, rel_pdir)
+                                if os.path.exists(old_pdir) and not os.path.exists(new_pdir):
+                                    os.makedirs(os.path.dirname(new_pdir), exist_ok=True)
+                                    shutil.copytree(old_pdir, new_pdir, dirs_exist_ok=True)
+                                it["project_dir"] = new_pdir
+                            dst_data.setdefault("items", []).append(it)
+                            existing_pids.add(pid)
+                            changed = True
+                    if changed:
+                        with open(dst_b, "w", encoding="utf-8") as f:
+                            json.dump(dst_data, f, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+_migrate_backlog_and_projects_if_split()
+
 try:
     from engine.license_manager import verify_current_machine_license
 except Exception:
@@ -6660,11 +6708,73 @@ def update_or_replace_queue_titles_batch(
     }
 
 
+def _ensure_web_accounts_ready_with_logging(set_note_fn=None) -> dict:
+    from engine.chatgpt_web_client import (
+        check_all_web_accounts_status,
+        ensure_all_initialized_browsers_open,
+        ensure_chrome_debug_browser_open,
+    )
+    init_note = "🌐 Đang khởi động trình duyệt Chrome & kiểm tra kết nối tài khoản ChatGPT (Port 9222..9224)..."
+    log_msg("WEB-CHECK", init_note)
+    if callable(set_note_fn):
+        try:
+            set_note_fn(init_note)
+        except Exception:
+            pass
+
+    acc_summary = check_all_web_accounts_status(force_refresh=True)
+    if int(acc_summary.get("logged_in_count") or 0) == 0:
+        log_msg("WEB-BROWSER", "🌐 Chưa thấy cửa sổ Chrome ChatGPT đang mở. Đang tự động bật trình duyệt Chrome Profile...")
+        try:
+            ensure_all_initialized_browsers_open(run_hidden=True)
+        except Exception as e_br:
+            log_msg("WEB-BROWSER-WARN", f"⚠️ Lưu ý khi mở Chrome ngầm: {e_br}")
+        for _ in range(6):
+            time.sleep(1.5)
+            acc_summary = check_all_web_accounts_status(force_refresh=True)
+            if int(acc_summary.get("logged_in_count") or 0) > 0:
+                break
+
+    if int(acc_summary.get("logged_in_count") or 0) == 0:
+        try:
+            ensure_chrome_debug_browser_open(
+                open_chatgpt_home=True,
+                force_bring_to_front=True,
+                run_hidden=False,
+                acc_id="acc_1",
+            )
+        except Exception as e_open:
+            log_msg("WEB-LOGIN-ERR", f"⚠️ Không thể tự mở cửa sổ Chrome (Port 9222): {e_open}")
+        wait_msg = (
+            "🔑 Đã tự động mở cửa sổ Chrome (Acc #1 - Port 9222)! "
+            "Hãy đăng nhập tài khoản ChatGPT trên cửa sổ Chrome vừa hiện ra — Hệ thống đang chờ và sẽ TỰ ĐỘNG VIẾT NGAY khi bạn đăng nhập xong!"
+        )
+        log_msg("WEB-LOGIN-WAIT", wait_msg)
+        if callable(set_note_fn):
+            try:
+                set_note_fn(wait_msg)
+            except Exception:
+                pass
+        for _ in range(240):
+            time.sleep(2.5)
+            acc_summary = check_all_web_accounts_status(force_refresh=True)
+            if int(acc_summary.get("logged_in_count") or 0) > 0:
+                log_msg("WEB-LOGIN-OK", "✅ Đã phát hiện đăng nhập ChatGPT thành công! Bắt đầu chạy Pipeline viết kịch bản ngay lập tức!")
+                break
+    else:
+        log_msg(
+            "WEB-READY",
+            f"✅ Kết nối ChatGPT Web sẵn sàng: {acc_summary.get('logged_in_count', 1)} tài khoản đã đăng nhập — Bắt đầu giao việc cho 9 Bàn AI Agent!",
+        )
+    return acc_summary
+
+
 def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_projects: int = 0, niche: str = None):
     """
     Chạy tự động các dự án đang chờ hoặc đang dở dang trong kho hàng đợi của kênh đã chọn (`mafia` hoặc `homeless`)
     với tối đa `max_workers` luồng song song (mặc định 3 luồng).
     """
+    _migrate_backlog_and_projects_if_split()
     try:
         from engine.license_manager import verify_current_machine_license
         lic_res = verify_current_machine_license(force_cloud_sync=False)
@@ -6678,9 +6788,10 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
         set_active_niche(niche)
     cfg = get_niche_config(niche or ACTIVE_KEY_ID or ACTIVE_NICHE)
     b_path = cfg["backlog_path"]
+    log_msg("QUEUE-START", f"🚀 Kích hoạt chạy Hàng đợi kênh [{cfg['label']}] (File: {os.path.basename(b_path)} | max_workers={max_workers} | thinking={thinking})...")
 
     if not os.path.exists(b_path):
-        print(f"Chưa có file hàng đợi {b_path} cho kênh {cfg['label']}.")
+        log_msg("QUEUE-EMPTY", f"⚠️ Chưa có file hàng đợi {os.path.basename(b_path)} cho kênh [{cfg['label']}]. Hãy dán tiêu đề vào ô Giao Việc và bấm Lưu & Chạy Ngay!")
         return
 
     backlog = json.load(open(b_path, encoding="utf-8"))
@@ -6689,6 +6800,7 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
         pid = it.get("project_id", "")
         pdir = os.path.join(cfg["projects_root"], pid) if pid else it["project_dir"]
         it["project_dir"] = pdir
+        os.makedirs(pdir, exist_ok=True)
         st_path = os.path.join(pdir, "STATE.json")
         if os.path.exists(st_path):
             try:
@@ -6698,6 +6810,27 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
                     continue
             except Exception:
                 pass
+        else:
+            # Tự động khôi phục STATE.json nếu chỉ mới có trong QUEUE_BACKLOG.json
+            skip_s1 = bool(it.get("skip_title_rewrite"))
+            init_st = {
+                "project_id": pid,
+                "project_dir": pdir,
+                "source_title": it.get("source_title", ""),
+                "custom_name": it.get("custom_name", ""),
+                "skip_title_rewrite": skip_s1,
+                "winner_title": it.get("source_title", "") if skip_s1 else it.get("winner_title", ""),
+                "winner_title_score": 100 if skip_s1 else it.get("winner_title_score", 0),
+                "thinking_effort": thinking,
+                "thread_id": "",
+                "host_id": "chatgpt_web",
+                "completed_steps": ["STEP_1_DONE"] if skip_s1 else [],
+                "current_step_status": "QUEUED_SKIP_STEP_1" if skip_s1 else "QUEUED",
+                "live_note": "🚀 Đang chuẩn bị khởi chạy...",
+                "completed": False,
+                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            write_json_file(st_path, init_st)
         pending_items.append(it)
 
     def _step_priority_key(item_obj: dict) -> tuple[int, str]:
@@ -6727,7 +6860,7 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
         pending_items = pending_items[:limit_projects]
 
     if not pending_items:
-        print(f"Tất cả kịch bản trong hàng đợi kênh {cfg['label']} đều đã hoàn thành 100%!")
+        log_msg("QUEUE-DONE", f"✅ Tất cả kịch bản trong hàng đợi kênh [{cfg['label']}] đều đã hoàn thành 100% (hoặc danh sách đang trống)!")
         update_progress_markdown(cfg["niche"])
         return
 
@@ -6747,49 +6880,8 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
                 except Exception:
                     pass
 
-    # PHIÊN BẢN 2 (ĐA TÀI KHOẢN CHATGPT WEB): Chia đều nhiệm vụ cho tất cả các Acc đã đăng nhập (`Acc #1..#3`),
-    # tối đa 1 Acc chạy 3 luồng (`MAX_THREADS_PER_ACCOUNT = 3`) -> Lên tới 9 luồng song song khi có 3 Acc!
-    from engine.chatgpt_web_client import (
-        check_all_web_accounts_status,
-        ensure_all_initialized_browsers_open,
-        ensure_chrome_debug_browser_open,
-        MAX_THREADS_PER_ACCOUNT,
-    )
-    _set_pending_Connect_note("🌐 Đang khởi động trình duyệt Chrome & kết nối tài khoản ChatGPT (Port 9222)...")
-    acc_summary = check_all_web_accounts_status(force_refresh=True)
-    if int(acc_summary.get("logged_in_count") or 0) == 0:
-        try:
-            ensure_all_initialized_browsers_open(run_hidden=True)
-        except Exception:
-            pass
-        for _ in range(6):
-            time.sleep(1.5)
-            acc_summary = check_all_web_accounts_status(force_refresh=True)
-            if int(acc_summary.get("logged_in_count") or 0) > 0:
-                break
-
-    if int(acc_summary.get("logged_in_count") or 0) == 0:
-        try:
-            ensure_chrome_debug_browser_open(
-                open_chatgpt_home=True,
-                force_bring_to_front=True,
-                run_hidden=False,
-                acc_id="acc_1",
-            )
-        except Exception:
-            pass
-        wait_msg = (
-            "🔑 Đã tự động mở cửa sổ Chrome (Acc #1 - Port 9222)! "
-            "Hãy đăng nhập tài khoản ChatGPT trên cửa sổ Chrome vừa hiện ra — Hệ thống đang chờ và sẽ TỰ ĐỘNG VIẾT NGAY khi bạn đăng nhập xong!"
-        )
-        log_msg("WEB-LOGIN-WAIT", wait_msg)
-        _set_pending_Connect_note(wait_msg)
-        for wait_idx in range(240):
-            time.sleep(2.5)
-            acc_summary = check_all_web_accounts_status(force_refresh=True)
-            if int(acc_summary.get("logged_in_count") or 0) > 0:
-                log_msg("WEB-LOGIN-OK", "✅ Đã phát hiện đăng nhập ChatGPT thành công! Bắt đầu chạy Pipeline viết kịch bản ngay lập tức!")
-                break
+    from engine.chatgpt_web_client import MAX_THREADS_PER_ACCOUNT
+    acc_summary = _ensure_web_accounts_ready_with_logging(set_note_fn=_set_pending_Connect_note)
 
     logged_in_count = max(1, int(acc_summary.get("logged_in_count") or 1))
     max_allowed_by_accounts = logged_in_count * MAX_THREADS_PER_ACCOUNT
@@ -6798,13 +6890,11 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
     else:
         max_workers = max(1, min(max_allowed_by_accounts, max_workers))
 
-    print("=" * 95)
-    print(
-        f"=== KHỞI CHẠY PHIÊN BẢN 2 [ĐA TÀI KHOẢN CHATGPT WEB - {cfg['label']}]: "
-        f"{len(pending_items)} DỰ ÁN | {logged_in_count} ACC ĐÃ ĐĂNG NHẬP | "
-        f"TỐI ĐA {max_workers} LUỒNG SONG SONG (CHIA ĐỀU TỐI ĐA {MAX_THREADS_PER_ACCOUNT} LUỒNG/ACC) ==="
+    log_msg(
+        "PIPELINE-START",
+        f"🔥 BẮT ĐẦU CHẠY ĐA LUỒNG [{cfg['label']}]: {len(pending_items)} DỰ ÁN | "
+        f"{logged_in_count} ACC ĐÃ ĐĂNG NHẬP | TỐI ĐA {max_workers} LUỒNG SONG SONG (CHIA ĐỀU TỐI ĐA {MAX_THREADS_PER_ACCOUNT} LUỒNG/ACC)",
     )
-    print("=" * 95)
 
     # Tự động khóa cấu hình Tạo Video hiện tại trên Video Batch Studio trước khi bắt đầu chạy (chạy bất đồng bộ không gây trễ)
     threading.Thread(target=notify_video_batch_studio_lock_config, daemon=True).start()
@@ -6852,53 +6942,95 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Multi-Channel (12 Keys + Mafia + Homeless V12 + MEXICO BÀ CÔ) Multi-Thread ChatGPT Pipeline")
-    parser.add_argument("--niche", type=str, default="mafia", help="Chọn Key / kênh giao việc (hỗ trợ 12 Key thư mục + 'mafia', 'homeless', 'mexico')")
-    parser.add_argument("--project_dir", type=str, help="Đường dẫn thư mục 1 dự án cụ thể")
-    parser.add_argument("--title", type=str, help="Tiêu đề gốc đầu vào cho dự án")
-    parser.add_argument("--add_titles", nargs="+", help="Thêm 1 hoặc nhiều tiêu đề vào hàng đợi của kênh đã chọn")
-    parser.add_argument("--add_titles_file", type=str, help="Đường dẫn file .txt chứa danh sách nhiều tiêu đề (mỗi dòng 1 tiêu đề)")
-    parser.add_argument("--run_queue", action="store_true", help="Chạy hàng đợi của kênh đã chọn (tối đa 3 luồng)")
-    parser.add_argument("--max_workers", type=int, default=3, help="Số luồng chạy song song tối đa (mặc định: 3)")
-    parser.add_argument("--limit", type=int, default=0, help="Giới hạn số lượng dự án lấy ra chạy trong đợt này (0 = chạy hết)")
-    parser.add_argument("--step", type=int, default=0, choices=[0, 1, 2, 3, 4, 5], help="Chạy riêng 1 bước (1..5) hoặc 0 để chạy trọn vẹn/tiếp tục từ checkpoint")
-    parser.add_argument("--thinking", type=str, default="medium", choices=["low", "medium", "high"], help="Mức suy luận của model ChatGPT (mặc định: medium)")
+    import traceback
 
-    args = parser.parse_args()
-    set_active_niche(args.niche)
-    if args.project_dir:
-        abs_pdir_up = os.path.abspath(args.project_dir).upper()
-        for k12 in KEY_PROFILES_12:
-            if f"PROJECTS_{k12.upper()}" in abs_pdir_up:
-                set_active_niche(k12)
-                break
-        else:
-            if "PROJECTS_MEXICO" in abs_pdir_up:
-                set_active_niche("mexico")
-            elif "PROJECTS_HOMELESS" in abs_pdir_up:
-                set_active_niche("homeless")
+    try:
+        parser = argparse.ArgumentParser(description="Multi-Channel (12 Keys + Mafia + Homeless V12 + MEXICO BÀ CÔ) Multi-Thread ChatGPT Pipeline")
+        parser.add_argument("--niche", type=str, default="mafia", help="Chọn Key / kênh giao việc (hỗ trợ 12 Key thư mục + 'mafia', 'homeless', 'mexico')")
+        parser.add_argument("--project_dir", type=str, help="Đường dẫn thư mục 1 dự án cụ thể")
+        parser.add_argument("--title", type=str, help="Tiêu đề gốc đầu vào cho dự án")
+        parser.add_argument("--add_titles", nargs="+", help="Thêm 1 hoặc nhiều tiêu đề vào hàng đợi của kênh đã chọn")
+        parser.add_argument("--add_titles_file", type=str, help="Đường dẫn file .txt chứa danh sách nhiều tiêu đề (mỗi dòng 1 tiêu đề)")
+        parser.add_argument("--run_queue", action="store_true", help="Chạy hàng đợi của kênh đã chọn (tối đa 3 luồng)")
+        parser.add_argument("--max_workers", type=int, default=3, help="Số luồng chạy song song tối đa (mặc định: 3)")
+        parser.add_argument("--limit", type=int, default=0, help="Giới hạn số lượng dự án lấy ra chạy trong đợt này (0 = chạy hết)")
+        parser.add_argument("--step", type=int, default=0, choices=[0, 1, 2, 3, 4, 5], help="Chạy riêng 1 bước (1..5) hoặc 0 để chạy trọn vẹn/tiếp tục từ checkpoint")
+        parser.add_argument("--thinking", type=str, default="medium", choices=["low", "medium", "high"], help="Mức suy luận của model ChatGPT (mặc định: medium)")
 
-    if args.add_titles:
-        added = add_titles_to_backlog(args.add_titles, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
-        print(f"Đã thêm {len(added)} tiêu đề vào hàng đợi [{ACTIVE_KEY_ID or ACTIVE_NICHE}] {BACKLOG_PATH}!")
+        args = parser.parse_args()
+        set_active_niche(args.niche)
+        if args.project_dir:
+            abs_pdir_up = os.path.abspath(args.project_dir).upper()
+            for k12 in KEY_PROFILES_12:
+                if f"PROJECTS_{k12.upper()}" in abs_pdir_up:
+                    set_active_niche(k12)
+                    break
+            else:
+                if "PROJECTS_MEXICO" in abs_pdir_up:
+                    set_active_niche("mexico")
+                elif "PROJECTS_HOMELESS" in abs_pdir_up:
+                    set_active_niche("homeless")
 
-    if args.add_titles_file and os.path.exists(args.add_titles_file):
-        lines = [ln.strip() for ln in open(args.add_titles_file, encoding="utf-8").read().splitlines() if ln.strip()]
-        added = add_titles_to_backlog(lines, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
-        print(f"Đã thêm {len(added)} tiêu đề từ file vào hàng đợi [{ACTIVE_KEY_ID or ACTIVE_NICHE}] {BACKLOG_PATH}!")
+        if args.add_titles:
+            added = add_titles_to_backlog(args.add_titles, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
+            log_msg("ADD-TITLES", f"📥 Đã thêm {len(added)} tiêu đề vào hàng đợi [{ACTIVE_KEY_ID or ACTIVE_NICHE}] {BACKLOG_PATH}!")
 
-    if args.project_dir:
-        from engine.chatgpt_web_client import ChatGPTWebMultiTabClient
-        c = ChatGPTWebMultiTabClient()
-        try:
-            run_single_project_pipeline(
-                c,
-                project_dir=args.project_dir,
-                source_title=args.title or "",
-                thinking=args.thinking,
-                only_step=args.step,
-            )
-        finally:
-            c.close()
-    elif args.run_queue:
-        run_backlog_queue(max_workers=args.max_workers, thinking=args.thinking, limit_projects=args.limit, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
+        if args.add_titles_file and os.path.exists(args.add_titles_file):
+            lines = [ln.strip() for ln in open(args.add_titles_file, encoding="utf-8").read().splitlines() if ln.strip()]
+            added = add_titles_to_backlog(lines, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
+            log_msg("ADD-TITLES-FILE", f"📥 Đã thêm {len(added)} tiêu đề từ file vào hàng đợi [{ACTIVE_KEY_ID or ACTIVE_NICHE}] {BACKLOG_PATH}!")
+
+        if args.project_dir:
+            pdir_norm = os.path.abspath(args.project_dir)
+            pid_single = os.path.basename(os.path.normpath(pdir_norm))
+            cfg_single = get_niche_config(ACTIVE_KEY_ID or ACTIVE_NICHE)
+            if not os.path.exists(pdir_norm):
+                alt_pdir = os.path.join(cfg_single["projects_root"], pid_single)
+                if os.path.exists(alt_pdir):
+                    pdir_norm = alt_pdir
+                else:
+                    os.makedirs(pdir_norm, exist_ok=True)
+            resolved_title = (args.title or "").strip()
+            if not resolved_title and os.path.exists(cfg_single["backlog_path"]):
+                try:
+                    b_s = json.load(open(cfg_single["backlog_path"], encoding="utf-8"))
+                    for bit in b_s.get("items", []):
+                        if bit.get("project_id") == pid_single and bit.get("source_title"):
+                            resolved_title = str(bit.get("source_title")).strip()
+                            break
+                except Exception:
+                    pass
+            log_msg(pid_single, f"🚀 Khởi chạy đơn luồng kịch bản [{pid_single}] (Kênh: {cfg_single['label']} | model={args.thinking})...")
+
+            def _set_single_note(note_text: str):
+                st_p = os.path.join(pdir_norm, "STATE.json")
+                if os.path.exists(st_p):
+                    try:
+                        st_d = json.load(open(st_p, encoding="utf-8"))
+                        skip_s1 = bool(st_d.get("skip_title_rewrite"))
+                        st_d["current_step_status"] = "STEP_1_5_STARTING" if skip_s1 else "STEP_1_STARTING"
+                        st_d["live_note"] = note_text
+                        st_d["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        write_json_file(st_p, st_d)
+                    except Exception:
+                        pass
+
+            _ensure_web_accounts_ready_with_logging(set_note_fn=_set_single_note)
+            threading.Thread(target=notify_video_batch_studio_lock_config, daemon=True).start()
+            from engine.chatgpt_web_client import ChatGPTWebMultiTabClient
+            c = ChatGPTWebMultiTabClient()
+            try:
+                run_single_project_pipeline(
+                    c,
+                    project_dir=pdir_norm,
+                    source_title=resolved_title,
+                    thinking=args.thinking,
+                    only_step=args.step,
+                )
+            finally:
+                c.close()
+        elif args.run_queue:
+            run_backlog_queue(max_workers=args.max_workers, thinking=args.thinking, limit_projects=args.limit, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
+    except Exception as fatal_exc:
+        log_msg("FATAL-ERROR", f"❌ Lỗi dừng tiến trình Pipeline: {fatal_exc}\n{traceback.format_exc()}")
+        raise

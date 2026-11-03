@@ -246,9 +246,71 @@ def start_worker_command(args_list: list[str], mode_desc: str, max_workers: int 
     ACTIVE_WORKER_NICHE = niche_key
     set_active_niche(niche_key)
 
+    # Cập nhật tức thời trạng thái STATE.json của các kịch bản sắp chạy để giao diện chuyển ngay từ CHỜ CHẠY -> ĐANG KHỞI ĐỘNG
+    try:
+        cfg_w = get_niche_config(niche_key)
+        backlog_w = cfg_w["BACKLOG_PATH"]
+        projects_root_w = cfg_w["PROJECTS_ROOT"]
+        target_pdir_single = ""
+        if "--project_dir" in args_list:
+            idx_pd = args_list.index("--project_dir")
+            if idx_pd + 1 < len(args_list):
+                target_pdir_single = os.path.abspath(args_list[idx_pd + 1])
+
+        if os.path.exists(backlog_w):
+            bdata = json.load(open(backlog_w, encoding="utf-8"))
+            bitems = bdata.get("items") or []
+            eff_lim = max(1, max_workers if max_workers > 0 else 3)
+            marked_cnt = 0
+            for it_w in bitems:
+                if it_w.get("completed"):
+                    continue
+                pid_w = it_w.get("project_id") or ""
+                pdir_w = it_w.get("project_dir") or (os.path.join(projects_root_w, pid_w) if pid_w else "")
+                if not pdir_w:
+                    continue
+                if target_pdir_single and os.path.normcase(os.path.abspath(pdir_w)) != os.path.normcase(target_pdir_single):
+                    continue
+                os.makedirs(pdir_w, exist_ok=True)
+                st_p = os.path.join(pdir_w, "STATE.json")
+                st_d = {}
+                if os.path.exists(st_p):
+                    try:
+                        st_d = json.load(open(st_p, encoding="utf-8"))
+                    except Exception:
+                        st_d = {}
+                if not st_d:
+                    skip_s1 = bool(it_w.get("skip_title_rewrite", False))
+                    st_d = {
+                        "project_id": pid_w,
+                        "custom_name": it_w.get("custom_name", ""),
+                        "export_prefix": it_w.get("export_prefix", pid_w.split("_")[0] if "_" in pid_w else pid_w),
+                        "niche": niche_key,
+                        "source_title": it_w.get("source_title", ""),
+                        "winner_title": it_w.get("source_title", "") if skip_s1 else "",
+                        "winner_title_score": 100 if skip_s1 else 0,
+                        "skip_title_rewrite": skip_s1,
+                        "completed_steps": ["STEP_1_DONE"] if skip_s1 else [],
+                        "current_step_status": "STEP_1_5_STARTING" if skip_s1 else "STEP_1_STARTING",
+                        "live_note": "🚀 Đang khởi động luồng AI Agent & kết nối trình duyệt ChatGPT...",
+                        "updated_at": datetime.now().isoformat(timespec="seconds"),
+                    }
+                elif st_d.get("current_step_status") in ("QUEUED", "QUEUED_SKIP_STEP_1", None, ""):
+                    skip_s1 = bool(st_d.get("skip_title_rewrite") or it_w.get("skip_title_rewrite", False))
+                    st_d["current_step_status"] = "STEP_1_5_STARTING" if skip_s1 else "STEP_1_STARTING"
+                    st_d["live_note"] = "🚀 Đang khởi động luồng AI Agent & kết nối trình duyệt ChatGPT..."
+                    st_d["updated_at"] = datetime.now().isoformat(timespec="seconds")
+                with open(st_p, "w", encoding="utf-8") as f_st:
+                    json.dump(st_d, f_st, ensure_ascii=False, indent=2)
+                marked_cnt += 1
+                if not target_pdir_single and marked_cnt >= eff_lim:
+                    break
+    except Exception as e_st:
+        append_studio_log(f"⚠️ Lưu ý cập nhật trạng thái khởi động sớm: {e_st}")
+
     with WORKER_LOCK:
         cmd = [sys.executable, "-u", ENGINE_SCRIPT, "--niche", niche_key] + args_list
-        append_studio_log(f"🚀 Khởi chạy lệnh [{niche_key.upper()}]: {' '.join(cmd)}")
+        append_studio_log(f"🚀 Khởi chạy lệnh [{niche_key.upper()}]: {mode_desc} | Python={sys.executable}")
         log_f = open(LIVE_LOG_PATH, "a", encoding="utf-8", buffering=1)
         ACTIVE_PROCESS = subprocess.Popen(
             cmd,
@@ -1898,20 +1960,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
   </div>
 </div>
 
-<!-- NGĂN KÉO 3 (THU GỌN MẶC ĐỊNH): LIVE CONSOLE LOG -->
-<div id="drawerLogs" class="top-drawer">
-  <div class="panel" style="padding:10px 14px; margin-bottom:0;">
-    <div class="panel-title" style="margin-bottom:6px;">
-      <span>📡 NHẬT KÝ HỆ THỐNG TRỰC TIẾP (LIVE CONSOLE LOG)</span>
-      <div style="display:flex; gap:6px;">
-        <button class="btn btn-dark btn-sm" onclick="clearLogs()">🧹 Xóa bớt Log</button>
-        <button class="btn btn-dark btn-sm" onclick="toggleTopDrawer('Logs')">✖ Thu gọn</button>
-      </div>
-    </div>
-    <div id="liveLogBox" class="log-box" style="height:150px;">Đang tải log hệ thống...</div>
-  </div>
-</div>
-
 <!-- KHUNG CHÍNH SỐ 1: GIAO VIỆC & ĐIỀU KHIỂN CHẠY (GỌN GÀNG, CÓ NÚT THU NHỎ Ô NHẬP) -->
 <div class="panel" style="padding:10px 14px; margin-bottom:10px;">
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -1964,6 +2012,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
       <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
       <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
       <button class="btn btn-red btn-sm" style="padding:6px 10px; font-size:11.8px;" onclick="stopWorker()">⏹️ Dừng</button>
+      <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #38bdf8; color:#38bdf8;" onclick="toggleTopDrawer('Logs')" title="Mở/Đóng khung Nhật ký tiến trình trực tiếp">📡 Xem Log</button>
     </div>
   </div>
 
@@ -2030,6 +2079,20 @@ HTML_PAGE = r"""<!DOCTYPE html>
     <div id="miniLatestLogLine" class="mini-log-ticker" style="flex:1; min-width:240px;" onclick="toggleTopDrawer('Logs')" title="Click để mở/đóng toàn bộ Nhật ký Log">
       📡 Log: Đang chờ lệnh...
     </div>
+  </div>
+</div>
+
+<!-- KHUNG NHẬT KÝ HỆ THỐNG TRỰC TIẾP (HIỂN THỊ NGAY DƯỚI NÚT CHẠY ĐỂ THEO DÕI TIẾN TRÌNH & LỖI) -->
+<div id="drawerLogs" class="top-drawer open" style="margin-bottom:10px;">
+  <div class="panel" style="padding:10px 14px; margin-bottom:0; border:1px solid rgba(56,189,248,0.35);">
+    <div class="panel-title" style="margin-bottom:6px;">
+      <span style="color:#38bdf8;">📡 NHẬT KÝ TIẾN TRÌNH &amp; TRẠNG THÁI CHẠY TRỰC TIẾP (LIVE CONSOLE LOG)</span>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-dark btn-sm" onclick="clearLogs()">🧹 Xóa bớt Log</button>
+        <button class="btn btn-dark btn-sm" onclick="toggleTopDrawer('Logs')">✖ Thu gọn / Mở rộng</button>
+      </div>
+    </div>
+    <div id="liveLogBox" class="log-box" style="height:125px;">Đang tải log hệ thống...</div>
   </div>
 </div>
 
@@ -2514,13 +2577,15 @@ function syncTitleModeSelection(modeVal) {
   }
 }
 
-function syncEmbeddedBridgeMode(modeVal) {
+function syncEmbeddedBridgeMode(modeVal, silent = false) {
   try {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'ZC_SET_BRIDGE_MODE', mode: modeVal }, '*');
     }
   } catch (e) {}
-  showMsg(`🎬 Đã đặt chế độ Bàn #7: ${modeVal === 'STREAMING_VIDEO' ? 'Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn!' : modeVal}`);
+  if (!silent) {
+    showMsg(`🎬 Đã đặt chế độ Bàn #7: ${modeVal === 'STREAMING_VIDEO' ? 'Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn!' : modeVal}`);
+  }
 }
 
 async function addTitlesOnly() {
@@ -2542,29 +2607,38 @@ async function addTitlesOnly() {
 async function addAndRunWithAutoVideoNow() {
   const embMode = document.getElementById('embeddedAutoVideoMode');
   if (embMode) embMode.value = 'STREAMING_VIDEO';
+  syncEmbeddedBridgeMode('STREAMING_VIDEO', true);
   await addAndRunNow(true);
-  syncEmbeddedBridgeMode('STREAMING_VIDEO');
 }
 
 async function addAndRunNow(isAutoVideo = false) {
   const {titles, custom_names} = collectTitlesAndCustomNamesFromUI();
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE || 'mafia';
   CURRENT_NICHE = niche;
-  const max_workers = parseInt(document.getElementById('maxWorkers').value || '3');
+  const max_workers = parseInt(document.getElementById('maxWorkers').value || '0');
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
+  const dl = document.getElementById('drawerLogs');
+  if (dl) dl.classList.add('open');
   showMsg(
     titles.length > 0
       ? `🚀 Đang lưu ${titles.length} tiêu đề & khởi chạy Pipeline 9 Bàn AI (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
-      : `🚀 Đang khởi chạy Hàng đợi kịch bản (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
+      : `🚀 Đang khởi chạy ngay Hàng đợi kịch bản đang chờ (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
   );
-  const r = await apiPost('/api/add_titles', {titles, custom_names, run_now: true, max_workers, thinking, niche, skip_title_rewrite});
-  showMsg(r.message, !r.ok);
+  let r;
+  if (titles.length === 0) {
+    r = await apiPost('/api/run_queue', {max_workers, thinking, niche, auto_video: isAutoVideo});
+  } else {
+    r = await apiPost('/api/add_titles', {titles, custom_names, run_now: true, max_workers, thinking, niche, skip_title_rewrite, auto_video: isAutoVideo});
+  }
+  showMsg(r.message || (r.ok ? `🚀 Đã kích hoạt chạy kịch bản (${niche})!` : `❌ Không thể khởi chạy kịch bản.`), !r.ok);
   if (Number(r.added_count) > 0 && titles.length > 0) {
     document.getElementById('titlesInput').value = '';
     document.getElementById('customNamesInput').value = '';
   }
   await fetchStatus();
+  const lb = document.getElementById('liveLogBox');
+  if (lb) lb.scrollTop = lb.scrollHeight;
 }
 
 function downloadProjectFile(project_id, file_type) {
@@ -2707,19 +2781,25 @@ async function promptRenameProject(project_id, current_name) {
 
 async function runQueueNow() {
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
-  const max_workers = parseInt(document.getElementById('maxWorkers').value || '3');
+  const max_workers = parseInt(document.getElementById('maxWorkers').value || '0');
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
+  const dl = document.getElementById('drawerLogs');
+  if (dl) dl.classList.add('open');
+  showMsg(`⏳ Đang kích hoạt chạy Hàng đợi kịch bản (${niche})...`);
   const r = await apiPost('/api/run_queue', {max_workers, thinking, niche});
-  showMsg(r.message, !r.ok);
-  fetchStatus();
+  showMsg(r.message || (r.ok ? `🚀 Đã kích hoạt chạy Hàng đợi (${niche})!` : `❌ Lỗi khởi chạy Hàng đợi`), !r.ok);
+  await fetchStatus();
 }
 
-async function runSingleProject(project_dir) {
+async function runSingleProject(project_dir, project_id = '') {
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
-  const r = await apiPost('/api/run_single', {project_dir, thinking, niche});
-  showMsg(r.message, !r.ok);
-  fetchStatus();
+  const dl = document.getElementById('drawerLogs');
+  if (dl) dl.classList.add('open');
+  showMsg(`⏳ Đang kích hoạt chạy dự án ${project_id || project_dir} (${niche})...`);
+  const r = await apiPost('/api/run_single', {project_dir, project_id, thinking, niche});
+  showMsg(r.message || (r.ok ? `🚀 Đã kích hoạt chạy dự án ${project_id || project_dir}!` : `❌ Lỗi khởi chạy dự án`), !r.ok);
+  await fetchStatus();
 }
 
 async function deleteProject(project_id) {
@@ -3404,7 +3484,7 @@ async function fetchStatus() {
               <button class="btn btn-dark btn-sm" style="padding:3px 8px; font-size:11px; border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="openEditProjectModal('${p.project_id}')" title="Cập nhật / sửa lại Tiêu đề &amp; Mã kịch bản cho dự án này (${p.project_id})">🔄 Cập Nhật Tiêu Đề</button>
               <button class="btn btn-dark btn-sm" style="padding:3px 7px; font-size:11px; border-color:var(--gold); color:var(--gold);" onclick="openProjectFolder('${p.project_id}')" title="Mở thư mục chứa kịch bản này (${p.project_id})">📂 Folder</button>
               <button class="btn btn-red btn-sm" style="padding:3px 8px; font-size:11px; font-weight:700;" onclick="deleteProject('${p.project_id}')" title="Xóa kịch bản này &amp; xóa luôn Folder chứa kịch bản (${p.project_id})">🗑️ Xóa</button>
-              ${!p.completed ? `<button class="btn btn-gold btn-sm" style="padding:3px 8px; font-size:11px;" onclick="runSingleProject('${p.project_dir.replace(/\\/g, '\\\\')}')">▶️ Chạy</button>` : ''}
+              ${!p.completed ? `<button class="btn btn-gold btn-sm" style="padding:3px 8px; font-size:11px;" onclick="runSingleProject('${(p.project_dir || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}', '${(p.project_id || '').replace(/'/g, "\\'")}')">▶️ Chạy</button>` : ''}
               <button class="btn btn-dark btn-sm" style="padding:3px 8px; font-size:11px; border-color:${isExpanded ? 'var(--gold)' : 'var(--border)'}; color:${isExpanded ? 'var(--gold)' : '#cbd5e1'};" onclick="toggleProjectDetail('${p.project_id}')">
                 ${isExpanded ? '🔼 Thu gọn' : '🔍 Chi tiết'}
               </button>
@@ -3433,7 +3513,7 @@ async function fetchStatus() {
                 <button class="btn btn-dark btn-sm" style="border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="openEditProjectModal('${p.project_id}')">🔄 Cập Nhật Tiêu Đề &amp; Mã</button>
                 <button class="btn btn-gold btn-sm" onclick="openProjectFolder('${p.project_id}')">📂 Mở Thư Mục Chứa Kịch Bản</button>
                 ${p.has_script ? `<button class="btn btn-blue btn-sm" style="background:linear-gradient(135deg,#0284c7,#2563eb); color:#fff; font-weight:700;" onclick="sendProjectToVideoStudio('${p.project_id}')">🎬 Đẩy Sang Bàn #7 Tạo Video</button>` : ''}
-                ${!p.completed ? `<button class="btn btn-green btn-sm" onclick="runSingleProject('${p.project_dir.replace(/\\/g, '\\\\')}')">▶️ Chạy / Tiếp tục dự án này</button>` : ''}
+                ${!p.completed ? `<button class="btn btn-green btn-sm" onclick="runSingleProject('${(p.project_dir || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}', '${p.project_id}')">▶️ Chạy / Tiếp tục dự án này</button>` : ''}
                 <button class="btn btn-red btn-sm" style="font-weight:700;" onclick="deleteProject('${p.project_id}')">🗑️ Xóa Kịch Bản &amp; Xóa Folder</button>
               </div>
             </div>
@@ -3613,6 +3693,13 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     content = f"Lỗi đọc file: {e}"
             self._send_json({"ok": True, "content": content})
+        elif parsed.path == "/api/is_real_python_server":
+            self._send_json({
+                "ok": True,
+                "engine": "python_real",
+                "build_number": 112,
+                "studio_root": STUDIO_ROOT,
+            })
         else:
             self.send_error(404)
 
@@ -3717,7 +3804,11 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                 self._send_json({
                     "ok": ok,
                     "added_count": len(added),
-                    "message": f"[{niche.upper()}]{title_mode_tag} Đã thêm {len(added)} kịch bản{cmd_note}. {msg}",
+                    "message": (
+                        f"[{niche.upper()}]{title_mode_tag} Đã thêm {len(added)} kịch bản{cmd_note}. {msg}"
+                        if len(added) > 0
+                        else f"[{niche.upper()}] Đang chạy các kịch bản trong Hàng đợi! {msg}"
+                    ),
                 })
             else:
                 if not added and user_commands:
@@ -3756,8 +3847,17 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/run_single":
             niche = _norm_niche(body.get("niche", SELECTED_NICHE))
             SELECTED_NICHE = niche
-            pdir = body.get("project_dir", "")
+            cfg = get_niche_config(niche)
+            pdir = str(body.get("project_dir", "") or "").strip()
+            pid = str(body.get("project_id", "") or "").strip()
             thinking = body.get("thinking", "medium")
+            if (not pdir or not os.path.exists(pdir)) and pid:
+                pdir = os.path.join(cfg["PROJECTS_ROOT"], pid)
+            if pdir and not os.path.exists(pdir):
+                try:
+                    os.makedirs(pdir, exist_ok=True)
+                except Exception:
+                    pass
             if not pdir or not os.path.exists(pdir):
                 self._send_json({"ok": False, "message": "Thư mục dự án không tồn tại."})
                 return
@@ -4177,7 +4277,7 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             self._send_json({
                 "ok": True,
                 "engine": "python_real",
-                "build_number": 111,
+                "build_number": 112,
                 "studio_root": STUDIO_ROOT,
             })
         else:
@@ -4211,9 +4311,25 @@ if __name__ == "__main__":
     print(f"==================================================================")
     print(f"PHIÊN BẢN 2 — CHATGPT WEB MULTI-ACCOUNT & MULTI-TAB STUDIO: http://127.0.0.1:{PORT}")
     print(f"==================================================================")
-    try:
-        server = ThreadingHTTPServer(("127.0.0.1", PORT), MafiaDashboardHandler)
-    except OSError:
+    server = None
+    for attempt in range(6):
+        try:
+            server = ThreadingHTTPServer(("127.0.0.1", PORT), MafiaDashboardHandler)
+            break
+        except OSError:
+            try:
+                import urllib.request
+                req_sd = urllib.request.Request(
+                    f"http://127.0.0.1:{PORT}/api/shutdown_node_fallback",
+                    data=b"{}",
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                urllib.request.urlopen(req_sd, timeout=0.6).read()
+            except Exception:
+                pass
+            time.sleep(0.3)
+    if server is None:
         print(f"✅ Server Mafia & Homeless Studio (Cổng {PORT}) đã đang hoạt động sẵn sàng!")
         print(f"👉 Giao diện đang mở tại: http://127.0.0.1:{PORT} (hoặc trong Tab Bàn #6 của Video Batch Studio).")
         sys.exit(0)

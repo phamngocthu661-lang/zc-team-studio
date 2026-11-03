@@ -111,6 +111,15 @@ class ScriptVideoBridgeService {
       try {
         if (!fs.existsSync(exe)) continue;
         const dir = path.dirname(exe);
+        const pthFile = path.join(dir, 'python314._pth');
+        if (fs.existsSync(pthFile)) {
+          try {
+            const curPth = fs.readFileSync(pthFile, 'utf8');
+            if (!curPth.includes('DLLs')) {
+              fs.writeFileSync(pthFile, 'python314.zip\r\nDLLs\r\n.\r\n..\r\nimport site\r\n', 'utf8');
+            }
+          } catch {}
+        }
         const dllsDir = path.join(dir, 'DLLs');
         if (fs.existsSync(dllsDir)) {
           try {
@@ -127,11 +136,11 @@ class ScriptVideoBridgeService {
         const hasZip = fs.existsSync(path.join(dir, 'python314.zip'))
           || fs.existsSync(path.join(dir, 'python313.zip'))
           || fs.existsSync(path.join(dir, 'python312.zip'));
-        const hasSocketOrDll = fs.existsSync(path.join(dir, '_socket.pyd'))
-          || fs.existsSync(path.join(dir, 'DLLs', '_socket.pyd'))
-          || fs.existsSync(path.join(dir, 'python314.dll'))
+        const hasDll = fs.existsSync(path.join(dir, 'python314.dll'))
           || fs.existsSync(path.join(dir, 'python3.dll'));
-        const isPortable = hasZip && hasSocketOrDll;
+        const hasSocketPyd = fs.existsSync(path.join(dir, '_socket.pyd'))
+          || fs.existsSync(path.join(dir, 'DLLs', '_socket.pyd'));
+        const isPortable = hasZip && hasDll && hasSocketPyd;
         const isSys = fs.existsSync(path.join(dir, 'Lib', 'os.py'));
         if (!isPortable && !isSys) {
           continue;
@@ -411,6 +420,14 @@ class ScriptVideoBridgeService {
               const chunks = [];
               req.on('data', (c) => chunks.push(c));
               req.on('end', () => {
+                if (u.pathname === '/api/shutdown_node_fallback') {
+                  const out = Buffer.from(JSON.stringify({ ok: true }), 'utf8');
+                  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+                  res.end(out);
+                  try { srv.close(); } catch {}
+                  if (this._nodeFallback8098Server === srv) this._nodeFallback8098Server = null;
+                  return;
+                }
                 let body = {};
                 try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch {}
                 if (body.niche && statusMap[body.niche]) selectedNiche = body.niche;

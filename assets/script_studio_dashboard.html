@@ -835,20 +835,6 @@
   </div>
 </div>
 
-<!-- NGĂN KÉO 3 (THU GỌN MẶC ĐỊNH): LIVE CONSOLE LOG -->
-<div id="drawerLogs" class="top-drawer">
-  <div class="panel" style="padding:10px 14px; margin-bottom:0;">
-    <div class="panel-title" style="margin-bottom:6px;">
-      <span>📡 NHẬT KÝ HỆ THỐNG TRỰC TIẾP (LIVE CONSOLE LOG)</span>
-      <div style="display:flex; gap:6px;">
-        <button class="btn btn-dark btn-sm" onclick="clearLogs()">🧹 Xóa bớt Log</button>
-        <button class="btn btn-dark btn-sm" onclick="toggleTopDrawer('Logs')">✖ Thu gọn</button>
-      </div>
-    </div>
-    <div id="liveLogBox" class="log-box" style="height:150px;">Đang tải log hệ thống...</div>
-  </div>
-</div>
-
 <!-- KHUNG CHÍNH SỐ 1: GIAO VIỆC & ĐIỀU KHIỂN CHẠY (GỌN GÀNG, CÓ NÚT THU NHỎ Ô NHẬP) -->
 <div class="panel" style="padding:10px 14px; margin-bottom:10px;">
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -901,6 +887,7 @@
       <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
       <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
       <button class="btn btn-red btn-sm" style="padding:6px 10px; font-size:11.8px;" onclick="stopWorker()">⏹️ Dừng</button>
+      <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #38bdf8; color:#38bdf8;" onclick="toggleTopDrawer('Logs')" title="Mở/Đóng khung Nhật ký tiến trình trực tiếp">📡 Xem Log</button>
     </div>
   </div>
 
@@ -967,6 +954,20 @@
     <div id="miniLatestLogLine" class="mini-log-ticker" style="flex:1; min-width:240px;" onclick="toggleTopDrawer('Logs')" title="Click để mở/đóng toàn bộ Nhật ký Log">
       📡 Log: Đang chờ lệnh...
     </div>
+  </div>
+</div>
+
+<!-- KHUNG NHẬT KÝ HỆ THỐNG TRỰC TIẾP (HIỂN THỊ NGAY DƯỚI NÚT CHẠY ĐỂ THEO DÕI TIẾN TRÌNH & LỖI) -->
+<div id="drawerLogs" class="top-drawer open" style="margin-bottom:10px;">
+  <div class="panel" style="padding:10px 14px; margin-bottom:0; border:1px solid rgba(56,189,248,0.35);">
+    <div class="panel-title" style="margin-bottom:6px;">
+      <span style="color:#38bdf8;">📡 NHẬT KÝ TIẾN TRÌNH &amp; TRẠNG THÁI CHẠY TRỰC TIẾP (LIVE CONSOLE LOG)</span>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-dark btn-sm" onclick="clearLogs()">🧹 Xóa bớt Log</button>
+        <button class="btn btn-dark btn-sm" onclick="toggleTopDrawer('Logs')">✖ Thu gọn / Mở rộng</button>
+      </div>
+    </div>
+    <div id="liveLogBox" class="log-box" style="height:125px;">Đang tải log hệ thống...</div>
   </div>
 </div>
 
@@ -1451,13 +1452,15 @@ function syncTitleModeSelection(modeVal) {
   }
 }
 
-function syncEmbeddedBridgeMode(modeVal) {
+function syncEmbeddedBridgeMode(modeVal, silent = false) {
   try {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'ZC_SET_BRIDGE_MODE', mode: modeVal }, '*');
     }
   } catch (e) {}
-  showMsg(`🎬 Đã đặt chế độ Bàn #7: ${modeVal === 'STREAMING_VIDEO' ? 'Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn!' : modeVal}`);
+  if (!silent) {
+    showMsg(`🎬 Đã đặt chế độ Bàn #7: ${modeVal === 'STREAMING_VIDEO' ? 'Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn!' : modeVal}`);
+  }
 }
 
 async function addTitlesOnly() {
@@ -1479,29 +1482,38 @@ async function addTitlesOnly() {
 async function addAndRunWithAutoVideoNow() {
   const embMode = document.getElementById('embeddedAutoVideoMode');
   if (embMode) embMode.value = 'STREAMING_VIDEO';
+  syncEmbeddedBridgeMode('STREAMING_VIDEO', true);
   await addAndRunNow(true);
-  syncEmbeddedBridgeMode('STREAMING_VIDEO');
 }
 
 async function addAndRunNow(isAutoVideo = false) {
   const {titles, custom_names} = collectTitlesAndCustomNamesFromUI();
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE || 'mafia';
   CURRENT_NICHE = niche;
-  const max_workers = parseInt(document.getElementById('maxWorkers').value || '3');
+  const max_workers = parseInt(document.getElementById('maxWorkers').value || '0');
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
+  const dl = document.getElementById('drawerLogs');
+  if (dl) dl.classList.add('open');
   showMsg(
     titles.length > 0
       ? `🚀 Đang lưu ${titles.length} tiêu đề & khởi chạy Pipeline 9 Bàn AI (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
-      : `🚀 Đang khởi chạy Hàng đợi kịch bản (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
+      : `🚀 Đang khởi chạy ngay Hàng đợi kịch bản đang chờ (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
   );
-  const r = await apiPost('/api/add_titles', {titles, custom_names, run_now: true, max_workers, thinking, niche, skip_title_rewrite});
-  showMsg(r.message, !r.ok);
+  let r;
+  if (titles.length === 0) {
+    r = await apiPost('/api/run_queue', {max_workers, thinking, niche, auto_video: isAutoVideo});
+  } else {
+    r = await apiPost('/api/add_titles', {titles, custom_names, run_now: true, max_workers, thinking, niche, skip_title_rewrite, auto_video: isAutoVideo});
+  }
+  showMsg(r.message || (r.ok ? `🚀 Đã kích hoạt chạy kịch bản (${niche})!` : `❌ Không thể khởi chạy kịch bản.`), !r.ok);
   if (Number(r.added_count) > 0 && titles.length > 0) {
     document.getElementById('titlesInput').value = '';
     document.getElementById('customNamesInput').value = '';
   }
   await fetchStatus();
+  const lb = document.getElementById('liveLogBox');
+  if (lb) lb.scrollTop = lb.scrollHeight;
 }
 
 function downloadProjectFile(project_id, file_type) {
@@ -1644,19 +1656,25 @@ async function promptRenameProject(project_id, current_name) {
 
 async function runQueueNow() {
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
-  const max_workers = parseInt(document.getElementById('maxWorkers').value || '3');
+  const max_workers = parseInt(document.getElementById('maxWorkers').value || '0');
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
+  const dl = document.getElementById('drawerLogs');
+  if (dl) dl.classList.add('open');
+  showMsg(`⏳ Đang kích hoạt chạy Hàng đợi kịch bản (${niche})...`);
   const r = await apiPost('/api/run_queue', {max_workers, thinking, niche});
-  showMsg(r.message, !r.ok);
-  fetchStatus();
+  showMsg(r.message || (r.ok ? `🚀 Đã kích hoạt chạy Hàng đợi (${niche})!` : `❌ Lỗi khởi chạy Hàng đợi`), !r.ok);
+  await fetchStatus();
 }
 
-async function runSingleProject(project_dir) {
+async function runSingleProject(project_dir, project_id = '') {
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
-  const r = await apiPost('/api/run_single', {project_dir, thinking, niche});
-  showMsg(r.message, !r.ok);
-  fetchStatus();
+  const dl = document.getElementById('drawerLogs');
+  if (dl) dl.classList.add('open');
+  showMsg(`⏳ Đang kích hoạt chạy dự án ${project_id || project_dir} (${niche})...`);
+  const r = await apiPost('/api/run_single', {project_dir, project_id, thinking, niche});
+  showMsg(r.message || (r.ok ? `🚀 Đã kích hoạt chạy dự án ${project_id || project_dir}!` : `❌ Lỗi khởi chạy dự án`), !r.ok);
+  await fetchStatus();
 }
 
 async function deleteProject(project_id) {
@@ -2341,7 +2359,7 @@ async function fetchStatus() {
               <button class="btn btn-dark btn-sm" style="padding:3px 8px; font-size:11px; border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="openEditProjectModal('${p.project_id}')" title="Cập nhật / sửa lại Tiêu đề &amp; Mã kịch bản cho dự án này (${p.project_id})">🔄 Cập Nhật Tiêu Đề</button>
               <button class="btn btn-dark btn-sm" style="padding:3px 7px; font-size:11px; border-color:var(--gold); color:var(--gold);" onclick="openProjectFolder('${p.project_id}')" title="Mở thư mục chứa kịch bản này (${p.project_id})">📂 Folder</button>
               <button class="btn btn-red btn-sm" style="padding:3px 8px; font-size:11px; font-weight:700;" onclick="deleteProject('${p.project_id}')" title="Xóa kịch bản này &amp; xóa luôn Folder chứa kịch bản (${p.project_id})">🗑️ Xóa</button>
-              ${!p.completed ? `<button class="btn btn-gold btn-sm" style="padding:3px 8px; font-size:11px;" onclick="runSingleProject('${p.project_dir.replace(/\\/g, '\\\\')}')">▶️ Chạy</button>` : ''}
+              ${!p.completed ? `<button class="btn btn-gold btn-sm" style="padding:3px 8px; font-size:11px;" onclick="runSingleProject('${(p.project_dir || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}', '${(p.project_id || '').replace(/'/g, "\\'")}')">▶️ Chạy</button>` : ''}
               <button class="btn btn-dark btn-sm" style="padding:3px 8px; font-size:11px; border-color:${isExpanded ? 'var(--gold)' : 'var(--border)'}; color:${isExpanded ? 'var(--gold)' : '#cbd5e1'};" onclick="toggleProjectDetail('${p.project_id}')">
                 ${isExpanded ? '🔼 Thu gọn' : '🔍 Chi tiết'}
               </button>
@@ -2370,7 +2388,7 @@ async function fetchStatus() {
                 <button class="btn btn-dark btn-sm" style="border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="openEditProjectModal('${p.project_id}')">🔄 Cập Nhật Tiêu Đề &amp; Mã</button>
                 <button class="btn btn-gold btn-sm" onclick="openProjectFolder('${p.project_id}')">📂 Mở Thư Mục Chứa Kịch Bản</button>
                 ${p.has_script ? `<button class="btn btn-blue btn-sm" style="background:linear-gradient(135deg,#0284c7,#2563eb); color:#fff; font-weight:700;" onclick="sendProjectToVideoStudio('${p.project_id}')">🎬 Đẩy Sang Bàn #7 Tạo Video</button>` : ''}
-                ${!p.completed ? `<button class="btn btn-green btn-sm" onclick="runSingleProject('${p.project_dir.replace(/\\/g, '\\\\')}')">▶️ Chạy / Tiếp tục dự án này</button>` : ''}
+                ${!p.completed ? `<button class="btn btn-green btn-sm" onclick="runSingleProject('${(p.project_dir || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}', '${p.project_id}')">▶️ Chạy / Tiếp tục dự án này</button>` : ''}
                 <button class="btn btn-red btn-sm" style="font-weight:700;" onclick="deleteProject('${p.project_id}')">🗑️ Xóa Kịch Bản &amp; Xóa Folder</button>
               </div>
             </div>

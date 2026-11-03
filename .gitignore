@@ -35,9 +35,11 @@ vbs_interactive_log.txt
 *.db
 *.db-shm
 *.db-wal
-python_runtime/
+QUEUE_BACKLOG*.json
 engine/python_runtime/
 *.zip
+!/python_runtime/
+!/python_runtime/**
 *.rar
 *.7z
 *.asar

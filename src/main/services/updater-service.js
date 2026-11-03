@@ -38,6 +38,11 @@ const PROTECTED_CUSTOMER_NAMES = new Set([
   'QUEUE_BACKLOG.json',
   'QUEUE_BACKLOG_HOMELESS.json',
   'QUEUE_BACKLOG_MEXICO.json',
+  'LIVE_STUDIO_LOG.txt',
+  'CUSTOM_LINKED_FOLDERS.json',
+  'TIEN_DO_MAFIA_STUDIO.md',
+  'TIEN_DO_HOMELESS_STUDIO.md',
+  'TIEN_DO_MEXICO_STUDIO.md',
   'push_update_github.py',
   'DAY_CAP_NHAT_LEN_GITHUB.bat',
   '.git'

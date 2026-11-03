@@ -33,12 +33,15 @@ function syncIframeToRealPythonUrl(port) {
     const iframe = document.getElementById('scriptStudioIframe');
     if (iframe) {
       const curSrc = String(iframe.getAttribute('src') || '');
-      const isVerified = iframe.dataset && iframe.dataset.verifiedLoaded === '1';
-      if (!curSrc.startsWith(targetBase) || !isVerified) {
+      const isRealVerified = iframe.dataset && iframe.dataset.realPythonPort === String(port);
+      if (!curSrc.startsWith(targetBase) || !isRealVerified) {
         const curChan = document.getElementById('topGlobalKeySelect')?.value
           || (typeof localStorage !== 'undefined' && localStorage.getItem('zc_active_channel_key'))
           || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
-        if (iframe.dataset) iframe.dataset.verifiedLoaded = '1';
+        if (iframe.dataset) {
+          iframe.dataset.verifiedLoaded = '1';
+          iframe.dataset.realPythonPort = String(port);
+        }
         iframe.src = `${targetBase}/?embedded=1&channel=${encodeURIComponent(curChan)}&t=${Date.now()}`;
       }
     }
@@ -124,6 +127,15 @@ function syncDirRecursiveSafe(srcDir, dstDir) {
 function flattenPortablePythonDlls(pyRuntimeDir) {
   try {
     if (!pyRuntimeDir || !fs.existsSync(pyRuntimeDir)) return;
+    const pthFile = path.join(pyRuntimeDir, 'python314._pth');
+    if (fs.existsSync(pthFile)) {
+      try {
+        const curPth = fs.readFileSync(pthFile, 'utf8');
+        if (!curPth.includes('DLLs')) {
+          fs.writeFileSync(pthFile, 'python314.zip\r\nDLLs\r\n.\r\n..\r\nimport site\r\n', 'utf8');
+        }
+      } catch {}
+    }
     const dllsDir = path.join(pyRuntimeDir, 'DLLs');
     if (!fs.existsSync(dllsDir)) return;
     for (const entry of fs.readdirSync(dllsDir, { withFileTypes: true })) {
@@ -134,6 +146,52 @@ function flattenPortablePythonDlls(pyRuntimeDir) {
         if (!fs.existsSync(dst)) {
           try { fs.copyFileSync(src, dst); } catch {}
         }
+      }
+    }
+  } catch {}
+}
+
+function mergeBacklogFilesBetweenDirs(srcDir, dstDir) {
+  try {
+    if (!srcDir || !dstDir || !fs.existsSync(srcDir) || !fs.existsSync(dstDir)) return;
+    if (path.resolve(srcDir).toLowerCase() === path.resolve(dstDir).toLowerCase()) return;
+    for (const entry of fs.readdirSync(srcDir)) {
+      if (entry.startsWith('QUEUE_BACKLOG') && entry.endsWith('.json')) {
+        const srcB = path.join(srcDir, entry);
+        const dstB = path.join(dstDir, entry);
+        try {
+          const srcData = JSON.parse(fs.readFileSync(srcB, 'utf8') || '{}');
+          const srcItems = Array.isArray(srcData.items) ? srcData.items : [];
+          if (!srcItems.length) continue;
+          let dstData = { max_parallel_threads: 3, thinking_effort: 'medium', items: [] };
+          if (fs.existsSync(dstB)) {
+            try {
+              dstData = JSON.parse(fs.readFileSync(dstB, 'utf8') || '{}') || dstData;
+              if (!Array.isArray(dstData.items)) dstData.items = [];
+            } catch {}
+          }
+          const existingIds = new Set(dstData.items.map((x) => x.project_id));
+          let changed = false;
+          for (const it of srcItems) {
+            if (it && it.project_id && !existingIds.has(it.project_id)) {
+              const oldPdir = String(it.project_dir || '');
+              if (oldPdir && oldPdir.toLowerCase().startsWith(path.resolve(srcDir).toLowerCase())) {
+                const rel = path.relative(srcDir, oldPdir);
+                const newPdir = path.join(dstDir, rel);
+                if (fs.existsSync(oldPdir) && !fs.existsSync(newPdir)) {
+                  syncDirRecursiveSafe(oldPdir, newPdir);
+                }
+                it.project_dir = newPdir;
+              }
+              dstData.items.push(it);
+              existingIds.add(it.project_id);
+              changed = true;
+            }
+          }
+          if (changed) {
+            fs.writeFileSync(dstB, JSON.stringify(dstData, null, 2), 'utf8');
+          }
+        } catch {}
       }
     }
   } catch {}
@@ -159,6 +217,21 @@ function ensureCustomerFilesSynced(appDir, exeDir) {
       }
     }
     if (!appDir || !exeDir || path.resolve(appDir) === path.resolve(exeDir)) return;
+    // Đồng bộ DLLs của python_runtime giữa appDir và exeDir nếu 1 trong 2 bên có đủ DLLs
+    const appPyDlls = path.join(appDir, 'python_runtime', 'DLLs');
+    const exePyDlls = path.join(exeDir, 'python_runtime', 'DLLs');
+    if (fs.existsSync(appPyDlls) && !fs.existsSync(path.join(exePyDlls, '_socket.pyd'))) {
+      syncDirRecursiveSafe(path.join(appDir, 'python_runtime'), path.join(exeDir, 'python_runtime'));
+      flattenPortablePythonDlls(path.join(exeDir, 'python_runtime'));
+    } else if (fs.existsSync(exePyDlls) && !fs.existsSync(path.join(appPyDlls, '_socket.pyd'))) {
+      syncDirRecursiveSafe(path.join(exeDir, 'python_runtime'), path.join(appDir, 'python_runtime'));
+      flattenPortablePythonDlls(path.join(appDir, 'python_runtime'));
+    }
+
+    // Đồng bộ QUEUE_BACKLOG*.json hai chiều để không bao giờ mất hàng đợi
+    mergeBacklogFilesBetweenDirs(appDir, exeDir);
+    mergeBacklogFilesBetweenDirs(exeDir, appDir);
+
     const appBuild = readBuildNumberSafe(appDir);
     const exeBuild = readBuildNumberSafe(exeDir);
     const srcBase = (exeBuild > appBuild && fs.existsSync(path.join(exeDir, 'mafia_dashboard_server.py')))
@@ -224,15 +297,15 @@ function isValidPortableOrSysPython(exe) {
     if (!exe || !fs.existsSync(exe)) return false;
     const dir = path.dirname(exe);
     flattenPortablePythonDlls(dir);
-    // Portable Python 3.14 must have python314.zip and _socket.pyd (in root or DLLs/) or python314.dll
+    // Portable Python 3.14 BẮT BUỘC phải có đủ: python314.zip + python314.dll + _socket.pyd (trong gốc hoặc DLLs/)
     const hasZip = fs.existsSync(path.join(dir, 'python314.zip'))
       || fs.existsSync(path.join(dir, 'python313.zip'))
       || fs.existsSync(path.join(dir, 'python312.zip'));
-    const hasSocketOrDll = fs.existsSync(path.join(dir, '_socket.pyd'))
-      || fs.existsSync(path.join(dir, 'DLLs', '_socket.pyd'))
-      || fs.existsSync(path.join(dir, 'python314.dll'))
+    const hasDll = fs.existsSync(path.join(dir, 'python314.dll'))
       || fs.existsSync(path.join(dir, 'python3.dll'));
-    if (hasZip && hasSocketOrDll) {
+    const hasSocketPyd = fs.existsSync(path.join(dir, '_socket.pyd'))
+      || fs.existsSync(path.join(dir, 'DLLs', '_socket.pyd'));
+    if (hasZip && hasDll && hasSocketPyd) {
       return true;
     }
     // System Python installation must have Lib/os.py
@@ -563,21 +636,108 @@ function persistTitlesToDiskNode(rootDir, niche, parsedItems, skipTitleRewrite =
   return added;
 }
 
-function triggerPipelineWorkerNode(appDir, exeDir, rootDir, niche, maxWorkers = 3, thinking = 'medium') {
+function appendStudioLogNode(rootDir, tag, message) {
+  try {
+    const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const logPath = path.join(rootDir, 'LIVE_STUDIO_LOG.txt');
+    fs.appendFileSync(logPath, `[${nowStr}] [${tag}] ${message}\n`, 'utf8');
+  } catch {}
+}
+
+function markQueuedProjectsStartingNode(rootDir, niche, maxWorkers = 3, singleProjectDir = '', singleProjectId = '') {
+  try {
+    const { backlogPath, projectsRoot } = resolveBacklogAndProjectsDirsNode(rootDir, niche);
+    const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const targetDirs = [];
+    if (singleProjectDir || singleProjectId) {
+      const pdir = singleProjectDir && fs.existsSync(singleProjectDir)
+        ? singleProjectDir
+        : path.join(projectsRoot, singleProjectId || path.basename(singleProjectDir || ''));
+      if (pdir) targetDirs.push(pdir);
+    } else if (fs.existsSync(backlogPath)) {
+      const bdata = JSON.parse(fs.readFileSync(backlogPath, 'utf8') || '{}');
+      const items = Array.isArray(bdata.items) ? bdata.items : [];
+      const limit = Math.max(1, Number(maxWorkers) > 0 ? Number(maxWorkers) : 3);
+      for (const it of items) {
+        if (it.status === 'COMPLETED') continue;
+        const pdir = it.project_dir && fs.existsSync(it.project_dir)
+          ? it.project_dir
+          : path.join(projectsRoot, String(it.project_id || ''));
+        if (pdir) targetDirs.push(pdir);
+        if (targetDirs.length >= limit) break;
+      }
+    }
+    for (const pdir of targetDirs) {
+      const stPath = path.join(pdir, 'STATE.json');
+      if (fs.existsSync(stPath)) {
+        try {
+          const stObj = JSON.parse(fs.readFileSync(stPath, 'utf8') || '{}');
+          if (!stObj.completed) {
+            const skipS1 = Boolean(stObj.skip_title_rewrite);
+            stObj.current_step_status = skipS1 ? 'STEP_1_5_STARTING' : 'STEP_1_STARTING';
+            stObj.live_note = '🚀 Đang khởi động trình duyệt Chrome & kết nối tài khoản ChatGPT (Port 9222)...';
+            stObj.updated_at = nowStr;
+            fs.writeFileSync(stPath, JSON.stringify(stObj, null, 2), 'utf8');
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+}
+
+function triggerPipelineWorkerNode(appDir, exeDir, rootDir, niche, maxWorkers = 3, thinking = 'medium', singleProjectDir = '', singleProjectId = '') {
+  const cleanNiche = String(niche || 'mafia').trim();
+  ensureCustomerFilesSynced(appDir, exeDir);
+  markQueuedProjectsStartingNode(rootDir, cleanNiche, maxWorkers, singleProjectDir, singleProjectId);
+  appendStudioLogNode(
+    rootDir,
+    'WEB-CONTROL',
+    singleProjectDir || singleProjectId
+      ? `🚀 Khởi chạy kịch bản đơn luồng [${singleProjectId || path.basename(singleProjectDir)}] (Kênh: ${cleanNiche.toUpperCase()} | model=${thinking})...`
+      : `🚀 Khởi chạy Hàng đợi kịch bản (Kênh: ${cleanNiche.toUpperCase()} | max_workers=${maxWorkers || 3} | model=${thinking})...`
+  );
+
+  // Tự động kiểm tra Port 9222 (Chrome ChatGPT Acc #1); nếu chưa mở thì bật Chrome lên ngay
+  checkPortQuick(9222, 500).then((chromeUp) => {
+    if (!chromeUp) {
+      const loginRes = launchChromeWebLoginNode(rootDir, 1);
+      if (loginRes && loginRes.message) {
+        appendStudioLogNode(rootDir, 'WEB-BROWSER', loginRes.message);
+      }
+    }
+  }).catch(() => {});
+
   ensurePortablePythonReady(appDir, exeDir).then((pyExe) => {
     const pipelineScript = path.join(rootDir, 'engine', 'mafia_chatgpt_pipeline.py');
-    if (!fs.existsSync(pipelineScript)) return;
+    if (!fs.existsSync(pipelineScript)) {
+      appendStudioLogNode(rootDir, 'ERROR', `❌ Không tìm thấy file ${pipelineScript}`);
+      return;
+    }
+    let logFd = null;
     try {
-      const child = spawn(pyExe, [
+      const liveLogPath = path.join(rootDir, 'LIVE_STUDIO_LOG.txt');
+      logFd = fs.openSync(liveLogPath, 'a');
+    } catch {}
+    try {
+      const { projectsRoot } = resolveBacklogAndProjectsDirsNode(rootDir, cleanNiche);
+      const resolvedSingleDir = (singleProjectDir && fs.existsSync(singleProjectDir))
+        ? singleProjectDir
+        : (singleProjectId ? path.join(projectsRoot, singleProjectId) : singleProjectDir);
+      const args = [
+        '-u',
         pipelineScript,
-        '--niche', String(niche || 'mafia'),
-        '--run_queue',
-        '--max_workers', String(maxWorkers || 3),
+        '--niche', cleanNiche,
         '--thinking', String(thinking || 'medium')
-      ], {
+      ];
+      if (resolvedSingleDir) {
+        args.push('--project_dir', resolvedSingleDir);
+      } else {
+        args.push('--run_queue', '--max_workers', String(maxWorkers || 3));
+      }
+      const child = spawn(pyExe, args, {
         cwd: rootDir,
         windowsHide: true,
-        stdio: 'ignore',
+        stdio: logFd !== null ? ['ignore', logFd, logFd] : 'ignore',
         detached: false,
         env: {
           ...process.env,
@@ -585,13 +745,51 @@ function triggerPipelineWorkerNode(appDir, exeDir, rootDir, niche, maxWorkers = 
           PYTHONIOENCODING: 'utf-8'
         }
       });
-      child.on('error', () => {});
-    } catch {}
-  }).catch(() => {});
+      child.on('error', (err) => {
+        appendStudioLogNode(rootDir, 'WORKER-ERROR', `❌ Lỗi khởi chạy Python Worker (${pyExe}): ${err.message}`);
+        if (logFd !== null) { try { fs.closeSync(logFd); } catch {} logFd = null; }
+      });
+      child.on('close', () => {
+        if (logFd !== null) { try { fs.closeSync(logFd); } catch {} logFd = null; }
+      });
+    } catch (err) {
+      appendStudioLogNode(rootDir, 'WORKER-ERROR', `❌ Ngoại lệ khi bật tiến trình Python: ${err.message}`);
+      if (logFd !== null) { try { fs.closeSync(logFd); } catch {} }
+    }
+  }).catch((err) => {
+    appendStudioLogNode(rootDir, 'PYTHON-ERROR', `❌ Không thể chuẩn bị môi trường Python: ${err?.message || err}`);
+  });
 }
 
 let _nodeFallbackServer = null;
 let _nodeSelectedNiche = '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+
+function requestShutdownNodeFallbackPort(port, timeoutMs = 400) {
+  return new Promise((resolve) => {
+    try {
+      const req = http.request({
+        hostname: '127.0.0.1',
+        port,
+        path: '/api/shutdown_node_fallback',
+        method: 'POST',
+        timeout: timeoutMs,
+        headers: { 'Content-Type': 'application/json', 'Content-Length': 2 }
+      }, (res) => {
+        res.resume();
+        resolve(true);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => {
+        try { req.destroy(); } catch {}
+        resolve(false);
+      });
+      req.write('{}');
+      req.end();
+    } catch {
+      resolve(false);
+    }
+  });
+}
 
 function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
   return new Promise((resolve) => {
@@ -637,43 +835,46 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
             }
             const baseSt = statusMap[_nodeSelectedNiche] || statusMap.mafia || Object.values(statusMap)[0] || {};
             try {
-              const { backlogPath } = resolveBacklogAndProjectsDirsNode(rootDir, _nodeSelectedNiche);
+              const { backlogPath, projectsRoot } = resolveBacklogAndProjectsDirsNode(rootDir, _nodeSelectedNiche);
               if (fs.existsSync(backlogPath)) {
                 const diskBacklog = JSON.parse(fs.readFileSync(backlogPath, 'utf8') || '{}');
                 const items = Array.isArray(diskBacklog.items) ? diskBacklog.items : [];
-                if (items.length > 0) {
-                  baseSt.projects = items.slice().reverse().map((it) => {
-                    const pid = it.project_id || '001_Story';
-                    let stObj = {};
-                    try {
-                      if (it.project_dir && fs.existsSync(path.join(it.project_dir, 'STATE.json'))) {
-                        stObj = JSON.parse(fs.readFileSync(path.join(it.project_dir, 'STATE.json'), 'utf8') || '{}');
-                      }
-                    } catch {}
-                    return {
-                      project_id: pid,
-                      project_dir: it.project_dir || '',
-                      custom_name: it.custom_name || stObj.custom_name || '',
-                      export_prefix: it.custom_name || stObj.custom_name || pid.slice(0, 3),
-                      account_id: stObj.account_id || 'acc_1',
-                      account_label: stObj.account_label || 'Acc #1',
-                      source_title: it.source_title || stObj.source_title || pid,
-                      winner_title: stObj.winner_title || it.winner_title || '',
-                      winner_title_score: stObj.winner_title_score || it.winner_title_score || 0,
-                      skip_title_rewrite: Boolean(it.skip_title_rewrite || stObj.skip_title_rewrite),
-                      completed_steps: Array.isArray(stObj.completed_steps) ? stObj.completed_steps : [],
-                      current_step_status: stObj.current_step_status || it.status || 'QUEUED',
-                      active_stage: stObj. current_step_status && stObj.current_step_status.includes('RUNNING') ? 1 : 0,
-                      progress_pct: stObj.completed ? 100 : 10,
-                      live_note: stObj.live_note || '📥 Đã lưu tiêu đề & mã vào danh sách kịch bản.',
-                      completed: Boolean(stObj.completed),
-                      script_metrics: stObj.script_metrics || {},
-                      audit_history: Array.isArray(stObj.audit_history) ? stObj.audit_history : [],
-                      agent_chat_registry: stObj.agent_chat_registry || {},
-                      updated_at: stObj.updated_at || it.added_at || new Date().toLocaleTimeString('vi-VN')
-                    };
-                  });
-                }
+                baseSt.projects = items.slice().reverse().map((it) => {
+                  const pid = it.project_id || '001_Story';
+                  const pdir = (it.project_dir && fs.existsSync(it.project_dir))
+                    ? it.project_dir
+                    : path.join(projectsRoot, pid);
+                  let stObj = {};
+                  try {
+                    if (pdir && fs.existsSync(path.join(pdir, 'STATE.json'))) {
+                      stObj = JSON.parse(fs.readFileSync(path.join(pdir, 'STATE.json'), 'utf8') || '{}');
+                    }
+                  } catch {}
+                  const curStep = String(stObj.current_step_status || it.status || 'QUEUED');
+                  const isActive = curStep.includes('RUNNING') || curStep.includes('STARTING');
+                  return {
+                    project_id: pid,
+                    project_dir: pdir || '',
+                    custom_name: it.custom_name || stObj.custom_name || '',
+                    export_prefix: it.custom_name || stObj.custom_name || pid.slice(0, 3),
+                    account_id: stObj.account_id || 'acc_1',
+                    account_label: stObj.account_label || 'Acc #1',
+                    source_title: it.source_title || stObj.source_title || pid,
+                    winner_title: stObj.winner_title || it.winner_title || '',
+                    winner_title_score: stObj.winner_title_score || it.winner_title_score || 0,
+                    skip_title_rewrite: Boolean(it.skip_title_rewrite || stObj.skip_title_rewrite),
+                    completed_steps: Array.isArray(stObj.completed_steps) ? stObj.completed_steps : [],
+                    current_step_status: curStep,
+                    active_stage: isActive ? 1 : 0,
+                    progress_pct: stObj.completed ? 100 : (isActive ? 15 : 5),
+                    live_note: stObj.live_note || '📥 Đã lưu tiêu đề & mã vào danh sách kịch bản.',
+                    completed: Boolean(stObj.completed),
+                    script_metrics: stObj.script_metrics || {},
+                    audit_history: Array.isArray(stObj.audit_history) ? stObj.audit_history : [],
+                    agent_chat_registry: stObj.agent_chat_registry || {},
+                    updated_at: stObj.updated_at || it.added_at || new Date().toLocaleTimeString('vi-VN')
+                  };
+                });
               }
               const liveLogPath = path.join(rootDir, 'LIVE_STUDIO_LOG.txt');
               if (fs.existsSync(liveLogPath)) {
@@ -715,6 +916,15 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
                 return;
               }
 
+              if (u.pathname === '/api/shutdown_node_fallback') {
+                const out = Buffer.from(JSON.stringify({ ok: true }), 'utf8');
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
+                res.end(out);
+                try { srv.close(); } catch {}
+                if (_nodeFallbackServer === srv) _nodeFallbackServer = null;
+                return;
+              }
+
               if (u.pathname === '/api/open_web_login') {
                 const loginRes = launchChromeWebLoginNode(rootDir, body.slot_id || body.acc_id || 1);
                 const out = Buffer.from(JSON.stringify(loginRes), 'utf8');
@@ -726,6 +936,18 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
               if (u.pathname === '/api/add_titles') {
                 const parsed = parseTitlesPayloadNode(body);
                 if (!parsed.length) {
+                  if (body.run_now) {
+                    triggerPipelineWorkerNode(appDir, exeDir, rootDir, _nodeSelectedNiche, body.max_workers || 3, body.thinking || 'medium');
+                    ensurePort8098FromPreload().catch(() => {});
+                    const outRun = Buffer.from(JSON.stringify({
+                      ok: true,
+                      added_count: 0,
+                      message: `🚀 Đã kích hoạt chạy Hàng đợi kịch bản hiện có (${_nodeSelectedNiche})!`
+                    }), 'utf8');
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': outRun.length });
+                    res.end(outRun);
+                    return;
+                  }
                   const out = Buffer.from(JSON.stringify({
                     ok: false,
                     message: '⚠️ Vui lòng nhập ít nhất 1 tiêu đề hợp lệ vào ô GIAO VIỆC.'
@@ -882,7 +1104,7 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
                   res.end(out);
                   return;
                 }
-                const { backlogPath, projectsRoot } = resolveBacklogAndProjectsDirsNode(rootDir, _nodeSelectedNiche);
+                const { backlogPath } = resolveBacklogAndProjectsDirsNode(rootDir, _nodeSelectedNiche);
                 try {
                   if (fs.existsSync(backlogPath)) {
                     const bdata = JSON.parse(fs.readFileSync(backlogPath, 'utf8') || '{}');
@@ -908,11 +1130,15 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
               }
 
               if (u.pathname === '/api/run_queue' || u.pathname === '/api/run_single') {
-                triggerPipelineWorkerNode(appDir, exeDir, rootDir, _nodeSelectedNiche, body.max_workers || 3, body.thinking || 'medium');
+                const sDir = u.pathname === '/api/run_single' ? String(body.project_dir || '').trim() : '';
+                const sPid = u.pathname === '/api/run_single' ? String(body.project_id || '').trim() : '';
+                triggerPipelineWorkerNode(appDir, exeDir, rootDir, _nodeSelectedNiche, body.max_workers || 3, body.thinking || 'medium', sDir, sPid);
                 ensurePort8098FromPreload().catch(() => {});
                 const out = Buffer.from(JSON.stringify({
                   ok: true,
-                  message: `🚀 Đã kích hoạt chạy Hàng đợi kịch bản (${_nodeSelectedNiche})!`
+                  message: u.pathname === '/api/run_single'
+                    ? `🚀 Đã khởi chạy kịch bản [${sPid || path.basename(sDir || '')}] (${_nodeSelectedNiche})! Đang mở trình duyệt ChatGPT...`
+                    : `🚀 Đã kích hoạt chạy Hàng đợi kịch bản (${_nodeSelectedNiche})! Đang kết nối trình duyệt ChatGPT...`
                 }), 'utf8');
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': out.length });
                 res.end(out);
@@ -951,21 +1177,7 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
 }
 
 async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
-  if (!forceRestart) {
-    // Chờ tối đa ~3 giây nếu tiến trình Python Server của Main Process vừa mới được bật và đang khởi tạo
-    for (let waitIdx = 0; waitIdx < 6; waitIdx += 1) {
-      for (const p of CANDIDATE_STUDIO_PORTS) {
-        if (await checkIsRealPythonServer(p, 700)) {
-          _activeScriptStudioPort = p;
-          _realPythonOnline = true;
-          syncIframeToRealPythonUrl(p);
-          return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
-        }
-      }
-      await new Promise((r) => setTimeout(r, 450));
-    }
-  }
-  if (_preloadSpawnPromise) {
+  if (_preloadSpawnPromise && !forceRestart) {
     return _preloadSpawnPromise;
   }
   _preloadSpawnPromise = (async () => {
@@ -976,7 +1188,7 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
 
       if (!forceRestart) {
         for (const p of CANDIDATE_STUDIO_PORTS) {
-          if (await checkIsRealPythonServer(p, 750)) {
+          if (await checkIsRealPythonServer(p, 550)) {
             _activeScriptStudioPort = p;
             _realPythonOnline = true;
             syncIframeToRealPythonUrl(p);
@@ -993,6 +1205,10 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
         if (_nodeFallbackServer) {
           try { _nodeFallbackServer.close(); } catch {}
           _nodeFallbackServer = null;
+        }
+        // Tắt mọi Node fallback server cũ (kể cả từ phiên trước khi reload) đang chiếm cổng 8098/8099
+        for (const p of [8098, 8099]) {
+          await requestShutdownNodeFallbackPort(p, 350);
         }
 
         // Chỉ dọn tiến trình mafia_dashboard_server.py bị treo nếu chưa có server thật nào phản hồi
@@ -1012,11 +1228,15 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
           }
         }
 
+        let srvLogFd = null;
         try {
-          const child = spawn(pyExe, [serverScript, '--no-browser', '--port', String(targetPort)], {
+          srvLogFd = fs.openSync(path.join(rootDir, 'LIVE_STUDIO_LOG.txt'), 'a');
+        } catch {}
+        try {
+          const child = spawn(pyExe, ['-u', serverScript, '--no-browser', '--port', String(targetPort)], {
             cwd: rootDir,
             windowsHide: true,
-            stdio: 'ignore',
+            stdio: srvLogFd !== null ? ['ignore', srvLogFd, srvLogFd] : 'ignore',
             detached: false,
             env: {
               ...process.env,
@@ -1024,16 +1244,25 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
               PYTHONIOENCODING: 'utf-8'
             }
           });
-          child.on('error', () => {});
-        } catch {}
+          child.on('error', () => {
+            if (srvLogFd !== null) { try { fs.closeSync(srvLogFd); } catch {} srvLogFd = null; }
+          });
+          child.on('close', () => {
+            if (srvLogFd !== null) { try { fs.closeSync(srvLogFd); } catch {} srvLogFd = null; }
+          });
+        } catch {
+          if (srvLogFd !== null) { try { fs.closeSync(srvLogFd); } catch {} }
+        }
 
         for (let i = 0; i < 16; i += 1) {
           await new Promise((r) => setTimeout(r, 450));
-          if (await checkIsRealPythonServer(targetPort, 800)) {
-            _activeScriptStudioPort = targetPort;
-            _realPythonOnline = true;
-            syncIframeToRealPythonUrl(targetPort);
-            return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
+          for (const checkP of [targetPort, ...CANDIDATE_STUDIO_PORTS]) {
+            if (await checkIsRealPythonServer(checkP, 600)) {
+              _activeScriptStudioPort = checkP;
+              _realPythonOnline = true;
+              syncIframeToRealPythonUrl(checkP);
+              return { online: true, url: `http://127.0.0.1:${_activeScriptStudioPort}`, engine: 'python_real' };
+            }
           }
         }
       }
@@ -1381,6 +1610,16 @@ contextBridge.exposeInMainWorld('vbs', {
     clearQueue: () => ipcRenderer.invoke('scriptBridge:clearQueue'),
     onState: (fn) => sub('scriptBridge:state', async (st) => {
       if (st) {
+        if (!_realPythonOnline) {
+          for (const p of CANDIDATE_STUDIO_PORTS) {
+            if (await checkIsRealPythonServer(p, 400)) {
+              _activeScriptStudioPort = p;
+              _realPythonOnline = true;
+              syncIframeToRealPythonUrl(p);
+              break;
+            }
+          }
+        }
         const up = await checkPortQuick(_activeScriptStudioPort, 600);
         if (up) {
           st.scriptServerOnline = true;
