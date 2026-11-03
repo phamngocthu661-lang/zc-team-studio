@@ -265,6 +265,26 @@ def resolve_canonical_key_id(niche: str = None) -> str:
     return "mafia"
 
 
+def _resolve_custom_tong_hop_dir(key_id: str, default_th_dir: str) -> str:
+    try:
+        custom_file = os.path.join(STUDIO_ROOT, "CUSTOM_LINKED_FOLDERS.json")
+        if os.path.exists(custom_file):
+            with open(custom_file, "r", encoding="utf-8") as f:
+                data = json.load(f) or {}
+            by_key = data.get("tongHopByKey") or {}
+            if key_id in by_key and str(by_key[key_id] or "").strip():
+                return str(by_key[key_id]).strip()
+            if key_id == "homeless" and str(data.get("tongHopHomelessFolder") or "").strip():
+                return str(data["tongHopHomelessFolder"]).strip()
+            if key_id == "mafia" and str(data.get("tongHopMafiaFolder") or "").strip():
+                return str(data["tongHopMafiaFolder"]).strip()
+            if key_id in ("mexico", "03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico") and str(data.get("tongHopMexicoFolder") or "").strip():
+                return str(data["tongHopMexicoFolder"]).strip()
+    except Exception:
+        pass
+    return default_th_dir
+
+
 def get_niche_config(niche: str = None) -> dict:
     """Trả về cấu hình đường dẫn và thông số chuẩn tách biệt 100% giữa 12 Key mới và 3 Key gốc (`mafia`, `homeless`, `mexico`)."""
     raw_in = (niche or "").strip()
@@ -278,7 +298,7 @@ def get_niche_config(niche: str = None) -> dict:
         canonical_key = KEY_PROFILES_12_LOWER_MAP[low]
         meta = KEY_PROFILES_12[canonical_key]
         p_root = os.path.join(STUDIO_ROOT, f"PROJECTS_{canonical_key}")
-        th_dir = os.path.join(p_root, "TONG HOP")
+        th_dir = _resolve_custom_tong_hop_dir(canonical_key, os.path.join(p_root, "TONG HOP"))
         b_path = os.path.join(STUDIO_ROOT, f"QUEUE_BACKLOG_{canonical_key}.json")
         md_path = os.path.join(STUDIO_ROOT, f"TIEN_DO_{canonical_key}.md")
         s_root = os.path.join(SKILLS_12_KEYS_ROOT, canonical_key)
@@ -310,7 +330,7 @@ def get_niche_config(niche: str = None) -> dict:
     n = low
     if "mexico" in n or "bà cô" in n or "ba co" in n:
         p_root = os.path.join(STUDIO_ROOT, "PROJECTS_MEXICO")
-        th_dir = os.path.join(p_root, "TONG HOP")
+        th_dir = _resolve_custom_tong_hop_dir("mexico", os.path.join(p_root, "TONG HOP"))
         b_path = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG_MEXICO.json")
         md_path = os.path.join(STUDIO_ROOT, "TIEN_DO_MEXICO_STUDIO.md")
         lbl = "MEXICO BÀ CÔ — DRAMA GIA ĐÌNH MẸ GIÀ MEXICO (ES-MX V1.3)"
@@ -340,7 +360,7 @@ def get_niche_config(niche: str = None) -> dict:
         }
     if "homeless" in n:
         p_root = os.path.join(STUDIO_ROOT, "PROJECTS_HOMELESS")
-        th_dir = os.path.join(p_root, "TONG HOP")
+        th_dir = _resolve_custom_tong_hop_dir("homeless", os.path.join(p_root, "TONG HOP"))
         b_path = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG_HOMELESS.json")
         md_path = os.path.join(STUDIO_ROOT, "TIEN_DO_HOMELESS_STUDIO.md")
         lbl = "HOMELESS × ABANDONED PROPERTY × HIDDEN LEGACY (V12)"
@@ -369,7 +389,7 @@ def get_niche_config(niche: str = None) -> dict:
             "pref_max_chars": 78000,
         }
     p_root = os.path.join(STUDIO_ROOT, "PROJECTS")
-    th_dir = os.path.join(p_root, "TONG HOP")
+    th_dir = _resolve_custom_tong_hop_dir("mafia", os.path.join(p_root, "TONG HOP"))
     b_path = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG.json")
     md_path = os.path.join(STUDIO_ROOT, "TIEN_DO_MAFIA_STUDIO.md")
     lbl = "MAFIA BOSS × MAID / WAITRESS / UNDERESTIMATED WOMAN"

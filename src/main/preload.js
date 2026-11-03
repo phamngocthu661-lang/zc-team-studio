@@ -588,6 +588,134 @@ setTimeout(() => {
   ensurePort8098FromPreload().catch(() => {});
 }, 200);
 
+function getStudioBaseDirs() {
+  const appDir = path.resolve(__dirname, '..', '..');
+  const exeDir = path.dirname(process.execPath);
+  const primaryRoot = fs.existsSync(path.join(exeDir, 'mafia_dashboard_server.py')) ? exeDir : appDir;
+  return { appDir, exeDir, primaryRoot };
+}
+
+function readCustomLinkedFolders() {
+  try {
+    const { appDir, exeDir } = getStudioBaseDirs();
+    for (const dir of [exeDir, appDir]) {
+      const f = path.join(dir, 'CUSTOM_LINKED_FOLDERS.json');
+      if (fs.existsSync(f)) {
+        return JSON.parse(fs.readFileSync(f, 'utf8') || '{}') || {};
+      }
+    }
+  } catch {}
+  return {};
+}
+
+function writeCustomLinkedFolders(partial = {}) {
+  const current = readCustomLinkedFolders();
+  const merged = {
+    ...current,
+    ...partial,
+    tongHopByKey: {
+      ...(current.tongHopByKey || {}),
+      ...(partial.tongHopByKey || {})
+    }
+  };
+  try {
+    const { appDir, exeDir } = getStudioBaseDirs();
+    for (const dir of [exeDir, appDir]) {
+      if (dir && fs.existsSync(dir)) {
+        try {
+          fs.writeFileSync(path.join(dir, 'CUSTOM_LINKED_FOLDERS.json'), JSON.stringify(merged, null, 2), 'utf8');
+        } catch {}
+      }
+    }
+  } catch {}
+  return merged;
+}
+
+function enrichBridgeStateWithLinkedFolders(st) {
+  if (!st || typeof st !== 'object') return st;
+  try {
+    const { primaryRoot } = getStudioBaseDirs();
+    const linked = readCustomLinkedFolders();
+    const cfg = st.lockedVideoConfig || {};
+    const s = st.lockedConfigSummary || {};
+    const activeKey = cfg.channelKey || st.activeChannelKey || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+    const studioRoot = linked.scriptStudioRoot || st.settings?.scriptStudioRoot || primaryRoot;
+
+    // 1. Kho Stock (mediaFolder)
+    let mediaFolder = String(cfg.mediaFolder || linked.mediaFolder || s.mediaFolder || '').trim();
+    if (mediaFolder && !mediaFolder.startsWith('(') && /^E:\\OBS-Recordings/i.test(mediaFolder) && !fs.existsSync(mediaFolder)) {
+      mediaFolder = linked.mediaFolder || '';
+    }
+    s.mediaFolder = mediaFolder || '(Chưa chọn — Bấm [📁 Chọn Folder] để chọn Kho Stock Video)';
+
+    // 2. Folder Output MP4
+    let outputFolder = String(cfg.outputFolder || linked.outputFolder || s.outputFolder || '').trim();
+    if (!outputFolder || (/^D:\\MAFIA_STUDIO_WEB/i.test(outputFolder) && !fs.existsSync('D:\\MAFIA_STUDIO_WEB'))) {
+      outputFolder = linked.outputFolder || path.join(studioRoot, 'TONG HOP', 'Videos');
+    }
+    s.outputFolder = outputFolder;
+
+    // 3. Folder Ảnh/Green theo Voice
+    const projImgFolder = String(
+      cfg.projectImageFolder !== undefined ? cfg.projectImageFolder : (linked.projectImageFolder || '')
+    ).trim();
+    const projImgMode = String(cfg.projectImageMode || linked.projectImageMode || s.projectImageMode || 'IMAGE').toUpperCase() === 'GREEN'
+      ? 'GREEN'
+      : 'IMAGE';
+    s.projectImageFolder = projImgFolder || '(Để trống — Ẩn lớp Ảnh theo voice, dùng 100% nền Stock)';
+    s.projectImageMode = projImgMode;
+    s.projectImageModeLabel = projImgMode === 'GREEN'
+      ? '🟢 Tự động tách nền Phông Xanh (Chroma Key)'
+      : '🖼️ Ảnh thường / Ảnh PNG đã tách nền trong suốt sẵn';
+
+    // 4. Folder Video Intro theo Voice
+    const introFolder = String(
+      cfg.jobIntroFolder !== undefined ? cfg.jobIntroFolder : (linked.jobIntroFolder || '')
+    ).trim();
+    s.jobIntroFolder = introFolder || '(Để trống — Không chèn Intro riêng)';
+    s.jobIntroAudioMode = cfg.jobIntroAudioMode || linked.jobIntroAudioMode || s.jobIntroAudioMode || 'MUTE';
+
+    // 5. Folder Kho Green & Disclaimer
+    if (linked.khoGreenFolder || cfg.khoGreenFolder) {
+      s.khoGreenFolder = String(cfg.khoGreenFolder || linked.khoGreenFolder).trim();
+    } else if (!s.khoGreenFolder) {
+      s.khoGreenFolder = path.join(studioRoot, 'Kho_Green');
+    }
+
+    if (linked.disclaimerPath !== undefined || cfg.disclaimerPath !== undefined) {
+      const dPath = String(cfg.disclaimerPath !== undefined ? cfg.disclaimerPath : (linked.disclaimerPath || '')).trim();
+      const dEnabled = cfg.disclaimerEnabled !== undefined
+        ? Boolean(cfg.disclaimerEnabled && dPath)
+        : Boolean(linked.disclaimerEnabled && dPath);
+      s.disclaimerEnabled = dEnabled;
+      s.disclaimerPath = dPath;
+      s.disclaimerLabel = dEnabled
+        ? `🟢 BẬT (${path.basename(dPath)})`
+        : '⚪ TẮT (Không chèn đầu video)';
+    }
+
+    // 6. Các Folder TONG HOP liên kết
+    const tongHopByKey = linked.tongHopByKey || {};
+    const defaultActiveKeyTongHop = activeKey === 'homeless'
+      ? path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP')
+      : activeKey === 'mafia'
+        ? path.join(studioRoot, 'PROJECTS', 'TONG HOP')
+        : activeKey === 'mexico'
+          ? path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP')
+          : path.join(studioRoot, `PROJECTS_${activeKey}`, 'TONG HOP');
+
+    s.activeKey = activeKey;
+    s.activeKeyTongHopFolder = tongHopByKey[activeKey] || s.activeKeyTongHopFolder || defaultActiveKeyTongHop;
+    s.tongHopHomelessFolder = linked.tongHopHomelessFolder || tongHopByKey.homeless || path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP');
+    s.tongHopMafiaFolder = linked.tongHopMafiaFolder || tongHopByKey.mafia || path.join(studioRoot, 'PROJECTS', 'TONG HOP');
+    s.tongHopMexicoFolder = linked.tongHopMexicoFolder || tongHopByKey.mexico || path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP');
+    s.scriptStudioRoot = studioRoot;
+    st.lockedConfigSummary = s;
+    st.linkedFolders = linked;
+  } catch {}
+  return st;
+}
+
 const sub = (channel, fn) => {
   const listener = (_event, payload) => fn(payload);
   ipcRenderer.on(channel, listener);
@@ -721,6 +849,11 @@ contextBridge.exposeInMainWorld('vbs', {
     onChanged: (fn) => sub('license:changed', fn)
   },
 
+  linkedFolders: {
+    get: () => readCustomLinkedFolders(),
+    save: (partial) => writeCustomLinkedFolders(partial)
+  },
+
   scriptBridge: {
     status: async () => {
       const st = (await ipcRenderer.invoke('scriptBridge:status').catch(() => ({}))) || {};
@@ -729,7 +862,7 @@ contextBridge.exposeInMainWorld('vbs', {
         if (res && res.online) {
           st.scriptServerOnline = true;
           st.scriptServerUrl = res.url || `http://127.0.0.1:${_activeScriptStudioPort}`;
-          return st;
+          return enrichBridgeStateWithLinkedFolders(st);
         }
       }
       const up = await checkPortQuick(_activeScriptStudioPort, 800);
@@ -743,7 +876,7 @@ contextBridge.exposeInMainWorld('vbs', {
           st.scriptServerUrl = res.url || `http://127.0.0.1:${_activeScriptStudioPort}`;
         }
       }
-      return st;
+      return enrichBridgeStateWithLinkedFolders(st);
     },
     ensureScriptServer: async () => {
       return ensurePort8098FromPreload();
@@ -751,8 +884,17 @@ contextBridge.exposeInMainWorld('vbs', {
     restartScriptServer: async () => {
       return ensurePort8098FromPreload({ forceRestart: true });
     },
-    saveSettings: (partial) => ipcRenderer.invoke('scriptBridge:saveSettings', partial),
-    lockConfig: (config) => ipcRenderer.invoke('scriptBridge:lockConfig', config),
+    saveSettings: async (partial) => {
+      if (partial && partial.linkedFolders) {
+        writeCustomLinkedFolders(partial.linkedFolders);
+      }
+      const st = await ipcRenderer.invoke('scriptBridge:saveSettings', partial);
+      return enrichBridgeStateWithLinkedFolders(st);
+    },
+    lockConfig: async (config) => {
+      const st = await ipcRenderer.invoke('scriptBridge:lockConfig', config);
+      return enrichBridgeStateWithLinkedFolders(st);
+    },
     enqueueScript: (payload) => ipcRenderer.invoke('scriptBridge:enqueueScript', payload),
     enqueueFolder: (folderPath) => ipcRenderer.invoke('scriptBridge:enqueueFolder', folderPath),
     clearQueue: () => ipcRenderer.invoke('scriptBridge:clearQueue'),
@@ -764,7 +906,7 @@ contextBridge.exposeInMainWorld('vbs', {
           st.scriptServerUrl = `http://127.0.0.1:${_activeScriptStudioPort}`;
         }
       }
-      fn(st);
+      fn(enrichBridgeStateWithLinkedFolders(st));
     }),
     onLog: (fn) => sub('scriptBridge:log', fn),
     onRequestSyncBatchConfig: (fn) => sub('scriptBridge:requestSyncBatchConfig', fn)

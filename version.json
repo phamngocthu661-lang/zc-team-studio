@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 105,
-  "released_at": "2026-11-03 20:40:00",
+  "build_number": 106,
+  "released_at": "2026-11-03 21:30:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản V1.0.0 (Build #105): (1) Mở sẵn khung 3 Tài khoản ChatGPT Web & nút [🔑 Đăng Nhập ChatGPT] ngay trên thanh Giao Việc để mở Chrome/Edge đăng nhập; (2) Khắc phục 100% nút [📥 Lưu Tiêu Đề & Mã] và tự động nạp Portable Python 3.14 thật (7.8MB CDN) cho máy khách; (3) Thêm nút [🎬 Viết Kịch Bản ➔ Làm Video Luôn] và thanh chọn chế độ Bàn #7 ngay trong ô Giao Việc."
+  "changelog": "Phiên bản V1.0.0 (Build #106): Nâng cấp bảng [📋 Xem Cấu Hình & Folder] (Mục 3: Danh sách các Folder chứa dữ liệu) — Cho phép bấm [📁 Chọn Folder], nhập/dán đường dẫn, [💾 Lưu], [📂 Mở Folder] trực tiếp cho Folder Kho Stock, Folder Xuất Video Output (.mp4), Folder Ảnh/Green theo Voice, Folder Intro, Kho_Green và tất cả Folder TONG HOP liên kết (kèm tùy chọn áp dụng Stock & Output cho cả 15 Key)."
 }

@@ -2687,6 +2687,50 @@ function _defaultLangForChannelKey(channelKey = '') {
   return 'en';
 }
 
+function _getGlobalLinkedFolders() {
+  let disk = {};
+  try {
+    disk = api.linkedFolders?.get?.() || {};
+  } catch {}
+  let local = {};
+  try {
+    const raw = localStorage.getItem('zc_global_linked_folders');
+    if (raw) local = JSON.parse(raw) || {};
+  } catch {}
+  return {
+    applyStockOutputAllKeys: true,
+    ...disk,
+    ...local,
+    tongHopByKey: {
+      ...(disk.tongHopByKey || {}),
+      ...(local.tongHopByKey || {})
+    }
+  };
+}
+
+async function _saveGlobalLinkedFolders(partial = {}) {
+  const prev = _getGlobalLinkedFolders();
+  const merged = {
+    ...prev,
+    ...partial,
+    tongHopByKey: {
+      ...(prev.tongHopByKey || {}),
+      ...(partial.tongHopByKey || {})
+    }
+  };
+  try {
+    localStorage.setItem('zc_global_linked_folders', JSON.stringify(merged));
+  } catch {}
+  try {
+    api.linkedFolders?.save?.(merged);
+  } catch {}
+  try {
+    await api.scriptBridge?.saveSettings?.({ linkedFolders: merged });
+  } catch {}
+  return merged;
+}
+window._saveGlobalLinkedFolders = _saveGlobalLinkedFolders;
+
 function _saveLocalKeyPreset(channelKey, partial = {}) {
   if (!channelKey) return;
   try {
@@ -2719,6 +2763,7 @@ async function applyChannelKeyPresetToUi(channelKey) {
     if (raw) localPreset = JSON.parse(raw);
   } catch {}
   const bridgePreset = _lastBridgeState?.channelConfigs?.[channelKey] || null;
+  const linked = _getGlobalLinkedFolders();
   const preset = { ...(bridgePreset || {}), ...(localPreset || {}) };
 
   const autoLang = _defaultLangForChannelKey(channelKey);
@@ -2750,8 +2795,31 @@ async function applyChannelKeyPresetToUi(channelKey) {
     $('bridgeKeyVoiceSelect').value = $('batchVoiceProfileSelect').value;
   }
 
-  if (preset?.outputFolder && $('outputFolder')) {
-    $('outputFolder').value = preset.outputFolder;
+  const targetMedia = (linked.applyStockOutputAllKeys !== false && linked.mediaFolder)
+    ? linked.mediaFolder
+    : (preset?.mediaFolder || linked.mediaFolder || '');
+  if (targetMedia && $('mediaFolder')) {
+    $('mediaFolder').value = targetMedia;
+  }
+
+  const targetOut = (linked.applyStockOutputAllKeys !== false && linked.outputFolder)
+    ? linked.outputFolder
+    : (preset?.outputFolder || linked.outputFolder || '');
+  if (targetOut && $('outputFolder')) {
+    $('outputFolder').value = targetOut;
+  }
+
+  if (linked.projectImageFolder !== undefined && $('projectImageFolder')) {
+    $('projectImageFolder').value = linked.projectImageFolder;
+  }
+  if (linked.projectImageMode && $('projectImageMode')) {
+    $('projectImageMode').value = linked.projectImageMode;
+  }
+  if (linked.jobIntroFolder !== undefined && $('jobIntroFolder')) {
+    $('jobIntroFolder').value = linked.jobIntroFolder;
+  }
+  if (linked.jobIntroAudioMode && $('batchJobIntroAudioMode')) {
+    $('batchJobIntroAudioMode').value = linked.jobIntroAudioMode;
   }
 
   try {
@@ -2761,7 +2829,12 @@ async function applyChannelKeyPresetToUi(channelKey) {
     }
   } catch {}
 
-  _saveLocalKeyPreset(channelKey, { voiceProfileId: targetVoiceId, whisperLanguage: autoLang });
+  _saveLocalKeyPreset(channelKey, {
+    voiceProfileId: targetVoiceId,
+    whisperLanguage: autoLang,
+    mediaFolder: targetMedia || $('mediaFolder')?.value || '',
+    outputFolder: targetOut || $('outputFolder')?.value || ''
+  });
   await syncBatchConfigToBridge({ silent: true });
 }
 
@@ -2771,6 +2844,40 @@ async function syncBatchConfigToBridge({ silent = true } = {}) {
   try {
     const rawCfg = collectBatch();
     applyDisclaimerSelection(rawCfg, 'batch');
+    const linked = _getGlobalLinkedFolders();
+
+    if (linked.mediaFolder && (!rawCfg.mediaFolder || /^E:\\OBS-Recordings/i.test(rawCfg.mediaFolder) || linked.applyStockOutputAllKeys !== false)) {
+      rawCfg.mediaFolder = linked.mediaFolder;
+      if ($('mediaFolder')) $('mediaFolder').value = linked.mediaFolder;
+    }
+    if (linked.outputFolder && (!rawCfg.outputFolder || /^D:\\MAFIA_STUDIO_WEB/i.test(rawCfg.outputFolder) || linked.applyStockOutputAllKeys !== false)) {
+      rawCfg.outputFolder = linked.outputFolder;
+      if ($('outputFolder')) $('outputFolder').value = linked.outputFolder;
+    }
+    if (linked.projectImageFolder !== undefined) {
+      rawCfg.projectImageFolder = linked.projectImageFolder;
+      if ($('projectImageFolder')) $('projectImageFolder').value = linked.projectImageFolder;
+    }
+    if (linked.projectImageMode) {
+      rawCfg.projectImageMode = linked.projectImageMode;
+      if ($('projectImageMode')) $('projectImageMode').value = linked.projectImageMode;
+    }
+    if (linked.jobIntroFolder !== undefined) {
+      rawCfg.jobIntroFolder = linked.jobIntroFolder;
+      if ($('jobIntroFolder')) $('jobIntroFolder').value = linked.jobIntroFolder;
+    }
+    if (linked.jobIntroAudioMode) {
+      rawCfg.jobIntroAudioMode = linked.jobIntroAudioMode;
+      if ($('batchJobIntroAudioMode')) $('batchJobIntroAudioMode').value = linked.jobIntroAudioMode;
+    }
+    if (linked.khoGreenFolder) {
+      rawCfg.khoGreenFolder = linked.khoGreenFolder;
+    }
+    if (linked.disclaimerPath !== undefined) {
+      rawCfg.disclaimerPath = linked.disclaimerPath;
+      rawCfg.disclaimerEnabled = Boolean(linked.disclaimerEnabled && linked.disclaimerPath);
+    }
+
     _saveLocalKeyPreset(rawCfg.channelKey, {
       projectId: rawCfg.projectId,
       templateId: rawCfg.templateId,
@@ -2900,9 +3007,9 @@ function renderScriptBridgeState(st) {
       `<span>🎨 Template: <strong style="color:#38bdf8;">${htmlEscape(s.templateName)}${tplCount ? ` (${tplCount} layers)` : ''}</strong></span>`,
       `<span>⚠️ Disclaimer: <strong style="color:${disColor};">${htmlEscape(s.disclaimerLabel || '⚪ TẮT')}</strong></span>`,
       `<span>🎙️ Giọng AI: <strong style="color:#34d399;">${htmlEscape(s.voiceProfileName)}</strong></span>`,
-      `<span>🎞️ Kho Stock: <strong style="color:#e2e8f0;" title="${htmlEscape(s.mediaFolder)}">${htmlEscape(s.mediaFolder)}</strong></span>`,
+      `<span>🎞️ Kho Stock: <strong style="color:#e2e8f0;" title="${htmlEscape(s.mediaFolder)}">${htmlEscape(s.mediaFolder)}</strong> <button type="button" onclick="event.stopPropagation();window.browseLinkedFolder('mediaFolder','Chọn Folder Kho Stock Video nền');" style="padding:1px 6px;font-size:10px;background:#1e3a8a;color:#93c5fd;border:1px solid #3b82f6;border-radius:4px;cursor:pointer;margin-left:3px;">📁 Chọn</button></span>`,
       `<span>💬 Sub: <strong style="color:#c084fc;">${htmlEscape(s.subtitleEffectLabel)}</strong></span>`,
-      `<span>📂 Output MP4: <strong style="color:#93c5fd;" title="${htmlEscape(s.outputFolder)}">${htmlEscape(s.outputFolder)}</strong></span>`
+      `<span>📂 Output MP4: <strong style="color:#93c5fd;" title="${htmlEscape(s.outputFolder)}">${htmlEscape(s.outputFolder)}</strong> <button type="button" onclick="event.stopPropagation();window.browseLinkedFolder('outputFolder','Chọn Folder Xuất Video Thành Phẩm (.mp4)');" style="padding:1px 6px;font-size:10px;background:#064e3b;color:#6ee7b7;border:1px solid #10b981;border-radius:4px;cursor:pointer;margin-left:3px;">📁 Chọn</button></span>`
     ].join('<span style="color:#334155;">|</span>');
   }
 
@@ -2949,11 +3056,230 @@ function renderScriptBridgeState(st) {
 }
 
 window.openBridgePath = function(p) {
-  if (p) api.openPath(p);
+  if (p && !String(p).startsWith('(')) api.openPath(p);
+};
+
+const ALL_15_CHANNEL_KEYS = [
+  '01_Nhom_Ong_Gia_Tra_Dua_My_US',
+  '02_Nhom_Phu_Nu_Bao_Thu_My_US',
+  '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico',
+  '04_Nhom_Ong_Gia_Trung_Tri_Mexico',
+  '05_Nhom_Manga_Doc_Than_Japan',
+  '06_Huu_Tri_Viec_Lam_Japan',
+  '07_Dong_Que_Co_Dien_Mexico',
+  '08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico',
+  '09_Tieu_Su_Goc_Khuat_Sao_Mexico',
+  '10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US',
+  '11_Chuyen_Tinh_Dan_Ong_My_US',
+  '12_Kinh_Di_Dem_Khuya_My_US',
+  'mexico',
+  'homeless',
+  'mafia'
+];
+
+window.applyLinkedFolderValue = async function(kind, rawValue) {
+  let val = String(rawValue ?? '').trim();
+  if (val.startsWith('(')) val = '';
+  const applyAllEl = $('chkApplyStockOutputAllKeys');
+  const applyAll = applyAllEl ? Boolean(applyAllEl.checked) : (_getGlobalLinkedFolders().applyStockOutputAllKeys !== false);
+  const activeKey = $('topGlobalKeySelect')?.value || _lastBridgeState?.activeChannelKey || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+
+  try {
+    if (kind === 'mediaFolder') {
+      if ($('mediaFolder')) $('mediaFolder').value = val;
+      try { localStorage.setItem('vbs.mediaFolder', val); } catch {}
+      await _saveGlobalLinkedFolders({ mediaFolder: val, applyStockOutputAllKeys: applyAll });
+      if (applyAll) {
+        for (const k of ALL_15_CHANNEL_KEYS) {
+          _saveLocalKeyPreset(k, { mediaFolder: val });
+        }
+      } else {
+        _saveLocalKeyPreset(activeKey, { mediaFolder: val });
+      }
+      if (val && api.libraries?.create) {
+        try {
+          const libs = await api.libraries.list();
+          let matched = (libs || []).find((l) => String(l.root_path || '').toLowerCase() === val.toLowerCase());
+          if (!matched) {
+            matched = await api.libraries.create({
+              name: val.split(/[\\/]/).filter(Boolean).pop() || 'Kho Stock Video',
+              rootPath: val,
+              libraryType: 'STOCK'
+            });
+          }
+          state.libraries = await api.libraries.list();
+          fillSelects();
+          if (matched?.id && $('batchLibrary')) {
+            $('batchLibrary').value = matched.id;
+          }
+        } catch {}
+      }
+      toast(val ? `🎞️ Đã chọn Folder Kho Stock Video: ${val}` : 'Đã xóa đường dẫn Kho Stock Video.');
+    } else if (kind === 'outputFolder') {
+      if ($('outputFolder')) $('outputFolder').value = val;
+      try { localStorage.setItem('vbs.outputFolder', val); } catch {}
+      await _saveGlobalLinkedFolders({ outputFolder: val, applyStockOutputAllKeys: applyAll });
+      if (applyAll) {
+        for (const k of ALL_15_CHANNEL_KEYS) {
+          _saveLocalKeyPreset(k, { outputFolder: val });
+        }
+      } else {
+        _saveLocalKeyPreset(activeKey, { outputFolder: val });
+      }
+      if (val && api.projects?.update) {
+        try {
+          const pid = $('batchProject')?.value || state.selectedProject?.id;
+          const proj = (state.projects || []).find((p) => p.id === pid) || state.selectedProject;
+          if (proj?.id) {
+            await api.projects.update(proj.id, {
+              ...proj,
+              outputRootPath: val,
+              output_root_path: val
+            });
+          }
+        } catch {}
+      }
+      toast(val ? `🏁 Đã chọn Folder Xuất Video Thành Phẩm (.mp4): ${val}` : 'Đã đặt lại Folder Output.');
+    } else if (kind === 'projectImageFolder') {
+      if ($('projectImageFolder')) $('projectImageFolder').value = val;
+      try { localStorage.setItem('vbs.projectImageFolder', val); } catch {}
+      await _saveGlobalLinkedFolders({ projectImageFolder: val });
+      if (val && typeof scanAndRenderProjectImageFolderList === 'function') {
+        scanAndRenderProjectImageFolderList(val).catch(() => {});
+      }
+      toast(val ? `🖼️ Đã chọn Folder Ảnh/Green theo Voice: ${val}` : '🖼️ Đã để trống Folder Ảnh theo Voice (Dùng 100% nền Stock).');
+    } else if (kind === 'projectImageMode') {
+      const m = String(val || 'IMAGE').toUpperCase() === 'GREEN' ? 'GREEN' : 'IMAGE';
+      if ($('projectImageMode')) $('projectImageMode').value = m;
+      try { localStorage.setItem('vbs.projectImageMode', m); } catch {}
+      await _saveGlobalLinkedFolders({ projectImageMode: m });
+      toast(`🖼️ Đã đổi chế độ Ảnh theo Voice sang: ${m === 'GREEN' ? 'Tách nền Phông Xanh (Chroma Key)' : 'Ảnh thường / PNG trong suốt'}`);
+    } else if (kind === 'jobIntroFolder') {
+      if ($('jobIntroFolder')) $('jobIntroFolder').value = val;
+      try { localStorage.setItem('vbs.jobIntroFolder', val); } catch {}
+      await _saveGlobalLinkedFolders({ jobIntroFolder: val });
+      toast(val ? `🎬 Đã chọn Folder Video Intro theo Voice: ${val}` : '🎬 Đã để trống Folder Video Intro riêng.');
+    } else if (kind === 'jobIntroAudioMode') {
+      const m = String(val || 'MUTE').toUpperCase() === 'KEEP' ? 'KEEP' : 'MUTE';
+      if ($('batchJobIntroAudioMode')) $('batchJobIntroAudioMode').value = m;
+      try { localStorage.setItem('vbs.batchJobIntroAudioMode', m); } catch {}
+      await _saveGlobalLinkedFolders({ jobIntroAudioMode: m });
+      toast(`🔊 Đã đổi chế độ âm thanh Intro sang: ${m}`);
+    } else if (kind === 'khoGreenFolder') {
+      await _saveGlobalLinkedFolders({ khoGreenFolder: val });
+      toast(val ? `📦 Đã chọn Folder Kho Green & Disclaimer: ${val}` : 'Đã đặt lại Folder Kho_Green mặc định.');
+    } else if (kind === 'activeKeyTongHopFolder') {
+      const patch = { tongHopByKey: { [activeKey]: val } };
+      if (activeKey === 'homeless') patch.tongHopHomelessFolder = val;
+      if (activeKey === 'mafia') patch.tongHopMafiaFolder = val;
+      if (activeKey === 'mexico' || activeKey === '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico') patch.tongHopMexicoFolder = val;
+      await _saveGlobalLinkedFolders(patch);
+      toast(`📝 Đã chọn Folder TONG HOP cho Key [${activeKey}]: ${val}`);
+    } else if (kind === 'tongHopHomelessFolder') {
+      await _saveGlobalLinkedFolders({ tongHopHomelessFolder: val, tongHopByKey: { homeless: val } });
+      toast(`📝 Đã chọn Folder TONG HOP (Kênh Homeless): ${val}`);
+    } else if (kind === 'tongHopMafiaFolder') {
+      await _saveGlobalLinkedFolders({ tongHopMafiaFolder: val, tongHopByKey: { mafia: val } });
+      toast(`📝 Đã chọn Folder TONG HOP (Kênh Mafia): ${val}`);
+    } else if (kind === 'tongHopMexicoFolder') {
+      await _saveGlobalLinkedFolders({
+        tongHopMexicoFolder: val,
+        tongHopByKey: { mexico: val, '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico': val }
+      });
+      toast(`📝 Đã chọn Folder TONG HOP (Kênh MEXICO BÀ CÔ): ${val}`);
+    }
+
+    await syncBatchConfigToBridge({ silent: true });
+    const latestSt = await api.scriptBridge?.status?.();
+    if (latestSt) renderScriptBridgeState(latestSt);
+    if ($('modal')?.classList.contains('open') || $('modal')?.style?.display === 'flex' || document.querySelector('#modalBtnEditBatchConfig')) {
+      openLockedConfigInspectorModal();
+    }
+  } catch (err) {
+    toast('Lỗi lưu đường dẫn Folder: ' + err.message, true);
+  }
+};
+
+window.browseLinkedFolder = async function(kind, titleText = 'Chọn thư mục liên kết') {
+  const picked = await api.chooseDirectory({ title: titleText });
+  if (!picked) return;
+  await window.applyLinkedFolderValue(kind, picked);
+};
+
+window.saveLinkedFolderFromInput = async function(kind, inputId) {
+  const el = $(inputId);
+  if (!el) return;
+  await window.applyLinkedFolderValue(kind, el.value);
+};
+
+window.runVideoFromLinkedTongHop = async function(folderPath) {
+  await syncBatchConfigToBridge({ silent: true });
+  let targetDir = String(folderPath || '').trim();
+  if (!targetDir || targetDir.startsWith('(')) {
+    targetDir = await api.chooseDirectory({ title: 'Chọn thư mục TONG HOP chứa kịch bản (.txt)' });
+  }
+  if (!targetDir) return;
+  try {
+    const res = await api.scriptBridge.enqueueFolder(targetDir);
+    toast(`🚀 Đã đẩy ${res?.count || 0} kịch bản từ [${targetDir}] vào Bàn #7 để Tạo Voice & Render Video!`);
+    const st = await api.scriptBridge.status();
+    if (st) renderScriptBridgeState(st);
+  } catch (err) {
+    toast('Lỗi chạy tạo video từ folder: ' + err.message, true);
+  }
+};
+
+window.pickDisclaimerVideoFileInModal = async function() {
+  const filePath = await api.chooseFile({
+    title: 'Chọn file Video Disclaimer chèn đầu video (.mp4, .mov, .webm)',
+    filters: [{ name: 'Video Files', extensions: ['mp4', 'mov', 'mkv', 'webm'] }]
+  });
+  if (!filePath) return;
+  try {
+    if (api.projectAssets?.create) {
+      const created = await api.projectAssets.create({
+        assetType: 'DISCLAIMER_VIDEO',
+        sourcePath: filePath,
+        name: filePath.split(/[\\/]/).pop()
+      });
+      await loadProjectAssets();
+      if (created?.id && $('batchDisclaimerAsset')) {
+        $('batchDisclaimerAsset').value = created.id;
+      }
+    }
+    if ($('batchDisclaimer')) $('batchDisclaimer').checked = true;
+    await _saveGlobalLinkedFolders({ disclaimerEnabled: true, disclaimerPath: filePath });
+    await syncBatchConfigToBridge({ silent: true });
+    const st = await api.scriptBridge?.status?.();
+    if (st) renderScriptBridgeState(st);
+    openLockedConfigInspectorModal();
+    toast(`🟢 Đã chọn và BẬT Video Disclaimer: ${filePath.split(/[\\/]/).pop()}`);
+  } catch (err) {
+    toast('Lỗi chọn file Disclaimer: ' + err.message, true);
+  }
+};
+
+window.toggleDisclaimerInModal = async function() {
+  const s = _lastBridgeState?.lockedConfigSummary || {};
+  const nextEnabled = !s.disclaimerEnabled;
+  if ($('batchDisclaimer')) $('batchDisclaimer').checked = nextEnabled;
+  let dPath = s.disclaimerPath || _getGlobalLinkedFolders().disclaimerPath || '';
+  if (nextEnabled && !dPath) {
+    await window.pickDisclaimerVideoFileInModal();
+    return;
+  }
+  await _saveGlobalLinkedFolders({ disclaimerEnabled: nextEnabled, disclaimerPath: nextEnabled ? dPath : '' });
+  await syncBatchConfigToBridge({ silent: true });
+  const st = await api.scriptBridge?.status?.();
+  if (st) renderScriptBridgeState(st);
+  openLockedConfigInspectorModal();
+  toast(nextEnabled ? '🟢 Đã BẬT chèn Video Disclaimer đầu video.' : '⚪ Đã TẮT Video Disclaimer đầu video.');
 };
 
 function openLockedConfigInspectorModal() {
   const s = _lastBridgeState?.lockedConfigSummary || {};
+  const linked = _getGlobalLinkedFolders();
+  const activeKey = $('topGlobalKeySelect')?.value || s.activeKey || _lastBridgeState?.activeChannelKey || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
   const layers = Array.isArray(s.templateLayersList) ? s.templateLayersList : [];
   const layersHtml = layers.length
     ? layers.map((l, idx) => `<div style="display:flex;justify-content:space-between;padding:4px 8px;background:#090d16;border:1px solid #1e293b;border-radius:4px;font-size:11px;">
@@ -2962,21 +3288,56 @@ function openLockedConfigInspectorModal() {
       </div>`).join('')
     : '<div style="font-size:11px;color:#94a3b8;">Template chưa có layer phụ (Chỉ chạy Stock nền + Phụ đề).</div>';
 
-  const folderRow = (label, folderPath, note = '') => {
-    const canOpen = folderPath && !String(folderPath).startsWith('(');
-    const escapedJs = canOpen ? htmlEscape(String(folderPath).replace(/\\/g, '\\\\')) : '';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#090d16;border:1px solid #1e293b;border-radius:6px;gap:10px;">
-      <div style="min-width:0;flex:1;">
-        <div style="font-size:11px;color:#94a3b8;font-weight:600;">${label}</div>
-        <div style="font-size:12px;color:#f8fafc;font-family:monospace;word-break:break-all;margin-top:2px;">${htmlEscape(folderPath || '—')}</div>
-        ${note ? `<div style="font-size:10px;color:#64748b;margin-top:2px;">${note}</div>` : ''}
+  const editableFolderRow = ({
+    kind,
+    label,
+    folderPath,
+    placeholder = 'Chưa chọn thư mục — Bấm [📁 Chọn Folder] hoặc dán đường dẫn vào đây...',
+    note = '',
+    allowClear = false,
+    allowRunTongHop = false,
+    extraControlHtml = '',
+    highlightColor = '#1e293b'
+  }) => {
+    const rawStr = String(folderPath || '').trim();
+    const isPlaceholder = rawStr.startsWith('(');
+    const cleanVal = isPlaceholder ? '' : rawStr;
+    const canOpen = Boolean(cleanVal);
+    const escapedJs = canOpen ? htmlEscape(cleanVal.replace(/\\/g, '\\\\')) : '';
+    const inputId = `modalFolderInput_${kind}`;
+    const safeTitle = htmlEscape(label.replace(/<[^>]+>/g, ''));
+
+    return `<div style="display:flex;flex-direction:column;padding:9px 11px;background:#090d16;border:1px solid ${highlightColor};border-radius:7px;gap:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="font-size:11.5px;color:#e2e8f0;font-weight:700;">${label}</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          ${extraControlHtml}
+          <button type="button" onclick="window.browseLinkedFolder('${kind}', '${safeTitle}')" style="padding:4px 10px;font-size:11px;font-weight:700;background:#4f46e5;color:#ffffff;border:1px solid #6366f1;border-radius:5px;cursor:pointer;white-space:nowrap;">📁 Chọn Folder</button>
+          <button type="button" onclick="window.saveLinkedFolderFromInput('${kind}', '${inputId}')" style="padding:4px 9px;font-size:11px;font-weight:600;background:#065f46;color:#d1fae5;border:1px solid #10b981;border-radius:5px;cursor:pointer;white-space:nowrap;" title="Lưu đường dẫn đã nhập trong ô">💾 Lưu</button>
+          ${allowClear && cleanVal ? `<button type="button" onclick="window.applyLinkedFolderValue('${kind}', '')" style="padding:4px 8px;font-size:11px;background:#3f1d2e;color:#fda4af;border:1px solid #be123c;border-radius:5px;cursor:pointer;white-space:nowrap;" title="Xóa / Để trống mục này">🗑️ Để trống</button>` : ''}
+          ${canOpen ? `<button type="button" onclick="window.openBridgePath('${escapedJs}')" style="padding:4px 10px;font-size:11px;background:#1e293b;color:#38bdf8;border:1px solid #334155;border-radius:5px;cursor:pointer;white-space:nowrap;">📂 Mở Folder</button>` : ''}
+          ${allowRunTongHop && canOpen ? `<button type="button" onclick="window.runVideoFromLinkedTongHop('${escapedJs}')" style="padding:4px 10px;font-size:11px;font-weight:700;background:#047857;color:#ecfdf5;border:1px solid #34d399;border-radius:5px;cursor:pointer;white-space:nowrap;" title="Đẩy toàn bộ kịch bản .txt trong folder này vào Bàn #7 để làm Video ngay">▶️ Tạo Video</button>` : ''}
+        </div>
       </div>
-      ${canOpen ? `<button type="button" onclick="window.openBridgePath('${escapedJs}')" style="padding:4px 10px;font-size:11px;background:#1e293b;color:#38bdf8;border:1px solid #334155;border-radius:5px;cursor:pointer;white-space:nowrap;">📂 Mở Folder</button>` : ''}
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input id="${inputId}" type="text" value="${htmlEscape(cleanVal)}" placeholder="${htmlEscape(isPlaceholder ? rawStr : placeholder)}" onkeydown="if(event.key==='Enter'){event.preventDefault();window.saveLinkedFolderFromInput('${kind}','${inputId}');}" style="width:100%;padding:6px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;background:#0f172a;color:#f8fafc;border:1px solid #334155;border-radius:5px;" />
+      </div>
+      ${note ? `<div style="font-size:10.5px;color:#94a3b8;">${note}</div>` : ''}
     </div>`;
   };
 
-  showModal('📋 Kiểm Tra Cấu Hình Xuất Video, Template, Disclaimer & Các Folder Chứa', `
-    <div style="display:flex;flex-direction:column;gap:14px;max-height:76vh;overflow-y:auto;padding-right:4px;">
+  const imgModeCtrl = `<select onchange="window.applyLinkedFolderValue('projectImageMode', this.value)" style="padding:3px 8px;font-size:11px;background:#0f172a;color:#38bdf8;border:1px solid #334155;border-radius:5px;width:auto;">
+    <option value="IMAGE" ${s.projectImageMode !== 'GREEN' ? 'selected' : ''}>🖼️ Ảnh thường / PNG trong suốt</option>
+    <option value="GREEN" ${s.projectImageMode === 'GREEN' ? 'selected' : ''}>🟢 Tách nền Phông Xanh (Chroma Key)</option>
+  </select>`;
+
+  const introAudioCtrl = `<select onchange="window.applyLinkedFolderValue('jobIntroAudioMode', this.value)" style="padding:3px 8px;font-size:11px;background:#0f172a;color:#fde047;border:1px solid #334155;border-radius:5px;width:auto;">
+    <option value="MUTE" ${s.jobIntroAudioMode !== 'KEEP' ? 'selected' : ''}>🔇 Tắt tiếng Intro (MUTE)</option>
+    <option value="KEEP" ${s.jobIntroAudioMode === 'KEEP' ? 'selected' : ''}>🔊 Giữ tiếng Intro (KEEP)</option>
+  </select>`;
+
+  showModal('📋 Kiểm Tra & Chọn Cấu Hình Xuất Video, Kho Stock, Output & Tất Cả Folder Liên Kết', `
+    <div style="display:flex;flex-direction:column;gap:14px;max-height:78vh;overflow-y:auto;padding-right:4px;">
       <div style="padding:12px;background:#0f172a;border:1px solid #0284c7;border-radius:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <strong style="color:#38bdf8;font-size:13px;">1. 🎨 Template & Phụ Đề Đang Chọn</strong>
@@ -2993,9 +3354,15 @@ function openLockedConfigInspectorModal() {
       <div style="padding:12px;background:#0f172a;border:1px solid #10b981;border-radius:8px;">
         <strong style="color:#34d399;font-size:13px;display:block;margin-bottom:6px;">2. ⚠️ Disclaimer & Giọng Đọc AI & Cấu Hình Xuất Ra (Export)</strong>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:#e2e8f0;">
-          <div style="padding:6px 10px;background:#090d16;border-radius:5px;border:1px solid #1e293b;">
-            <span style="color:#94a3b8;">Video Disclaimer đầu video:</span><br>
-            <strong style="color:${s.disclaimerEnabled ? '#34d399' : '#f87171'};">${htmlEscape(s.disclaimerLabel || '⚪ TẮT')}</strong>
+          <div style="padding:6px 10px;background:#090d16;border-radius:5px;border:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <div>
+              <span style="color:#94a3b8;">Video Disclaimer đầu video:</span><br>
+              <strong style="color:${s.disclaimerEnabled ? '#34d399' : '#f87171'};">${htmlEscape(s.disclaimerLabel || '⚪ TẮT')}</strong>
+            </div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <button type="button" onclick="window.pickDisclaimerVideoFileInModal()" style="padding:4px 8px;font-size:10.5px;background:#1e293b;color:#38bdf8;border:1px solid #334155;border-radius:4px;cursor:pointer;">🎬 Chọn File</button>
+              <button type="button" onclick="window.toggleDisclaimerInModal()" style="padding:4px 8px;font-size:10.5px;background:#065f46;color:#d1fae5;border:1px solid #10b981;border-radius:4px;cursor:pointer;">${s.disclaimerEnabled ? '⚪ Tắt' : '🟢 Bật'}</button>
+            </div>
           </div>
           <div style="padding:6px 10px;background:#090d16;border-radius:5px;border:1px solid #1e293b;">
             <span style="color:#94a3b8;">Giọng đọc AI (VoiceStudio 3900):</span><br>
@@ -3013,21 +3380,81 @@ function openLockedConfigInspectorModal() {
       </div>
 
       <div style="padding:12px;background:#0f172a;border:1px solid #6366f1;border-radius:8px;">
-        <strong style="color:#a5b4fc;font-size:13px;display:block;margin-bottom:8px;">3. 📂 Danh Sách Các Folder Chứa Dữ Liệu (Input / Stock / TONG HOP / Output)</strong>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          ${folderRow('🎞️ Folder Kho Stock Video nền (Dùng để cắt ghép nền):', s.mediaFolder, 'Chọn tại mục "Thư viện Stock đã lưu" hoặc "Thư mục Stock Video / Media" ở tab Tạo Batch Video.')}
-          ${folderRow('🖼️ Folder Ảnh/Green theo Voice (Cho layer "Ảnh theo voice 1" trong Template):', s.projectImageFolder, `Chế độ: ${s.projectImageModeLabel || 'Ảnh thường / PNG trong suốt'} · Nếu để trống: tự động ẩn khung Ảnh theo voice và hiển thị 100% nền Stock Video.`)}
-          ${folderRow('🎬 Folder Video Intro theo Voice (Sau Disclaimer):', s.jobIntroFolder, `Chế độ âm thanh Intro: ${s.jobIntroAudioMode || 'MUTE'}`)}
-          ${folderRow('📦 Folder Kho Green & Disclaimer dùng chung (Kho_Green):', s.khoGreenFolder, 'Chứa dis-type2.mp4, Green_analog_screen_texture, kenh2.mp4, SUB.mp4, SONG6.mp4, NÈN DEN.jpg')}
-          ${folderRow('📝 Folder TONG HOP — Kênh Homeless (Chứa Kịch bản _KB.txt, _SEO.txt, Voice .wav, Phụ đề .srt):', s.tongHopHomelessFolder)}
-          ${folderRow('📝 Folder TONG HOP — Kênh Mafia (Chứa Kịch bản _KB.txt, _SEO.txt, Voice .wav, Phụ đề .srt):', s.tongHopMafiaFolder)}
-          ${folderRow('📝 Folder TONG HOP — Kênh MEXICO BÀ CÔ (Chứa Kịch bản _KB.txt, _SEO.txt, Voice .wav, Phụ đề .srt):', s.tongHopMexicoFolder)}
-          ${folderRow('🏁 Folder Xuất Video Thành Phẩm (.mp4):', s.outputFolder, 'Nơi lưu file video .mp4 cuối cùng sau khi Render GPU NVENC hoàn tất.')}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <strong style="color:#a5b4fc;font-size:13px;">3. 📂 Danh Sách Các Folder Chứa Dữ Liệu (Bấm [📁 Chọn Folder] hoặc dán đường dẫn để đổi trực tiếp)</strong>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#fde047;background:#1e1b4b;padding:4px 10px;border-radius:6px;border:1px solid #4f46e5;cursor:pointer;">
+            <input id="chkApplyStockOutputAllKeys" type="checkbox" ${linked.applyStockOutputAllKeys !== false ? 'checked' : ''} onchange="window._saveGlobalLinkedFolders({ applyStockOutputAllKeys: this.checked })" />
+            <span>Áp dụng Kho Stock &amp; Folder Output cho tất cả 15 Key</span>
+          </label>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${editableFolderRow({
+            kind: 'mediaFolder',
+            label: '🎞️ Folder Kho Stock Video nền (Dùng để cắt ghép nền):',
+            folderPath: s.mediaFolder,
+            note: 'Bấm [📁 Chọn Folder] để chọn thư mục chứa các video Stock nền trên máy của bạn.',
+            highlightColor: '#3b82f6'
+          })}
+          ${editableFolderRow({
+            kind: 'outputFolder',
+            label: '🏁 Folder Xuất Video Thành Phẩm (.mp4) (Output):',
+            folderPath: s.outputFolder,
+            note: 'Nơi lưu file video .mp4 cuối cùng sau khi Render GPU NVENC hoàn tất.',
+            highlightColor: '#10b981'
+          })}
+          ${editableFolderRow({
+            kind: 'projectImageFolder',
+            label: '🖼️ Folder Ảnh/Green theo Voice (Cho layer "Ảnh theo voice 1" trong Template):',
+            folderPath: s.projectImageFolder,
+            note: 'Nếu để trống: tự động ẩn khung Ảnh theo voice và hiển thị 100% nền Stock Video.',
+            allowClear: true,
+            extraControlHtml: imgModeCtrl
+          })}
+          ${editableFolderRow({
+            kind: 'jobIntroFolder',
+            label: '🎬 Folder Video Intro theo Voice (Sau Disclaimer):',
+            folderPath: s.jobIntroFolder,
+            note: 'Nếu để trống: không chèn Intro riêng cho từng bài.',
+            allowClear: true,
+            extraControlHtml: introAudioCtrl
+          })}
+          ${editableFolderRow({
+            kind: 'khoGreenFolder',
+            label: '📦 Folder Kho Green & Disclaimer dùng chung (Kho_Green):',
+            folderPath: s.khoGreenFolder,
+            note: 'Chứa dis-type2.mp4, Green_analog_screen_texture, kenh2.mp4, SUB.mp4, SONG6.mp4, NÈN DEN.jpg'
+          })}
+          ${editableFolderRow({
+            kind: 'activeKeyTongHopFolder',
+            label: `📝 Folder TONG HOP — Của Key Đang Chọn (${htmlEscape(activeKey)}):`,
+            folderPath: s.activeKeyTongHopFolder,
+            note: 'Chứa Kịch bản sạch _KB.txt, _SEO.txt, Voice .wav, Phụ đề .srt của Key đang chọn.',
+            allowRunTongHop: true,
+            highlightColor: '#8b5cf6'
+          })}
+          ${editableFolderRow({
+            kind: 'tongHopHomelessFolder',
+            label: '📝 Folder TONG HOP — Kênh Homeless (Chứa Kịch bản _KB.txt, _SEO.txt, Voice .wav, Phụ đề .srt):',
+            folderPath: s.tongHopHomelessFolder,
+            allowRunTongHop: true
+          })}
+          ${editableFolderRow({
+            kind: 'tongHopMafiaFolder',
+            label: '📝 Folder TONG HOP — Kênh Mafia (Chứa Kịch bản _KB.txt, _SEO.txt, Voice .wav, Phụ đề .srt):',
+            folderPath: s.tongHopMafiaFolder,
+            allowRunTongHop: true
+          })}
+          ${editableFolderRow({
+            kind: 'tongHopMexicoFolder',
+            label: '📝 Folder TONG HOP — Kênh MEXICO BÀ CÔ (Chứa Kịch bản _KB.txt, _SEO.txt, Voice .wav, Phụ đề .srt):',
+            folderPath: s.tongHopMexicoFolder,
+            allowRunTongHop: true
+          })}
         </div>
       </div>
 
       <div class="actions" style="justify-content:flex-end;gap:10px;">
-        <button type="button" id="modalBtnEditBatchConfig" class="primary" style="padding:8px 16px;font-weight:700;">⚙️ Sang Tab Tạo Batch Video Để Chỉnh Cấu Hình</button>
+        <button type="button" id="modalBtnEditBatchConfig" class="primary" style="padding:8px 16px;font-weight:700;">⚙️ Sang Tab Tạo Batch Video Để Chỉnh Chi Tiết Hơn</button>
       </div>
     </div>
   `);

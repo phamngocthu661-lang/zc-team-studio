@@ -413,9 +413,13 @@ class ScriptVideoBridgeService {
   }
 
   saveSettings(partial = {}) {
+    const nextLinked = partial.linkedFolders
+      ? { ...(this.settings.linkedFolders || {}), ...partial.linkedFolders }
+      : (this.settings.linkedFolders || {});
     this.settings = {
       ...this.settings,
-      ...partial
+      ...partial,
+      linkedFolders: nextLinked
     };
     if (partial.actionMode === 'DISABLED') {
       this.settings.enabled = false;
@@ -424,6 +428,12 @@ class ScriptVideoBridgeService {
     }
     try {
       this.database?.setSetting?.('script_video_bridge_settings', this.settings);
+      if (partial.linkedFolders) {
+        const studioRoot = this.settings.scriptStudioRoot || this._detectScriptStudioRoot();
+        if (studioRoot && fs.existsSync(studioRoot)) {
+          fs.writeFileSync(path.join(studioRoot, 'CUSTOM_LINKED_FOLDERS.json'), JSON.stringify(nextLinked, null, 2), 'utf8');
+        }
+      }
     } catch {}
     this._emitBridgeState();
     return this.getPublicState();
@@ -465,16 +475,18 @@ class ScriptVideoBridgeService {
   }
 
   _resolveValidStockLibraryAndFolder(cfg = {}, libraries = []) {
+    const linked = this.settings?.linkedFolders || {};
     const stockLibraries = libraries.filter((l) => String(l.library_type || '').toUpperCase() === 'STOCK');
     const preferredStockLib = stockLibraries.find((l) => /16-6|OBS-Recordings/i.test(l.name || l.root_path || '')) || stockLibraries[0] || libraries[0] || null;
     const matchedLib = libraries.find((l) => l.id === cfg.libraryId) || preferredStockLib;
 
-    let rawFolder = String(cfg.mediaFolder || '').trim();
+    let rawFolder = String(cfg.mediaFolder || linked.mediaFolder || '').trim();
     const isScratchTest = /scratch[\\/]+e2e_test_project/i.test(rawFolder);
-    if (isScratchTest || (rawFolder && !fs.existsSync(rawFolder))) {
+    if (isScratchTest) {
       rawFolder = '';
     }
-    const mediaFolder = rawFolder || matchedLib?.root_path || '';
+    const libPath = (matchedLib?.root_path && fs.existsSync(matchedLib.root_path)) ? matchedLib.root_path : '';
+    const mediaFolder = rawFolder || libPath || matchedLib?.root_path || '';
     const libraryId = (!isScratchTest && libraries.some((l) => l.id === cfg.libraryId))
       ? cfg.libraryId
       : (matchedLib?.id || null);
@@ -484,6 +496,7 @@ class ScriptVideoBridgeService {
 
   summarizeLockedConfig() {
     const cfg = this.lockedVideoConfig || {};
+    const linked = this.settings?.linkedFolders || {};
     const projects = this.database?.listProjects?.() || [];
     const templates = this.database?.listTemplates?.() || [];
     const libraries = this.database?.listLibraries?.() || [];
@@ -521,8 +534,10 @@ class ScriptVideoBridgeService {
       STORY_PIP_STOCK: 'Ảnh AI đè Stock (Story PiP)'
     };
     const bgMode = cfg.backgroundMode || 'STOCK_VIDEO';
-    const mediaFolder = resolvedMediaFolder || '(Tự nhận từ Thư viện Stock)';
-    const outputFolder = (cfg.outputFolder || '').trim() || proj?.output_root_path || 'D:\\MAFIA_STUDIO_WEB\\PROJECTS_HOMELESS\\TONG HOP\\Videos';
+    const studioRoot = linked.scriptStudioRoot || this.settings?.scriptStudioRoot || 'D:\\ZC_TEAM\\TOOL_ZC_TEAM';
+    const mediaFolder = resolvedMediaFolder || '(Chưa chọn — Bấm [📁 Chọn Folder] để chọn Kho Stock Video)';
+    const projOut = (proj?.output_root_path && !/^D:\\MAFIA_STUDIO_WEB/i.test(proj.output_root_path)) ? proj.output_root_path : '';
+    const outputFolder = (cfg.outputFolder || linked.outputFolder || '').trim() || projOut || path.join(studioRoot, 'TONG HOP', 'Videos');
 
     const tplConfig = tpl?.config || {};
     const tplLayers = (tpl?.layers?.length ? tpl.layers : tplConfig.layers || []).filter((l) => l && l.visible !== false && l.visible !== 0);
@@ -537,22 +552,34 @@ class ScriptVideoBridgeService {
       ? `🟢 BẬT (${disclaimerFileName})`
       : '⚪ TẮT (Không chèn đầu video)';
 
-    const projectImageFolder = (cfg.projectImageFolder || '').trim();
-    const projectImageMode = String(cfg.projectImageMode || 'IMAGE').toUpperCase() === 'GREEN' ? 'GREEN' : 'IMAGE';
+    const projectImageFolder = (cfg.projectImageFolder || linked.projectImageFolder || '').trim();
+    const projectImageMode = String(cfg.projectImageMode || linked.projectImageMode || 'IMAGE').toUpperCase() === 'GREEN' ? 'GREEN' : 'IMAGE';
     const projectImageModeLabel = projectImageMode === 'GREEN'
       ? '🟢 Tự động tách nền Phông Xanh (Chroma Key)'
       : '🖼️ Ảnh thường / Ảnh PNG đã tách nền trong suốt sẵn';
-    const jobIntroFolder = (cfg.jobIntroFolder || '').trim();
-    let khoGreenFolder = path.resolve(__dirname, '../../../Kho_Green');
-    try {
-      const { resolveGreenStorageDir } = require('./path-utils');
-      khoGreenFolder = resolveGreenStorageDir();
-    } catch {}
-    const studioRoot = this.settings?.scriptStudioRoot || 'D:\\ZC_TEAM\\TOOL_ZC_TEAM';
+    const jobIntroFolder = (cfg.jobIntroFolder || linked.jobIntroFolder || '').trim();
+    let khoGreenFolder = (cfg.khoGreenFolder || linked.khoGreenFolder || '').trim();
+    if (!khoGreenFolder) {
+      khoGreenFolder = path.resolve(__dirname, '../../../Kho_Green');
+      try {
+        const { resolveGreenStorageDir } = require('./path-utils');
+        khoGreenFolder = resolveGreenStorageDir();
+      } catch {}
+    }
+
+    const tongHopByKey = linked.tongHopByKey || {};
+    const defaultActiveKeyTongHop = activeKey === 'homeless'
+      ? path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP')
+      : activeKey === 'mafia'
+        ? path.join(studioRoot, 'PROJECTS', 'TONG HOP')
+        : activeKey === 'mexico'
+          ? path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP')
+          : path.join(studioRoot, `PROJECTS_${activeKey}`, 'TONG HOP');
 
     return {
       hasLockedConfig: Boolean(this.lockedVideoConfig),
       lockedAt: this.lockedAt,
+      activeKey,
       projectName: proj?.name || 'Mặc định (1080p)',
       templateId: tpl?.id || null,
       templateName: tpl?.name || 'Default 16:9',
@@ -572,11 +599,12 @@ class ScriptVideoBridgeService {
       projectImageMode,
       projectImageModeLabel,
       jobIntroFolder: jobIntroFolder || '(Để trống — Không chèn Intro riêng)',
-      jobIntroAudioMode: cfg.jobIntroAudioMode || 'MUTE',
+      jobIntroAudioMode: cfg.jobIntroAudioMode || linked.jobIntroAudioMode || 'MUTE',
       khoGreenFolder,
-      tongHopHomelessFolder: path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP'),
-      tongHopMafiaFolder: path.join(studioRoot, 'PROJECTS', 'TONG HOP'),
-      tongHopMexicoFolder: path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP'),
+      activeKeyTongHopFolder: tongHopByKey[activeKey] || defaultActiveKeyTongHop,
+      tongHopHomelessFolder: linked.tongHopHomelessFolder || tongHopByKey.homeless || path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP'),
+      tongHopMafiaFolder: linked.tongHopMafiaFolder || tongHopByKey.mafia || path.join(studioRoot, 'PROJECTS', 'TONG HOP'),
+      tongHopMexicoFolder: linked.tongHopMexicoFolder || tongHopByKey.mexico || path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP'),
       outputFolder,
       disclaimerEnabled,
       disclaimerPath: cfg.disclaimerPath || '',
