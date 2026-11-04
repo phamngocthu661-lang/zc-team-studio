@@ -3993,11 +3993,12 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if parsed.path == "/" or parsed.path == "/index.html":
-            ext_html_path = Path(__file__).resolve().parent / "assets" / "script_studio_dashboard.html"
-            if ext_html_path.exists():
+        if parsed.path == "/" or parsed.path == "/index.html" or parsed.path.startswith("/?"):
+            ext_html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "script_studio_dashboard.html")
+            if os.path.isfile(ext_html_path):
                 try:
-                    raw = ext_html_path.read_text(encoding="utf-8", errors="ignore").encode("utf-8")
+                    with open(ext_html_path, "r", encoding="utf-8", errors="ignore") as _hf:
+                        raw = _hf.read().encode("utf-8")
                 except Exception:
                     raw = HTML_PAGE.encode("utf-8")
             else:
