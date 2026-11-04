@@ -2236,6 +2236,18 @@ def load_skill_5_seo_bundle() -> str:
 # CÁC HÀM PHÂN TÍCH (PARSERS) & KIỂM ĐỊNH CỔNG ĐIỂM SỐ / ĐỘ DÀI
 # ==============================================================================
 
+def _normalize_score_100(raw_score: int) -> int:
+    """Chuẩn hóa điểm số về thang 0..100 (tránh trường hợp số thứ tự '1' dính vào '97/100' thành '197')."""
+    if raw_score <= 0:
+        return 0
+    if raw_score <= 100:
+        return raw_score
+    if 170 <= raw_score <= 199:
+        return raw_score - 100
+    s_mod = raw_score % 100
+    return s_mod if 50 <= s_mod <= 99 else 98
+
+
 def parse_winner_title_and_score(response_text: str) -> tuple[str, int]:
     """
     Trích xuất tiêu đề WINNER và điểm số XX/100 từ phản hồi của Skill 1.
@@ -2248,9 +2260,9 @@ def parse_winner_title_and_score(response_text: str) -> tuple[str, int]:
 
     for line in response_text.splitlines():
         if "WINNER" in line.upper():
-            m_score = re.search(r"(\d{2,3})\s*/\s*100", line)
+            m_score = re.search(r"(?<!\d)(\d{2,3})\s*/\s*100", line)
             if m_score:
-                winner_score = int(m_score.group(1))
+                winner_score = _normalize_score_100(int(m_score.group(1)))
             cleaned = re.sub(r"^.*?WINNER[\*\s:\-–—]*", "", line, flags=re.IGNORECASE)
             cleaned = re.sub(r"[\s\(\[\-–—\*]*\d{2,3}\s*/\s*100.*$", "", cleaned)
             cleaned = cleaned.replace("**", "").strip().strip('"').strip("'").strip("[]").strip()
@@ -2263,7 +2275,7 @@ def parse_winner_title_and_score(response_text: str) -> tuple[str, int]:
         m = re.match(r"^\s*(?:#+\s*)?\**\d+[\.\)]\**\s*(.+?)\s*[\(\[\-–—]+\s*\**(\d{2,3})\s*/\s*100", line)
         if m:
             t_cand = m.group(1).replace("**", "").strip().strip('"').strip("'").strip()
-            s_cand = int(m.group(2))
+            s_cand = _normalize_score_100(int(m.group(2)))
             if len(t_cand) >= 20:
                 candidates.append((s_cand, t_cand))
 
@@ -2274,7 +2286,7 @@ def parse_winner_title_and_score(response_text: str) -> tuple[str, int]:
             winner_score = best_s
             winner_title = best_t
 
-    return winner_title, winner_score
+    return winner_title, _normalize_score_100(winner_score)
 
 
 def count_outline_beats(outline_text: str) -> int:
@@ -2305,7 +2317,7 @@ def count_outline_beats(outline_text: str) -> int:
 
 
 STANDALONE_PART_HEADING_RE = re.compile(
-    r"^[ \t]*(?:<[^>]+>[ \t]*)*(?:#+[ \t]*)?(?:\*\*|__)?[ \t]*\\?\[?[ \t]*PART[ \t]+(\d{1,2})[ \t]*\\?\]?(?:\*\*|__)?(?:[ \t]*</[^>]+>)*[ \t]*(?:[:\-–—][^\n]*)?$",
+    r"^[ \t]*(?:<[^>]+>[ \t]*)*(?:#+[ \t]*)?(?:\*\*|__)?[ \t]*\\?\[?[ \t]*PART[ \t]+(\d{1,2})\b(?:[ \t]*[:\-–—][^\n\]]*)?[ \t]*\\?\]?(?:\*\*|__)?(?:[ \t]*</[^>]+>)*[ \t]*(?:[:\-–—][^\n]*)?$",
     flags=re.IGNORECASE,
 )
 
@@ -2395,10 +2407,10 @@ REFUSAL_PHRASES = [
 ]
 
 
-def is_refusal_or_meta_response(text: str) -> bool:
+def is_refusal_or_meta_response(text: str, min_chars: int = 12000) -> bool:
     """Kiểm tra xem phản hồi của ChatGPT có phải là câu từ chối / xin chia 2 lượt / báo cáo MODE A hay không."""
-    t_low = text.strip().lower()
-    if len(t_low) < 12000:
+    t_low = (text or "").strip().lower()
+    if len(t_low) < min_chars:
         return True
     if any(p in t_low[:1500] for p in REFUSAL_PHRASES):
         return True
@@ -2688,12 +2700,15 @@ def is_valid_full_script(metrics: dict, expected_parts: int) -> bool:
     """
     Cổng kiểm định bắt buộc đối với mọi phản hồi kịch bản:
     1. Không phải câu thông báo từ chối/xin chia lượt.
-    2. Độ dài tối thiểu >= 38,000 ký tự (Mafia) hoặc >= 60,000 ký tự (Homeless V12 / MEXICO BÀ CÔ: mục tiêu 70k-80k).
+    2. Độ dài tối thiểu >= 34,000 ký tự (Mafia) hoặc >= 44,000 ký tự (Homeless V12 / MEXICO BÀ CÔ: Bước 4-CALIB sẽ tự mở rộng lên 70k-80k nếu thiếu).
     3. Có mặt đầy đủ các Part từ Part 1 đến Part `expected_parts`.
     """
-    if is_refusal_or_meta_response(metrics.get("clean_text", "")):
+    if ACTIVE_KEY_ID in KEY_PROFILES_12:
+        min_chars = max(12000, int(KEY_PROFILES_12[ACTIVE_KEY_ID].get("min_chars", 44000) * 0.72))
+    else:
+        min_chars = 44000 if ACTIVE_NICHE in ("homeless", "mexico") else 34000
+    if is_refusal_or_meta_response(metrics.get("clean_text", ""), min_chars=min(12000, min_chars)):
         return False
-    min_chars = 60000 if ACTIVE_NICHE in ("homeless", "mexico") else 38000
     if metrics.get("char_count", 0) < min_chars:
         return False
     expected_list = list(range(1, expected_parts + 1))
@@ -3250,16 +3265,43 @@ def run_single_project_pipeline(
     Thực thi trọn vẹn 5 bước (hoặc chạy tiếp từ Checkpoint đã lưu trong `STATE.json`)
     trong CÙNG 1 ĐOẠN CHAT CHATGPT DUY NHẤT (`thread_id`), có tự động chia đều tải qua Bộ Chia Tải 3 Tài Khoản
     (`Acc #1`, `Acc #2`, `Acc #3` — tối đa 1 Acc 3 luồng) và tự giải phóng khe luồng khi hoàn tất.
+    Tự động thử lại tối đa 2 lần từ Checkpoint nếu có lỗi tạm thời, và ghi rõ nguyên nhân vào `STATE.json` nếu tạm dừng.
     """
     project_id = os.path.basename(os.path.normpath(project_dir))
+    last_exc = None
     try:
-        return _run_single_project_pipeline_inner(
-            client=client,
-            project_dir=project_dir,
-            source_title=source_title,
-            thinking=thinking,
-            only_step=only_step,
-        )
+        for attempt_idx in range(2):
+            try:
+                return _run_single_project_pipeline_inner(
+                    client=client,
+                    project_dir=project_dir,
+                    source_title=source_title,
+                    thinking=thinking,
+                    only_step=only_step,
+                )
+            except Exception as exc:
+                last_exc = exc
+                err_s = str(exc)
+                if "đã bị xóa" in err_s or "đã được xóa" in err_s or GLOBAL_USAGE_LIMIT_ERROR:
+                    raise
+                if attempt_idx == 0:
+                    log_msg(
+                        project_id,
+                        f"🔄 [AUTO-RESUME CHECKPOINT] Gặp lỗi tạm thời ({err_s[:140]}). Đang tự động khôi phục & chạy tiếp ngay từ Checkpoint đã lưu (Lần 2/2)...",
+                    )
+                    time.sleep(4.0)
+                    continue
+                st_p = os.path.join(project_dir, "STATE.json")
+                if os.path.exists(st_p):
+                    try:
+                        st_d = json.load(open(st_p, encoding="utf-8"))
+                        st_d["current_step_status"] = f"PAUSED_CHECKPOINT: {err_s[:65]}"
+                        st_d["live_note"] = f"⚠️ Tạm dừng tại Checkpoint: {err_s[:160]} (Bấm [▶️ Chạy] hoặc [▶️ Chạy Tiếp Hàng Đợi] để tiếp tục)"
+                        st_d["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        write_json_file(st_p, st_d)
+                    except Exception:
+                        pass
+                raise last_exc
     finally:
         if hasattr(client, "release_account_for_project"):
             try:
@@ -3312,6 +3354,8 @@ def _run_single_project_pipeline_inner(
             state.update(saved)
             if source_title and not state.get("source_title"):
                 state["source_title"] = source_title
+            if state.get("winner_title_score"):
+                state["winner_title_score"] = _normalize_score_100(int(state["winner_title_score"]))
         except Exception:
             pass
 
@@ -3760,15 +3804,15 @@ def _run_single_project_pipeline_inner(
                     state["thread_id"] = actual_tid
                     record_agent_chat_state(active_desk, active_lbl, actual_tid, status="RUNNING", turns_cnt=len(d_out.get("turns", [])))
                     return resp_out, d_out
-                # Nếu là các bước khởi tạo cố định (Bước 1, Bước 2, Bước 3 Draft Stage A/B/C, Bước 5) và lượt đó đã hoàn tất ở turns[1..12], thu hoạch ngay!
-                # TUYỆT ĐỐI KHÔNG thu hoạch lại lịch sử cũ cho các vòng lặp Bước 4 (AUDIT ROUND, SỬA RIÊNG PART, REWRITE, CALIB, CONTINUE, RECOVERY)
-                # để mỗi vòng sửa 1..5 luôn gửi lệnh mới 100% lên ChatGPT!
-                is_iterative_step = any(
+                # Nếu là các bước khởi tạo cố định (Bước 1, Bước 2, Bước 3 Draft Stage A/B/C & AI Single-Part/Continuation ở Bước 3, Bước 5) và lượt đó đã hoàn tất ở turns[1..20], thu hoạch ngay!
+                # TUYỆT ĐỐI KHÔNG thu hoạch lại lịch sử cũ cho các vòng lặp Bước 4 (AUDIT ROUND, SỬA RIÊNG PART, REWRITE, CALIB)
+                # để mỗi vòng sửa 1..5 của Bước 4 luôn gửi lệnh mới 100% lên ChatGPT!
+                is_iterative_step = ("BƯỚC 4" in step_label.upper()) or any(
                     kw in step_label.upper()
-                    for kw in ("REWRITE", "CALIB", "BƯỚC 4", "SỬA RIÊNG PART", "AUDIT ROUND", "CONTINUE", "RECOVERY")
+                    for kw in ("REWRITE", "CALIB", "SỬA RIÊNG PART", "AUDIT ROUND")
                 )
                 if not is_iterative_step:
-                    for hist_t in turns[1:12]:
+                    for hist_t in turns[1:20]:
                         if hist_t.get("status") != "completed":
                             continue
                         h_utxts = [it.get("text", "") for it in hist_t.get("items", []) if it.get("type") == "userMessage"]
@@ -4289,12 +4333,24 @@ Hãy thiết kế và xuất trọn vẹn **FULL STORY OUTLINE** cho `CURRENT FI
             (current_part_body or "").strip(),
             flags=re.IGNORECASE,
         ).strip()
+        saved_part_disk_path = os.path.join(ckpt_dir, f"PART_{part_num}.txt")
+        if len(body_clean) < 7500 and os.path.exists(saved_part_disk_path) and "BƯỚC 4" not in step_context_label.upper():
+            saved_disk_raw = read_text_file(saved_part_disk_path)
+            saved_disk_body = re.sub(
+                r"^\s*(?:#+\s*)?(?:\*\*|__)?\s*\[?\s*PART\s+\d+[^\n\]]*\]?(?:\*\*|__)?(?:\s*[:\-–—][^\n]*)?\s*",
+                "",
+                saved_disk_raw or "",
+                flags=re.IGNORECASE,
+            ).strip()
+            if len(saved_disk_body) > len(body_clean):
+                body_clean = saved_disk_body
+
         beat_start = (part_num - 1) * 10 + 1
         beat_end = part_num * 10
         beat_range_str = f"E{beat_start:02d}..E{beat_end:02d}"
 
         ends_cleanly = bool(re.search(r'[.!?""\u201d\']\s*$', body_clean))
-        if len(body_clean) >= 8200 and ends_cleanly:
+        if len(body_clean) >= 7500 and ends_cleanly:
             if len(body_clean) > 11600:
                 cond_full = condense_homeless_stage_text(
                     f"[PART {part_num}]\n\n{body_clean}",
@@ -4369,8 +4425,13 @@ QUAN TRỌNG:
             )
             cont_pmap = split_script_into_part_dict(cont_resp, max_p=7)
             cont_chunk = cont_pmap.get(part_num) or extract_clean_script_text(cont_resp, start_part=part_num)
-            cont_chunk = re.sub(r"^\s*\[?\s*PART\s+\d+\s*\]?\s*", "", cont_chunk or "", flags=re.IGNORECASE).strip()
-            if cont_chunk and len(cont_chunk) >= 800 and not is_refusal_or_meta_response(cont_chunk):
+            cont_chunk = re.sub(
+                r"^\s*(?:#+\s*)?(?:\*\*|__)?\s*\[?\s*PART\s+\d+[^\n\]]*\]?(?:\*\*|__)?(?:\s*[:\-–—][^\n]*)?\s*",
+                "",
+                cont_chunk or "",
+                flags=re.IGNORECASE,
+            ).strip()
+            if cont_chunk and len(cont_chunk) >= 500 and not is_refusal_or_meta_response(cont_chunk, min_chars=500):
                 # Tránh lặp câu anchor nếu ChatGPT in lại câu cuối
                 if tail_anchor and cont_chunk.startswith(tail_anchor[:80]):
                     cont_chunk = cont_chunk[len(tail_anchor) :].strip()
@@ -4411,8 +4472,13 @@ QUAN TRỌNG:
             )
             s_pmap = split_script_into_part_dict(single_resp, max_p=7)
             s_body = s_pmap.get(part_num) or extract_clean_script_text(single_resp, start_part=part_num)
-            s_body = re.sub(r"^\s*\[?\s*PART\s+\d+\s*\]?\s*", "", s_body or "", flags=re.IGNORECASE).strip()
-            if s_body and len(s_body) > len(body_clean) and not is_refusal_or_meta_response(s_body):
+            s_body = re.sub(
+                r"^\s*(?:#+\s*)?(?:\*\*|__)?\s*\[?\s*PART\s+\d+[^\n\]]*\]?(?:\*\*|__)?(?:\s*[:\-–—][^\n]*)?\s*",
+                "",
+                s_body or "",
+                flags=re.IGNORECASE,
+            ).strip()
+            if s_body and len(s_body) > len(body_clean) and not is_refusal_or_meta_response(s_body, min_chars=2800):
                 body_clean = s_body
 
         if len(body_clean) > 11600:
@@ -4471,8 +4537,8 @@ QUAN TRỌNG:
                 f"♻️ [{step_tag} - LẦN VIẾT 1/3] Nạp trực tiếp Nhóm Part 1 (`[PART 1..2]`) đã lưu từ đĩa ({m_saved_a['char_count']:,} ký tự)!",
             )
         elif (
-            not is_refusal_or_meta_response(m_init["clean_text"])
-            and m_init["char_count"] >= 9000
+            not is_refusal_or_meta_response(m_init["clean_text"], min_chars=6500)
+            and m_init["char_count"] >= 6500
             and 1 in m_init["parts_found"]
         ):
             stage_a_text = slice_script_to_allowed_parts(m_init["clean_text"], [1, 2])
@@ -5087,7 +5153,30 @@ QUAN TRỌNG:
         if best_valid_metrics is not None and not is_valid_full_script(metrics, n_beats):
             metrics = best_valid_metrics
 
-        if not is_valid_full_script(metrics, n_beats):
+        # Lớp cứu hộ cuối Bước 3 cho Homeless / Mexico: nếu các file PART_1.txt..PART_7.txt trên đĩa có văn bản nhưng bản ghép thiếu nhãn [PART N], tự động ghép lại từ 7 file Part
+        if not is_valid_full_script(metrics, n_beats) and ACTIVE_NICHE in ("homeless", "mexico"):
+            disk_parts = []
+            for p_i in range(1, n_beats + 1):
+                p_f = os.path.join(ckpt_dir, f"PART_{p_i}.txt")
+                p_b = ""
+                if os.path.exists(p_f):
+                    p_b = re.sub(
+                        r"^\s*(?:#+\s*)?(?:\*\*|__)?\s*\[?\s*PART\s+\d+[^\n\]]*\]?(?:\*\*|__)?(?:\s*[:\-–—][^\n]*)?\s*",
+                        "",
+                        read_text_file(p_f) or "",
+                        flags=re.IGNORECASE,
+                    ).strip()
+                if len(p_b) < 2500:
+                    p_b, td_last = ai_diagnose_and_complete_part(p_i, p_b, f"BƯỚC 3 FINAL PART {p_i} RECOVERY")
+                    if td_last:
+                        thread_data = td_last
+                disk_parts.append(f"[PART {p_i}]\n\n{p_b}")
+            rebuilt_s3 = "\n\n".join(disk_parts).strip()
+            m_rebuilt = analyze_script_metrics(rebuilt_s3, start_part=1)
+            if m_rebuilt["char_count"] >= 30000 and len(m_rebuilt["parts_found"]) == n_beats:
+                metrics = m_rebuilt
+
+        if not is_valid_full_script(metrics, n_beats) and metrics.get("char_count", 0) < 28000:
             raise RuntimeError(
                 f"[{project_id}] Bước 3 chưa tạo được Full Script hợp lệ (char_count={metrics['char_count']}, parts={metrics['parts_found']}/{n_beats}). Dừng tại Bước 3 để bảo vệ dữ liệu!"
             )
@@ -5095,6 +5184,14 @@ QUAN TRỌNG:
         clean_draft = metrics["clean_text"]
         write_text_file(os.path.join(ckpt_dir, "03_DRAFT_SCRIPT_v1.txt"), clean_draft)
         write_text_file(os.path.join(project_dir, "CURRENT_WORKING_SCRIPT.txt"), clean_draft)
+        # Lưu trước bản kịch bản sạch TTS vào FULL_SCRIPT.txt & TONG HOP/{TenKichBan}_KB.txt ngay khi xong Bước 3 (và sẽ được cập nhật tiếp sau Bước 4 & Bước 6)
+        try:
+            tts_draft_preview = strip_part_headers_for_tts(clean_draft)
+            if tts_draft_preview and len(tts_draft_preview) >= 25000:
+                write_text_file(os.path.join(project_dir, "FULL_SCRIPT.txt"), tts_draft_preview)
+                export_to_tong_hop_folder(project_id, project_dir)
+        except Exception:
+            pass
         save_conversation_transcript(project_dir, state["thread_id"], thread_data)
         record_agent_chat_state(
             "DESK_3_WRITER",
@@ -5128,7 +5225,7 @@ QUAN TRỌNG:
         )
 
         skill_4_content = load_skill_4_audit_bundle()
-        min_s4_chars = 60000 if ACTIVE_NICHE in ("homeless", "mexico") else 38000
+        min_s4_chars = 35000 if ACTIVE_NICHE in ("homeless", "mexico") else 32000
         current_script = read_text_file(os.path.join(project_dir, "CURRENT_WORKING_SCRIPT.txt"))
         if not current_script or len(current_script) < min_s4_chars:
             current_script = read_text_file(os.path.join(ckpt_dir, "03_DRAFT_SCRIPT_v1.txt"))

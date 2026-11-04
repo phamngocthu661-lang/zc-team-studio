@@ -327,3 +327,35 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
 3. **Làm sạch tuyệt đối `.ProseMirror` & Auto-Heal tức thì lỗi `"The messages you submitted were too long"` ([`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py)):**
    - Xóa sạch `.ProseMirror` bằng cả `execCommand('delete')` lẫn `el.innerHTML = '<p><br></p>'` và bỏ bước dán trùng `dtHead`, đảm bảo mỗi lượt chỉ dán đúng 1 bản duy nhất.
    - Tự động phát hiện thông báo `"The messages you submitted were too long, please edit them and resubmit."` ngay sau khi bấm Send và trong vòng lặp `wait_for_turn_completion`, tự động nén gọn các khối Reference phụ trợ (`_compact_overlong_prompt_preserving_script`), mở hội thoại sạch tại `https://chatgpt.com/` và gửi lại ngay lập tức.
+
+
+### 29.3. Phát hành OTA Chính thức `V1.0.1 (Build #115)` trên GitHub (`phamngocthu661-lang/zc-team-studio`)
+- Đã nâng cấp công cụ phát hành [`push_update_github.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/push_update_github.py) để tự động đồng bộ mã nguồn (`version.json`, `package.json`, `mafia_dashboard_server.py`, `engine/*.py`) sang cả `Ban-Giao-Khach-Hang-EXE/VideoBatchStudio` và `Ban-Giao-Khach-Hang-EXE/VideoBatchStudio/resources/app`.
+- Đã phát hành phiên bản **`V1.0.1 (Build #115)`** lên nhánh `main` của kho lưu trữ GitHub `https://github.com/phamngocthu661-lang/zc-team-studio`.
+- Tất cả các máy khách đang mở ứng dụng trên bản `V1.0.0` sẽ tự động hiển thị thông báo **`🚀 Có bản cập nhật mới: V1.0.1 — Ấn để Cập Nhật`** trên thanh trên cùng để bấm **`🚀 Cập Nhật Ngay Lên V1.0.1`**.
+
+---
+
+## 30. Nâng Cấp Bản `V1.0.2 (Build #116)` — Sửa Triệt Để Lỗi Kênh `HOMELESS V12` / `MEXICO` Dừng Ở `DESK_3_WRITER`, Không Xuất Kịch Bản `_KB.txt` & Lỗi Hiển Thị Điểm `Title 197đ`
+
+### 30.1. Nguyên nhân gốc rễ từ ảnh chụp màn hình hàng đợi `🏚️ BÊN HOMELESS V12: 10` (`#9-HOME-04_11` .. `#18-HOME-04_11`)
+1. **Lỗi xung đột ngưỡng `12.000 ký tự` trong `is_refusal_or_meta_response()` khi chạy `ai_diagnose_and_complete_part()` ở Bước 3 & Bước 4B:**
+   - Trong [`engine/mafia_chatgpt_pipeline.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/mafia_chatgpt_pipeline.py), hàm `is_refusal_or_meta_response(text)` trước đây khóa cứng `if len(t_low) < 12000: return True` (dành cho kịch bản nguyên bài của Mafia).
+   - Tuy nhiên, ở kênh **Homeless V12 / Mexico**, mỗi Part độc lập (`[PART 1]`..`[PART 7]`) chỉ có độ dài mục tiêu **`10.500 – 11.200 ký tự`** (`< 12.000` ký tự), và mỗi đoạn viết nối tiếp (`AI-CONTINUATION-HANDLER`) có độ dài **`2.800 – 5.000 ký tự`** (`< 12.000` ký tự).
+   - Khi `ai_diagnose_and_complete_part()` kiểm tra `not is_refusal_or_meta_response(cont_chunk)` hoặc `not is_refusal_or_meta_response(s_body)`, hàm này **luôn trả về `False` (từ chối 100%)** vì `< 12.000` ký tự! Hậu quả là Part được AI viết bổ sung bị bỏ qua thành rỗng, khiến cuối Bước 3 báo `RuntimeError: Bước 3 chưa tạo được Full Script hợp lệ` và dừng tại `DESK_3_WRITER` mà chưa xuất `FULL_SCRIPT.txt` / `TONG HOP/{TenKichBan}_KB.txt`.
+2. **Biểu thức `STANDALONE_PART_HEADING_RE` chưa bắt các tiêu đề Part có phụ đề bên trong ngoặc vuông (như `[PART 3 — THE HIDDEN LEDGER]`, `**[PART 4: ...]**`):**
+   - Khi ChatGPT thêm phụ đề sau dấu gạch ngang/hai chấm bên trong `[PART N — ...]`, regex cũ không khớp khiến Part đó bị gộp vào Part trước và báo thiếu Part.
+3. **Điểm tiêu đề hiển thị `Title 197đ` / `Title 196đ` trên `#16-HOME-04_11` và `#17-HOME-04_11`:**
+   - Khi dòng kết quả có số thứ tự đứng sát điểm số (ví dụ `1 97/100`), regex `(\d{2,3})\s*/\s*100` bắt nhầm thành `197`.
+
+### 30.2. Giải pháp kỹ thuật đã triển khai (`V1.0.2 Build #116`)
+1. **Tham số hóa `is_refusal_or_meta_response(text, min_chars=12000)` & Khôi phục tức thời `PART_1..7.txt` ([`engine/mafia_chatgpt_pipeline.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/mafia_chatgpt_pipeline.py)):**
+   - Truyền `min_chars=500` cho `AI-CONTINUATION-HANDLER`, `min_chars=2800` cho `AI-SINGLE-PART-WRITER` và `min_chars=6500` cho `Stage A`, đảm bảo 100% các Part viết lẻ (`10.500` ký tự) và đoạn viết nối (`3.000` ký tự) đều được chấp nhận và ghép nối mượt mà.
+   - Mở rộng thu hoạch lịch sử `turns[1:20]` trong `send_or_harvest_turn` cho toàn bộ các bước của Bàn #3 (`DESK_3_WRITER`) và tự động nạp `checkpoints/PART_{N}.txt` từ ổ cứng, giúp 10 dự án `#9-HOME-04_11`..`#18-HOME-04_11` khi bấm **Chạy Tiếp Hàng Đợi** sẽ thu hoạch lại ngay lập tức các Part đã viết sẵn trong đoạn chat `/c/6aea...` mà không phải viết lại từ đầu.
+2. **Mở rộng `STANDALONE_PART_HEADING_RE` & Xuất sớm `FULL_SCRIPT.txt` + `TONG HOP/{TenKichBan}_KB.txt` ngay khi xong Bước 3:**
+   - Hỗ trợ nhận diện mọi biến thể tiêu đề Part (`[PART 3 — ...]`, `**[PART 4: ...]**`, `### PART 5 - ...`).
+   - Ngay khi hoàn tất Bước 3 (`DESK_3_WRITER`), hệ thống lập tức xuất bản kịch bản sạch TTS ra `FULL_SCRIPT.txt` và `TONG HOP/{TenKichBan}_KB.txt` (sau đó tiếp tục cập nhật bản hoàn thiện hơn sau Bước 4 Kiểm định & Bước 6 Chuẩn hóa TTS trước khi đẩy sang Bàn #7 tạo Voice + Video).
+3. **Chuẩn hóa điểm số `_normalize_score_100()` (`197đ -> 97đ`, `196đ -> 96đ`) & Tự động thử lại từ Checkpoint (`Auto-Resume Checkpoint`):**
+   - Chuẩn hóa điểm tiêu đề trong cả `parse_winner_title_and_score()`, khi đọc `STATE.json` và trên `mafia_dashboard_server.py`.
+   - Bổ sung cơ chế tự động thử lại từ Checkpoint (`2 lần`) trong `run_single_project_pipeline` nếu gặp lỗi mạng tạm thời.
+

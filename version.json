@@ -1,12 +1,13 @@
 {
-  "version": "V1.0.1",
-  "build_number": 115,
-  "released_at": "2026-11-04 11:59:44",
+  "version": "V1.0.2",
+  "build_number": 116,
+  "released_at": "2026-11-04 19:04:11",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.2 (Build #116) - 2026-11-04 19:04:11] V1.0.2 (Build #116): Sửa triệt để lỗi kênh Homeless V12 / Mexico dừng ở DESK_3_WRITER không xuất kịch bản _KB.txt, tự động thu hoạch các Part đã viết trong đoạn chat /c/6aea..., xuất sớm _KB.txt ngay khi xong Bước 3 và chuẩn hóa điểm Title 197đ -> 97đ.",
     "[V1.0.1 (Build #115) - 2026-11-04 11:59:44] Sửa triệt để lỗi 'The messages you submitted were too long' và 'Could not load this ChatGPT conversation' trên ChatGPT Web; cân bằng ngân sách Prompt <= 82k-84k ký tự bảo toàn 100% kịch bản truyện; tích hợp Auto-Heal tự động mở hội thoại sạch & gửi lại lệnh tức thì.",
     "Phiên bản V1.0.0 (Build #114): Sửa triệt để 100% lỗi 'The messages you submitted were too long, please edit them and resubmit.' trên ChatGPT Web: (1) Loại bỏ đính kèm trùng lặp 02_STORY_OUTLINE.md trong _build_checkpoint_context_preamble khi Prompt đã có sẵn Giàn ý/Kịch bản; (2) Khóa cứng ngân sách ký tự <= 82.000–84.000 ký tự/tin nhắn ở Bước 2, Bước 3, Bước 4A (Vòng 1..6), Bước 4B và Bước 5 cho cả 15 Key mà vẫn BẢO TOÀN 100% văn bản kịch bản truyện (CURRENT REVISION BASELINE / CURRENT WORKING SCRIPT); (3) Xóa sạch triệt để ô .ProseMirror và bỏ dán trùng headLine trước khi dán Prompt để không bao giờ nhân đôi văn bản khi cửa sổ Chrome chạy ngầm; (4) Tích hợp Auto-Heal tự động phát hiện 'The messages you submitted were too long', tự động nén gọn khối Reference phụ trợ và gửi lại ngay lập tức trên hội thoại sạch."
   ],
-  "release_date": "2026-11-04 11:59:44"
+  "release_date": "2026-11-04 19:04:11"
 }

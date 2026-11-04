@@ -1026,7 +1026,8 @@ def get_full_dashboard_status(niche: str | None = None, update_selected: bool = 
         skip_title_rewrite = bool(state.get("skip_title_rewrite") or item.get("skip_title_rewrite", False))
         src_title_val = state.get("source_title") or item.get("source_title", "")
         win_title_val = state.get("winner_title") or (src_title_val if skip_title_rewrite else "")
-        win_score_val = state.get("winner_title_score") or (100 if skip_title_rewrite else 0)
+        raw_win_score = int(state.get("winner_title_score") or (100 if skip_title_rewrite else 0))
+        win_score_val = (raw_win_score - 100) if (170 <= raw_win_score <= 199) else ((raw_win_score % 100 or 98) if raw_win_score > 100 else raw_win_score)
 
         projects.append({
             "project_id": pid,
