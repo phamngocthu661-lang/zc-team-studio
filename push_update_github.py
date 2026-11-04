@@ -143,6 +143,17 @@ def main():
                     if os.path.isfile(sf):
                         os.makedirs(os.path.dirname(df), exist_ok=True)
                         shutil.copy2(sf, df)
+                for rel_f in (
+                    os.path.join("assets", "script_studio_dashboard.html"),
+                    os.path.join("src", "renderer", "index.html"),
+                    os.path.join("src", "renderer", "app.js"),
+                    os.path.join("src", "renderer", "styles.css"),
+                ):
+                    sf = os.path.join(ROOT_DIR, rel_f)
+                    df = os.path.join(dst_base, rel_f)
+                    if os.path.isfile(sf):
+                        os.makedirs(os.path.dirname(df), exist_ok=True)
+                        shutil.copy2(sf, df)
             except Exception as e:
                 print(f"[WARN] Đồng bộ sang {dst_base}: {e}")
 

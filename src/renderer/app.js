@@ -316,7 +316,24 @@ async function subtitlePreviewSample(prefix,renderConfig){const fallback=templat
 async function renderSubtitleBackgroundPreview(root,prefix){if(!root)return;root.innerHTML='';try{const single=prefix==='single',mode=$(single?'singleBackgroundMode':'backgroundMode')?.value;let result=null;if(single&&mode==='SINGLE_STOCK'&&$('singleStockFile')?.value)result=await api.mediaPreview($('singleStockFile').value,{timeSeconds:.4,width:960});else if(mode==='MANUAL_MEDIA'){const p=$(single?'singleManualMedia':'manualMediaPath')?.value;if(p)result=await api.mediaPreview(p,{timeSeconds:.4,width:960});}else if(['STOCK_VIDEO','IMAGE_SEQUENCE'].includes(mode)){const folder=$(single?'singleMediaFolder':'mediaFolder')?.value;if(folder)result=await api.mediaFolderPreview?.(folder,mode==='IMAGE_SEQUENCE'?'IMAGE':'STOCK');}if(result?.previewPath){root.innerHTML=`<img src="${fileUrl(result.previewPath)}" alt="">`;}}catch{}}
 async function openSubtitlePreview(prefix){const cap=prefix==='single'?'Single':'Batch',label=prefix==='single'?'một video':'batch';state.activeRenderMode=prefix;const width=Math.max(1,Number($(`${prefix}Width`)?.value||1920)),height=Math.max(1,Number($(`${prefix}Height`)?.value||1080));let sub=renderSubtitleOverride(prefix),sample=await subtitlePreviewSample(prefix,{width,height,subtitle:subtitlePreviewOnly(sub)}),cfg=subtitleRenderBox(sub,width,height);showModal(`Preview subtitle ${label}`,`<div class="subtitle-preview-wrap"><div id="${prefix}SubtitlePreviewStage" class="subtitle-preview-stage green-template-stage" style="aspect-ratio:${width}/${height}"><div id="${prefix}SubtitleBackground" class="subtitle-preview-background"></div><div id="${prefix}SubtitleTemplateLayers" class="green-template-layers"></div><div id="${prefix}SubtitlePreviewBox" class="subtitle-preview-box"><div id="${prefix}SubtitlePreviewText" class="subtitle-preview-text">${htmlEscape(sample)}</div><span class="green-resize nw" data-resize="nw"></span><span class="green-resize ne" data-resize="ne"></span><span class="green-resize sw" data-resize="sw"></span><span class="green-resize se" data-resize="se"></span></div></div><div class="form four-col compact"><label>X<input id="subPreviewX" type="number"></label><label>Y<input id="subPreviewY" type="number"></label><label>Width<input id="subPreviewW" type="number"></label><label>Height<input id="subPreviewH" type="number"></label><label>Size sub<input id="subPreviewSize" type="number" min="8"></label><label>Màu sub<input id="subPreviewColor" type="color"></label><label>Màu viền<input id="subPreviewOutlineColor" type="color"></label></div><div class="actions"><button id="subPreviewCenter">Căn giữa</button><button id="subPreviewBottom">Căn dưới bottom</button><button id="subPreviewApply" class="primary">Áp dụng</button></div><div id="subPreviewInfo" class="source-preview-info"></div></div>`);document.querySelector('.modal-card')?.classList.add('subtitle-preview-modal');const stage=$(`${prefix}SubtitlePreviewStage`),box=$(`${prefix}SubtitlePreviewBox`),text=$(`${prefix}SubtitlePreviewText`),info=$('subPreviewInfo');await renderSubtitleBackgroundPreview($(`${prefix}SubtitleBackground`),prefix);const template=await activeGreenTemplate();await renderGreenTemplatePreview($(`${prefix}SubtitleTemplateLayers`),template,{width,height});$(`${prefix}SubtitleTemplateLayers`)?.querySelectorAll('.green-subtitle-demo').forEach(el=>el.remove());let raf=0,refreshTimer=0;function sampleSub(){return{...subtitlePreviewOnly(sub),maxWidthPercent:Math.max(MIN_SUBTITLE_BOX_WIDTH_PERCENT,Math.min(100,Math.round(cfg.width/width*1000)/10)),boxWidthPercent:Math.max(MIN_SUBTITLE_BOX_WIDTH_PERCENT,Math.min(100,Math.round(cfg.width/width*1000)/10)),boxHeightPercent:Math.max(1,Math.min(60,Math.round(cfg.height/height*1000)/10))};}async function refreshText(){const next=await subtitlePreviewSample(prefix,{width,height,subtitle:sampleSub()});sample=next;text.textContent=sample;cfg=clampCfg(cfg);}function scheduleTextRefresh(){clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>refreshText().catch(()=>{}),120);}function clampCfg(next){const minW=Math.round(width*MIN_SUBTITLE_BOX_WIDTH_PERCENT/100),minH=Math.max(24,Math.round(height*0.08));const w=Math.max(minW,Math.min(width,Math.round(next.width)));const h=Math.max(minH,Math.min(height,Math.round(next.height)));return{x:Math.max(0,Math.min(width-w,Math.round(next.x))),y:Math.max(0,Math.min(height-h,Math.round(next.y))),width:w,height:h};}function syncInputs(){if($('subPreviewX'))$('subPreviewX').value=cfg.x;if($('subPreviewY'))$('subPreviewY').value=cfg.y;if($('subPreviewW'))$('subPreviewW').value=cfg.width;if($('subPreviewH'))$('subPreviewH').value=cfg.height;if($('subPreviewSize'))$('subPreviewSize').value=Math.round(Number(sub.fontSize||32));if($('subPreviewColor'))$('subPreviewColor').value=sub.color||'#FFFFFF';if($('subPreviewOutlineColor'))$('subPreviewOutlineColor').value=sub.outlineColor||'#000000';const bottom=Math.max(0,height-cfg.y-cfg.height),maxWidthPercent=Math.round(cfg.width/width*1000)/10;info.textContent=`Canvas ${width}x${height} · Font ${sub.fontFamily} · Màu ${sub.color||'#FFFFFF'} · Màu viền ${sub.outlineColor||'#000000'} · Size input ${Math.round(Number(sub.fontSize||32))} · Preview size ${subtitleExportFontSize(sub)} · Bottom ${bottom} · Width ${maxWidthPercent}% · Outline ${sub.outlineWidth}`;}function applyBox(){const rect=stage.getBoundingClientRect(),scale=(rect.width||width)/width,renderScale=Number(sub.renderScale??1),fontPx=Math.max(8,subtitleExportFontSize(sub)*scale),outline=Math.max(0,Number(sub.outlineWidth??1)*renderScale*scale);box.style.left=`${cfg.x/width*100}%`;box.style.top=`${cfg.y/height*100}%`;box.style.width=`${cfg.width/width*100}%`;box.style.height=`${cfg.height/height*100}%`;text.style.fontFamily=sub.fontFamily||'Arial';text.style.fontWeight=String(Number(sub.fontWeight|| (sub.bold===true?700:400)));text.style.letterSpacing=Number.isFinite(Number(sub.letterSpacingEm))?`${Number(sub.letterSpacingEm)}em`:Number.isFinite(Number(sub.letterSpacingPx))?`${Number(sub.letterSpacingPx)}px`:'0';text.style.fontStyle=sub.italic===true?'italic':'normal';text.style.lineHeight=String(subtitlePreviewLineHeight(sub));text.style.fontSize=`${fontPx}px`;text.style.color=sub.color||'#FFFFFF';text.style.textShadow=subtitleOutlineShadow(outline,sub.outlineColor);syncInputs();}function scheduleBox(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;applyBox();});}document.querySelectorAll('#modalBody input').forEach(el=>el.addEventListener('input',()=>{if(el.id==='subPreviewSize'){sub={...sub,fontSize:Number(el.value||32)};cfg=clampCfg(cfg);applyBox();scheduleTextRefresh();return;}if(el.id==='subPreviewColor'){sub={...sub,color:el.value||'#FFFFFF'};applyBox();return;}if(el.id==='subPreviewOutlineColor'){sub={...sub,outlineColor:el.value||'#000000'};applyBox();return;}cfg=clampCfg({x:Number($('subPreviewX').value||0),y:Number($('subPreviewY').value||0),width:Number($('subPreviewW').value||1),height:Number($('subPreviewH').value||1)});applyBox();if(['subPreviewW','subPreviewH'].includes(el.id))scheduleTextRefresh();}));box.addEventListener('pointerdown',(ev)=>{if(ev.target.closest('.green-resize'))return;ev.preventDefault();const rect=stage.getBoundingClientRect(),start={clientX:ev.clientX,clientY:ev.clientY,x:cfg.x,y:cfg.y};box.setPointerCapture(ev.pointerId);const move=(m)=>{cfg=clampCfg({...cfg,x:start.x+(m.clientX-start.clientX)/rect.width*width,y:start.y+(m.clientY-start.clientY)/rect.height*height});scheduleBox();};const up=()=>{box.removeEventListener('pointermove',move);box.removeEventListener('pointerup',up);box.removeEventListener('pointercancel',up);};box.addEventListener('pointermove',move);box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);});box.querySelectorAll('.green-resize').forEach(handle=>handle.addEventListener('pointerdown',(ev)=>{ev.preventDefault();ev.stopPropagation();const direction=handle.dataset.resize,rect=stage.getBoundingClientRect(),start={clientX:ev.clientX,clientY:ev.clientY,x:cfg.x,y:cfg.y,w:cfg.width,h:cfg.height};handle.setPointerCapture(ev.pointerId);const move=(m)=>{let dx=(m.clientX-start.clientX)/rect.width*width,dy=(m.clientY-start.clientY)/rect.height*height,x=start.x,y=start.y,w=start.w,h=start.h;if(direction.includes('e'))w=start.w+dx;if(direction.includes('s'))h=start.h+dy;if(direction.includes('w')){w=start.w-dx;x=start.x+dx;}if(direction.includes('n')){h=start.h-dy;y=start.y+dy;}cfg=clampCfg({x,y,width:w,height:h});scheduleBox();scheduleTextRefresh();};const up=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);};handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);}));$('subPreviewCenter').onclick=()=>{cfg=clampCfg({...cfg,x:(width-cfg.width)/2});applyBox();};$('subPreviewBottom').onclick=()=>{cfg=clampCfg({...cfg,y:height-cfg.height-Number($(`${prefix}SubtitleMargin`)?.value||20)});applyBox();};$('subPreviewApply').onclick=()=>{const bottom=Math.max(0,Math.round(height-cfg.y-cfg.height)),maxWidthPercent=Math.max(MIN_SUBTITLE_BOX_WIDTH_PERCENT,Math.min(100,Math.round(cfg.width/width*1000)/10)),saved={positionMode:'absolute',fontSize:Math.max(8,Math.round(Number(sub.fontSize||32))),color:sub.color||'#FFFFFF',outlineColor:sub.outlineColor||'#000000',maxWidthPercent,boxXPercent:Math.round(cfg.x/width*1000)/10,boxYPercent:Math.round(cfg.y/height*1000)/10,boxWidthPercent:maxWidthPercent,boxHeightPercent:Math.round(cfg.height/height*1000)/10};if($(`${prefix}SubtitleSize`))$(`${prefix}SubtitleSize`).value=saved.fontSize;if($(`${prefix}SubtitleMargin`))$(`${prefix}SubtitleMargin`).value=bottom;saveSubtitlePreview(prefix,saved);closeModal();toast(`Đã áp dụng subtitle cho ${label}.`);};
 }
-function activePage(name){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`));document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.page===name));if(name==='dashboard')loadDashboard();if(name==='queue')loadQueue();if(name==='templates')renderEditor();if(name==='resources')loadProjectAssets().catch(e=>toast(e.message,true));if(name==='story-video'){renderStoryRows();fillSelects();}if(name==='voice-studio'){loadVoiceStudioPage();}if(name==='script-studio'){loadScriptStudioPage();}}
+function activePage(name){
+  if(name==='batch'){
+    activePage('script-studio');
+    if(typeof window.switchWorkspaceSubTab==='function'){
+      window.switchWorkspaceSubTab('render');
+    }
+    return;
+  }
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`));
+  document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
+  if(name==='dashboard')loadDashboard();
+  if(name==='queue')loadQueue();
+  if(name==='templates')renderEditor();
+  if(name==='resources')loadProjectAssets().catch(e=>toast(e.message,true));
+  if(name==='story-video'){renderStoryRows();fillSelects();}
+  if(name==='voice-studio'){loadVoiceStudioPage();}
+  if(name==='script-studio'){loadScriptStudioPage();}
+}
 function defaultTemplate(){return{name:'New Template',canvas:{width:1920,height:1080,fps:24},backgroundMode:'STOCK_VIDEO',subtitle:{subtitleEffect:'none',karaokeBoxColor:'#7C00FF',stylePreset:'simple',renderer:'canvas',karaoke:false,fontFamily:'Arial',fontWeight:400,fontSize:32,bottomMargin:20,outlineWidth:0,outlineConfigured:true,color:'#FFFFFF',outlineColor:'#000000',maxWidthPercent:96,maxLines:4,lineHeight:1.2,letterSpacingEm:0,bold:false,uppercase:false,italic:false,shadow:0,renderScale:1,assScale:1,boxHeightPercent:8,positionMode:'absolute'},transition:{minDurationMs:600,maxDurationMs:900,avoidRepeatCount:2,items:TRANSITIONS.map(x=>({...x,enabled:x.recommended!==false}))},imageSequence:{durationMs:5000,allowFlip:false},layers:[]};}
 function newLayer(type){const i=(state.editor?.layers?.length||0)+1;const name=type==='VOICE_IMAGE'?`Ảnh theo voice ${i}`:`${type} ${i}`;return{id:crypto.randomUUID(),type,name,zIndex:i,sourceReference:'',text:type==='TEXT'?'Text mới':'',visible:true,locked:false,loop:['VIDEO','GREENSCREEN_VIDEO','OVERLAY_VIDEO'].includes(type),startMs:0,endMs:null,transform:{x:80+i*10,y:70+i*10,width:type==='TEXT'?500:320,height:type==='TEXT'?100:180,rotation:0,opacity:.9},style:{fontSize:52,color:'#FFFFFF',outlineColor:'#000000',outlineWidth:2,blendMode:'normal'},timing:{},effect:{blendMode:type.startsWith('OVERLAY')?'screen':'normal',similarity:.24,softness:.06,despillMix:.45,despillExpand:.02}};}
 
@@ -3021,10 +3038,22 @@ function renderScriptBridgeState(st) {
   const items = Array.isArray(st.queue) ? st.queue : [];
 
   if (queueBox && queueList) {
+    queueBox.style.display = 'block';
+    if ($('zcBadgeSubTab_render')) {
+      const activeCount0 = items.filter(x => ['RENDERING', 'WAITING_GPU', 'WAITING_BATCH'].includes(x.status)).length;
+      const doneCount0 = items.filter(x => x.status === 'COMPLETED').length;
+      if (activeCount0 > 0) {
+        $('zcBadgeSubTab_render').textContent = `🟢 ${activeCount0} đang render · ${doneCount0}/${items.length} MP4`;
+      } else if (items.length > 0) {
+        $('zcBadgeSubTab_render').textContent = `${doneCount0}/${items.length} MP4`;
+      }
+    }
     if (!items.length) {
-      queueBox.style.display = 'none';
+      if (queueTitle) {
+        queueTitle.textContent = '🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice (.wav), Phụ Đề (.srt) & Render Video GPU (.mp4)';
+      }
+      queueList.innerHTML = `<div style="padding:10px 12px;background:#0d1320;border:1px dashed #334155;border-radius:6px;color:#94a3b8;font-size:12px;">⏳ Hàng đợi Bàn #7 đang rảnh. Khi kịch bản ở Tab 1 viết xong (hoặc khi bạn bấm <strong>"🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render"</strong>), tiến độ tạo Voice &amp; Render Video sẽ hiển thị trực tiếp tại đây.</div>`;
     } else {
-      queueBox.style.display = 'block';
       const activeCount = items.filter(x => ['RENDERING', 'WAITING_GPU', 'WAITING_BATCH'].includes(x.status)).length;
       const doneCount = items.filter(x => x.status === 'COMPLETED').length;
       if (queueTitle) {
@@ -3518,6 +3547,7 @@ function setupScriptBridgeEvents() {
     $('btnLockConfigForScriptStudio').onclick = async () => {
       await syncBatchConfigToBridge({ silent: false });
       activePage('script-studio');
+      window.switchWorkspaceSubTab('scripts');
     };
   }
 
@@ -3545,8 +3575,153 @@ function setupScriptBridgeEvents() {
     };
   }
 
+
+window._activeWorkspaceSubTab = 'scripts';
+window._activeWorkspaceLogMode = 'SPLIT';
+
+window.switchWorkspaceSubTab = function(subtab, { notifyIframe = true } = {}) {
+  const valid = ['scripts', 'render', 'logs', 'agents'];
+  const target = valid.includes(subtab) ? subtab : 'scripts';
+  window._activeWorkspaceSubTab = target;
+
+  for (const t of valid) {
+    const btn = $('zcBtnSubTab_' + t);
+    if (btn) btn.classList.toggle('active', t === target);
+  }
+
+  const iframeShell = $('zcStudioIframeShell');
+  const renderPane = $('zcRenderSubTabContainer');
+  const logToolbar = $('zcLogModeToolbar');
+  const nvencLogBox = $('zcNvencLogContainer');
+  const hintEl = $('zcSubTabHintText');
+
+  const hints = {
+    scripts: '✍️ Đang ở Tab 1: Soạn & Quản lý Danh sách Kịch bản (Đã tách riêng Render & Log sang Tab 2, 3)',
+    render: '🎬 Đang ở Tab 2: Quan sát Tiến độ Tạo Voice (.wav), Phụ đề (.srt), Render Video GPU (.mp4) & Cấu hình Batch',
+    logs: '📡 Đang ở Tab 3: Nhật ký Log Hệ thống riêng biệt (Theo dõi Log Viết Kịch Bản AI & Log Render Video GPU)',
+    agents: '🤖 Đang ở Tab 4: Quản lý 3 Tài khoản ChatGPT Web & Sơ đồ 9 Bàn Nhân viên Agent AI'
+  };
+  if (hintEl) hintEl.textContent = hints[target] || '';
+
+  if (target === 'render') {
+    if (iframeShell) iframeShell.style.display = 'none';
+    if (logToolbar) logToolbar.style.display = 'none';
+    if (nvencLogBox) nvencLogBox.style.display = 'none';
+    if (renderPane) renderPane.style.display = 'block';
+  } else if (target === 'logs') {
+    if (renderPane) renderPane.style.display = 'none';
+    if (logToolbar) logToolbar.style.display = 'flex';
+    window.setWorkspaceLogViewMode(window._activeWorkspaceLogMode || 'SPLIT');
+    if (notifyIframe) {
+      try {
+        $('scriptStudioIframe')?.contentWindow?.postMessage({ type: 'ZC_SWITCH_STUDIO_SUBTAB', subtab: 'logs' }, '*');
+      } catch {}
+    }
+  } else {
+    // 'scripts' or 'agents'
+    if (renderPane) renderPane.style.display = 'none';
+    if (logToolbar) logToolbar.style.display = 'none';
+    if (nvencLogBox) nvencLogBox.style.display = 'none';
+    if (iframeShell) {
+      iframeShell.style.display = 'block';
+      iframeShell.style.height = 'calc(100vh - 225px)';
+      iframeShell.style.minHeight = '650px';
+    }
+    if (notifyIframe) {
+      try {
+        $('scriptStudioIframe')?.contentWindow?.postMessage({ type: 'ZC_SWITCH_STUDIO_SUBTAB', subtab: target }, '*');
+      } catch {}
+    }
+  }
+};
+
+window.setWorkspaceLogViewMode = function(mode) {
+  const valid = ['SPLIT', 'SCRIPT', 'RENDER'];
+  const m = valid.includes(mode) ? mode : 'SPLIT';
+  window._activeWorkspaceLogMode = m;
+
+  for (const k of valid) {
+    const btn = $('zcBtnLogMode_' + k);
+    if (btn) btn.classList.toggle('active', k === m);
+  }
+
+  if (window._activeWorkspaceSubTab !== 'logs') return;
+
+  const iframeShell = $('zcStudioIframeShell');
+  const nvencLogBox = $('zcNvencLogContainer');
+  const renderPre = $('renderLog');
+
+  if (m === 'SPLIT') {
+    if (iframeShell) {
+      iframeShell.style.display = 'block';
+      iframeShell.style.height = '45vh';
+      iframeShell.style.minHeight = '320px';
+    }
+    if (nvencLogBox) {
+      nvencLogBox.style.display = 'block';
+    }
+    if (renderPre) {
+      renderPre.style.height = '28vh';
+      renderPre.style.maxHeight = '320px';
+    }
+  } else if (m === 'SCRIPT') {
+    if (iframeShell) {
+      iframeShell.style.display = 'block';
+      iframeShell.style.height = 'calc(100vh - 275px)';
+      iframeShell.style.minHeight = '560px';
+    }
+    if (nvencLogBox) nvencLogBox.style.display = 'none';
+  } else if (m === 'RENDER') {
+    if (iframeShell) iframeShell.style.display = 'none';
+    if (nvencLogBox) nvencLogBox.style.display = 'block';
+    if (renderPre) {
+      renderPre.style.height = 'calc(100vh - 340px)';
+      renderPre.style.maxHeight = 'none';
+    }
+  }
+};
+
+window.copyNvencRenderLog = function() {
+  const txt = $('renderLog')?.textContent || '';
+  navigator.clipboard.writeText(txt);
+  toast('📋 Đã copy Nhật ký Log Render GPU vào Clipboard!');
+};
+
+window.clearNvencRenderLog = function() {
+  if ($('renderLog')) {
+    $('renderLog').textContent = '';
+    toast('🧹 Đã xóa nội dung Log Render GPU.');
+  }
+};
+
+window.triggerAllReadyScriptsToBridge = function() {
+  try {
+    $('scriptStudioIframe')?.contentWindow?.postMessage({ type: 'ZC_TRIGGER_ALL_READY_TO_VIDEO' }, '*');
+    toast('🚀 Đang kiểm tra và đẩy toàn bộ kịch bản đã có file _KB.txt sang Bàn #7 để Tạo Voice & Render Video...');
+  } catch (e) {
+    toast('Lỗi gửi lệnh sang Script Studio: ' + e.message, true);
+  }
+};
+
   window.addEventListener('message', async (ev) => {
-    if (ev?.data?.type === 'ZC_SET_BRIDGE_MODE' && ev.data.mode) {
+    if (ev?.data?.type === 'ZC_STUDIO_SUBTAB_CHANGED' && ev.data.subtab) {
+      window.switchWorkspaceSubTab(ev.data.subtab, { notifyIframe: false });
+    } else if (ev?.data?.type === 'ZC_OPEN_FULL_BATCH_RENDER_SUBTAB') {
+      window.switchWorkspaceSubTab('render');
+    } else if (ev?.data?.type === 'ZC_STUDIO_TELEMETRY_SYNC') {
+      if ($('zcBadgeSubTab_scripts') && ev.data.scriptsCount != null) {
+        $('zcBadgeSubTab_scripts').textContent = String(ev.data.scriptsCount);
+      }
+      if ($('zcBadgeSubTab_logs') && ev.data.logBadge) {
+        $('zcBadgeSubTab_logs').textContent = String(ev.data.logBadge);
+      }
+      if ($('zcBadgeSubTab_agents') && ev.data.agentsBadge) {
+        $('zcBadgeSubTab_agents').textContent = String(ev.data.agentsBadge);
+      }
+      if ($('zcBadgeSubTab_render') && ev.data.renderBadge && !(_lastBridgeState?.queue?.length)) {
+        $('zcBadgeSubTab_render').textContent = String(ev.data.renderBadge);
+      }
+    } else if (ev?.data?.type === 'ZC_SET_BRIDGE_MODE' && ev.data.mode) {
       if ($('bridgeModeSelect')) {
         $('bridgeModeSelect').value = ev.data.mode;
       }
@@ -3668,8 +3843,8 @@ function setupScriptBridgeEvents() {
 
   setTimeout(() => {
     syncBatchConfigToBridge({ silent: true });
-    api.scriptBridge?.status?.().then((st) => renderScriptBridgeState(st)).catch(() => {});
-  }, 900);
+    loadScriptStudioPage().catch(() => {});
+  }, 600);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

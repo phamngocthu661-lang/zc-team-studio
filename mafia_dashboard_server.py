@@ -1775,27 +1775,108 @@ HTML_PAGE = r"""<!DOCTYPE html>
     background: #131820;
     color: #e6edf3;
     border: 1px solid #262f3d;
-    border-radius: 6px;
-    padding: 6px 11px;
-    font-size: 11.8px;
-    font-weight: 600;
+    border-radius: 7px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     transition: all 0.15s;
   }
-  .drawer-toggle-btn:hover { border-color: var(--gold); color: #fff; }
+  .drawer-toggle-btn:hover { border-color: var(--gold); color: #fff; background: #19212d; }
   .drawer-toggle-btn.active {
-    background: rgba(0,255,136,0.14);
+    background: rgba(0,255,136,0.16);
     border-color: var(--gold);
     color: var(--gold);
+    box-shadow: 0 0 12px rgba(0,255,136,0.18);
+  }
+  .studio-subtabs-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    background: #0d121a;
+    border: 1px solid #1e293b;
+    border-left: 3px solid var(--gold);
+    border-radius: 9px;
+    padding: 6px 10px;
+    margin-bottom: 10px;
+  }
+  .studio-subtabs-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .studio-subtab-btn {
+    cursor: pointer;
+    background: #131924;
+    color: #94a3b8;
+    border: 1px solid #263244;
+    border-radius: 7px;
+    padding: 7px 13px;
+    font-size: 12.2px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .studio-subtab-btn:hover {
+    border-color: #38bdf8;
+    color: #f8fafc;
+    background: #172030;
+  }
+  .studio-subtab-btn.active {
+    background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(16,185,129,0.12));
+    border-color: var(--gold);
+    color: #ffffff;
+    box-shadow: 0 0 14px rgba(0,255,136,0.2), inset 0 0 0 1px rgba(0,255,136,0.25);
+  }
+  .studio-subtab-pane {
+    display: none;
+    animation: fadeInDrawer 0.14s ease;
+  }
+  .studio-subtab-pane.active {
+    display: block;
+  }
+  body.embedded-electron .studio-subtab-btn {
+    display: none !important;
+  }
+  .render-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .render-stat-card {
+    background: #0b0f17;
+    border: 1px solid #1e293b;
+    border-left: 3px solid var(--gold);
+    border-radius: 8px;
+    padding: 9px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .render-stat-card span {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .render-stat-card b {
+    font-size: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #f8fafc;
   }
   .top-drawer {
-    display: none;
+    display: block;
     margin-bottom: 10px;
     animation: fadeInDrawer 0.15s ease;
   }
-  .top-drawer.open { display: block; }
   @keyframes fadeInDrawer {
     from { opacity: 0; transform: translateY(-3px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1817,9 +1898,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .mini-log-ticker:hover { border-color: var(--gold); }
 </style>
 </head>
-<body style="padding: 10px 14px;">
+<body style="padding: 8px 12px;">
 
-<!-- THANH CÔNG CỤ TRÊN CÙNG GỌN 1 DÒNG (ZC TEAM LOGO + CHỌN KEY DẠNG SELECTION OPTION + TRẠNG THÁI) -->
+<!-- THANH CÔNG CỤ TRÊN CÙNG GỌN 1 DÒNG + THANH 4 TAB NHỎ TÁCH BIỆT RÕ RÀNG -->
 <div class="compact-top-navbar">
   <div class="nav-left">
     <div class="zc-brand-badge" title="ZC TEAM · Cyber Terminal Studio Matrix">
@@ -1861,14 +1942,17 @@ HTML_PAGE = r"""<!DOCTYPE html>
   </div>
 
   <div class="nav-right">
-    <button id="btnDrawerAccounts" class="drawer-toggle-btn active" onclick="toggleTopDrawer('Accounts')" title="Bấm để mở/đóng bảng Quản lý 3 Tài khoản ChatGPT (Acc #1, #2, #3) & Môi trường">
-      🔑 Đăng Nhập 3 Tài Khoản ChatGPT <span id="navAccSummary" class="badge" style="padding:1px 6px; font-size:10.5px; color:#00ff88; border-color:rgba(0,255,136,0.4);">Acc #1..#3</span> <span id="chevAccounts">▴</span>
+    <button id="btnSubTab_scripts" class="studio-subtab-btn active" onclick="switchStudioSubTab('scripts')" title="Tab 1: Giao việc, nhập Tiêu đề và quản lý Danh sách Kịch bản (Gọn gàng, dễ quan sát)">
+      ✍️ 1. Viết Kịch Bản <span id="subtabCountScripts" class="badge" style="padding:1px 6px; font-size:10.5px; color:#00ff88; border-color:rgba(0,255,136,0.4);">0</span>
     </button>
-    <button id="btnDrawerMonitor" class="drawer-toggle-btn active" onclick="toggleTopDrawer('Monitor')" title="Bấm để mở/đóng Sơ đồ 9 Bàn Nhân Viên Agent AI & Các Khe Luồng Song Song">
-      🤖 9 Agent AI &amp; Luồng <span id="navMonitorSummary" class="badge" style="padding:1px 6px; font-size:10.5px; color:#00ff88; border-color:rgba(0,255,136,0.4);">9 Agent</span> <span id="chevMonitor">▴</span>
+    <button id="btnSubTab_render" class="studio-subtab-btn" onclick="switchStudioSubTab('render')" title="Tab 2: Quan sát tiến độ Tạo Voice (.wav), Phụ đề (.srt) & Render Video GPU (.mp4) + Cấu hình Batch Video">
+      🎬 2. Render Video <span id="subtabCountRender" class="badge" style="padding:1px 6px; font-size:10.5px; color:#38bdf8; border-color:rgba(56,189,248,0.4);">Bàn #7</span>
     </button>
-    <button id="btnDrawerLogs" class="drawer-toggle-btn" onclick="toggleTopDrawer('Logs')" title="Bấm để mở/đóng Màn hình Nhật ký Log trực tiếp">
-      📡 Nhật ký Log <span id="chevLogs">▾</span>
+    <button id="btnSubTab_logs" class="studio-subtab-btn" onclick="switchStudioSubTab('logs')" title="Tab 3: Màn hình Nhật ký Log hệ thống riêng biệt (Có tìm kiếm, bộ lọc và xem toàn màn hình)">
+      📡 3. Nhật Ký Log <span id="subtabLogBadge" class="badge" style="padding:1px 6px; font-size:10.5px; color:#fde68a; border-color:rgba(245,185,66,0.4);">Live</span>
+    </button>
+    <button id="btnSubTab_agents" class="studio-subtab-btn" onclick="switchStudioSubTab('agents')" title="Tab 4: Đăng nhập 3 Tài khoản ChatGPT Web & Sơ đồ 9 Bàn Nhân Viên Agent AI">
+      🤖 4. 9 Agent &amp; 3 Acc <span id="navAccSummary" class="badge" style="padding:1px 6px; font-size:10.5px; color:#00ff88; border-color:rgba(0,255,136,0.4);">Acc #1..#3</span>
     </button>
     <button class="btn btn-gold btn-sm" style="padding:6px 10px; font-size:11.5px; font-weight:800;" onclick="openProjectFolder('TONG_HOP')">📂 Mở TONG HOP</button>
   </div>
@@ -1898,240 +1982,320 @@ HTML_PAGE = r"""<!DOCTYPE html>
 
 <div id="mainStudioWorkspace">
 
-<!-- NGĂN KÉO 1 (MỞ SẴN MẶC ĐỊNH): QUẢN LÝ & ĐĂNG NHẬP 3 TÀI KHOẢN CHATGPT WEB -->
-<div id="drawerAccounts" class="top-drawer open">
-  <div id="portabilityBanner" class="portability-banner" style="flex-direction:column; align-items:stretch; gap:8px; margin-bottom:0; padding:10px 14px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-      <div style="font-size:12px; color:var(--text);">
-        <b style="color:#38bdf8;">🌐 ĐĂNG NHẬP &amp; QUẢN LÝ 3 TÀI KHOẢN CHATGPT WEB (Giới hạn &le; 3 Kịch bản/Acc &amp; &le; 5 Tab/Acc):</b>
-        Kho lưu: <b id="activeStorageInfo" style="color:var(--gold);">D:\ZC_TEAM\TOOL_ZC_TEAM\PROJECTS</b>
-        <div id="envErrorDetails" style="font-size:11.5px; color:#fca5a5; margin-top:4px; font-weight:600; display:none;"></div>
-      </div>
-      <div class="env-pills">
-        <span id="agyStatusPill" class="env-pill" style="font-size:11px; padding:3px 8px;">✅ 12 Key Skills: SẴN SÀNG</span>
-        <span id="chatgptStatusPill" class="env-pill" style="font-size:11px; padding:3px 8px;">🔍 3 Acc ChatGPT...</span>
-        <button class="btn btn-green btn-sm" onclick="openChatGPTWebLogin('acc_1')">🔑 Mở Chrome Đăng Nhập Acc #1</button>
-        <button class="btn btn-dark btn-sm" onclick="setChromeVisibility(true)" style="border-color:#10b981; color:#34d399;">👁️ Hiện Chrome</button>
-        <button class="btn btn-dark btn-sm" onclick="setChromeVisibility(false)" style="border-color:#38bdf8; color:#38bdf8;">👻 Ẩn Tất Cả Chrome</button>
-        <button class="btn btn-dark btn-sm" onclick="syncNewMachine()">🔧 Đồng bộ Skill</button>
-        <button class="btn btn-dark btn-sm" onclick="toggleTopDrawer('Accounts')">✖ Thu gọn</button>
-      </div>
-    </div>
-    <div id="multiAccountsGrid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; padding-top:6px; border-top:1px solid var(--border);">
-      <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-          <b style="color:var(--gold); font-size:12.8px;">👤 Acc #1 (Port 9222)</b>
-          <span style="color:#fde68a; font-weight:700;">⚪ Bấm nút dưới để Đăng nhập</span>
-        </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
-          <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_1')">🔑 Đăng Nhập Acc #1</button>
-        </div>
-      </div>
-      <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-          <b style="color:var(--gold); font-size:12.8px;">👤 Acc #2 (Port 9223)</b>
-          <span style="color:#94a3b8;">⚪ Tùy chọn (Chạy 6 luồng)</span>
-        </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
-          <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_2')">🔑 Đăng Nhập Acc #2</button>
-        </div>
-      </div>
-      <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-          <b style="color:var(--gold); font-size:12.8px;">👤 Acc #3 (Port 9224)</b>
-          <span style="color:#94a3b8;">⚪ Tùy chọn (Chạy 9 luồng)</span>
-        </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
-          <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_3')">🔑 Đăng Nhập Acc #3</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- NGĂN KÉO 2 (MỞ SẴN MẶC ĐỊNH): SƠ ĐỒ 9 BÀN NHÂN VIÊN AGENT AI & KHE LUỒNG SONG SONG -->
-<div id="drawerMonitor" class="top-drawer open">
-  <div class="panel" style="padding:10px 14px; margin-bottom:0;">
-    <div class="section-label" style="margin-bottom:8px;">
-      <span>🤖 SƠ ĐỒ 9 BÀN NHÂN VIÊN AGENT AI (<span id="deskChannelLabel">🇲🇽 MEXICO BÀ CÔ</span>) — TỪ BÀN #0 ➔ BÀN #1.5 ➔ BÀN #7 &amp; ⚡ KHE ĐA LUỒNG</span>
-      <button class="btn btn-dark btn-sm" onclick="toggleTopDrawer('Monitor')">🔼 Thu gọn / Mở rộng Sơ đồ Agent</button>
-    </div>
-    <div id="desksContainer" class="desks-grid" style="margin-bottom:8px; gap:8px;"></div>
-    <div id="threadsContainer" class="threads-bar" style="margin-bottom:0; gap:8px;"></div>
-  </div>
-</div>
-
-<!-- KHUNG CHÍNH SỐ 1: GIAO VIỆC & ĐIỀU KHIỂN CHẠY (GỌN GÀNG, CÓ NÚT THU NHỎ Ô NHẬP) -->
-<div class="panel" style="padding:10px 14px; margin-bottom:10px;">
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      <button id="btnToggleComposer" class="btn btn-dark btn-sm" style="border-color:var(--gold); color:var(--gold); font-weight:700;" onclick="toggleComposerBody()" title="Thu gọn hoặc mở rộng khung nhập tiêu đề">
-        <span id="composerToggleLabel">🔽 Thu nhỏ ô nhập</span>
-      </button>
-      <b style="font-size:13px; color:var(--gold);">📝 GIAO VIỆC:</b>
-      <select id="nicheSelector" onchange="switchChannel(this.value)" style="font-weight:700; color:#fde68a; border-color:var(--gold); padding:5px 9px; font-size:12px;">
-        <option value="01_Nhom_Ong_Gia_Tra_Dua_My_US">🇺🇸 01_Nhom_Ong_Gia_Tra_Dua_My_US (Ông già trả đũa - Mỹ US)</option>
-        <option value="02_Nhom_Phu_Nu_Bao_Thu_My_US">🇺🇸 02_Nhom_Phu_Nu_Bao_Thu_My_US (Phụ nữ báo thù - Mỹ US)</option>
-        <option value="03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico">🇲🇽 03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico (Bà già Drama Gia đình - Mexico)</option>
-        <option value="04_Nhom_Ong_Gia_Trung_Tri_Mexico">🇲🇽 04_Nhom_Ong_Gia_Trung_Tri_Mexico (Ông già trừng trị con bất hiếu - Mexico)</option>
-        <option value="05_Nhom_Manga_Doc_Than_Japan">🇯🇵 05_Nhom_Manga_Doc_Than_Japan (Manga Đàn ông Độc thân - Nhật Bản)</option>
-        <option value="06_Huu_Tri_Viec_Lam_Japan">🇯🇵 06_Huu_Tri_Viec_Lam_Japan (Hưu trí &amp; Việc làm Kuchikomi - Nhật Bản)</option>
-        <option value="07_Dong_Que_Co_Dien_Mexico">🇲🇽 07_Dong_Que_Co_Dien_Mexico (Truyện xưa Đồng quê Cổ điển - Mexico)</option>
-        <option value="08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico">🇲🇽 08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico (Tình yêu Ngoại tình Phản bội - Mexico)</option>
-        <option value="09_Tieu_Su_Goc_Khuat_Sao_Mexico">🇲🇽 09_Tieu_Su_Goc_Khuat_Sao_Mexico (Tiểu sử Góc khuất Sao - Mexico)</option>
-        <option value="10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US">🇺🇸 10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US (Người cha da màu CEO ngầm - Mỹ US)</option>
-        <option value="11_Chuyen_Tinh_Dan_Ong_My_US">🇺🇸 11_Chuyen_Tinh_Dan_Ong_My_US (Chuyện tình Đàn ông POV - Mỹ US)</option>
-        <option value="12_Kinh_Di_Dem_Khuya_My_US">🇺🇸 12_Kinh_Di_Dem_Khuya_My_US (Kinh dị Đêm khuya - Mỹ US)</option>
-        <option value="mexico">🇲🇽 MEXICO BÀ CÔ (7 Parts, 70k–80k ký tự, es-MX + Bàn 1.5 &amp; Bàn 7 Check TTS)</option>
-        <option value="homeless">🏚️ BÊN HOMELESS V12 (7 Parts, 70k–80k ký tự)</option>
-        <option value="mafia" selected>🎩 BÊN MAFIA (5–6 Parts, 44k–48k ký tự)</option>
-      </select>
-      <select id="maxWorkers" style="padding:5px 8px; font-size:11.8px;" title="Chế độ chia tải luồng">
-        <option value="0" selected>⚡ Tự động (&le;3 KB/Acc)</option>
-        <option value="1">1 Luồng</option>
-        <option value="2">2 Luồng</option>
-        <option value="3">3 Luồng (1 Acc)</option>
-        <option value="6">6 Luồng (2 Acc)</option>
-        <option value="9">9 Luồng (3 Acc)</option>
-      </select>
-      <select id="thinkingEffort" style="padding:5px 8px; font-size:11.8px;" title="Độ sâu suy luận ChatGPT">
-        <option value="medium" selected>Effort: Medium</option>
-        <option value="high">Effort: High</option>
-        <option value="low">Effort: Low</option>
-      </select>
-      <select id="titleModeSelector" onchange="syncTitleModeSelection(this.value)" style="padding:5px 9px; font-size:11.8px; font-weight:700; color:#fde68a; border-color:var(--gold); background:#0f172a;" title="Chọn chế độ xử lý khi dán Tiêu đề: Viết lại ở Bàn #1 hoặc Dùng luôn Tiêu đề đã dán (Bỏ qua Bàn #1 ➔ Chạy thẳng Bàn #1.5)">
-        <option value="rewrite" selected>🔥 Chế độ: Viết lại Tiêu đề (Chạy từ Bàn #1)</option>
-        <option value="keep_original">🎯 Chế độ: Dùng luôn Tiêu đề đã dán — Không viết lại (Bỏ qua Bàn #1 ➔ Chạy thẳng Bàn #1.5)</option>
-      </select>
-    </div>
-
-    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-      <button class="btn btn-green btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #34d399;" onclick="openChatGPTWebLogin('acc_1')" title="Mở trình duyệt Chrome để đăng nhập tài khoản ChatGPT">🔑 Đăng Nhập ChatGPT</button>
-      <button class="btn btn-blue btn-sm" style="padding:6px 10px; font-size:11.8px; font-weight:700;" onclick="addTitlesOnly()">📥 Lưu Tiêu Đề &amp; Mã</button>
-      <button id="btnUpdateTitlesMain" class="btn btn-dark btn-sm" style="padding:6px 11px; font-size:11.8px; font-weight:800; border:1px solid #38bdf8; color:#38bdf8; background:rgba(14,165,233,0.14);" onclick="updateTitlesFromComposerNow()" title="Cập nhật lại Tiêu đề & Mã kịch bản cho danh sách hiện tại (Nếu ô nhập đang trống, bấm lần 1 để nạp danh sách Tiêu đề hiện tại lên ô nhập, sửa xong bấm lần 2 để lưu đè!)">🔄 Cập Nhật Tiêu Đề</button>
-      <button class="btn btn-gold btn-sm" style="padding:6px 12px; font-size:11.8px; font-weight:800; background:linear-gradient(135deg,#00ff88,#10b981); color:#04130b; border-color:#00ff88;" onclick="addAndRunWithAutoVideoNow()" title="Lưu Tiêu đề + Mã kịch bản, tự động viết kịch bản qua 9 Bàn AI rồi tự động Tạo Voice + Phụ đề + Render Video MP4 luôn!">🎬 Viết Kịch Bản ➔ Làm Video Luôn</button>
-      <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
-      <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
-      <button class="btn btn-red btn-sm" style="padding:6px 10px; font-size:11.8px;" onclick="stopWorker()">⏹️ Dừng</button>
-      <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #38bdf8; color:#38bdf8;" onclick="toggleTopDrawer('Logs')" title="Mở/Đóng khung Nhật ký tiến trình trực tiếp">📡 Xem Log</button>
-    </div>
-  </div>
-
-  <!-- KHUNG 2 Ô NHẬP TIÊU ĐỀ + CHỌN CHẾ ĐỘ TIÊU ĐỀ KHI DÁN (CÓ THỂ THU NHỎ BẰNG NÚT TRÊN) -->
-  <div id="composerBody" style="margin-top:8px; padding-top:8px; border-top:1px solid #1e293b;">
-    <!-- THANH CHỌN NHANH CHẾ ĐỘ TIÊU ĐỀ NGAY KHI DÁN + CHẾ ĐỘ TỰ ĐỘNG LÀM VIDEO LUÔN -->
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px; padding:7px 10px; border-radius:8px; background:rgba(15,23,42,0.85); border:1px solid #334155;">
+<!-- ======================================================================= -->
+<!-- TAB NHỎ 1 (MẶC ĐỊNH): VIẾT KỊCH BẢN & DANH SÁCH TIÊU ĐỀ (GỌN GÀNG 100%) -->
+<!-- ======================================================================= -->
+<div id="subtabPane_scripts" class="studio-subtab-pane active">
+  <!-- KHUNG CHÍNH SỐ 1: GIAO VIỆC & ĐIỀU KHIỂN CHẠY (GỌN GÀNG, CÓ NÚT THU NHỎ Ô NHẬP) -->
+  <div class="panel" style="padding:10px 14px; margin-bottom:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <span style="font-size:12px; font-weight:700; color:#f8fafc;">⚡ Chế độ Tiêu đề:</span>
-        <label id="lblModeRewrite" onclick="syncTitleModeSelection('rewrite')" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; cursor:pointer; font-size:11.8px; font-weight:700; border:1px solid var(--gold); background:rgba(245,185,66,0.18); color:#fde68a; transition:all 0.15s;">
-          <input type="radio" name="titlePasteModeRadio" id="radioModeRewrite" value="rewrite" checked onchange="syncTitleModeSelection('rewrite')" style="accent-color:#f5b942; cursor:pointer;" />
-          <span>🔥 Viết lại Tiêu đề (Bàn #1)</span>
-        </label>
-        <label id="lblModeKeepOriginal" onclick="syncTitleModeSelection('keep_original')" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; cursor:pointer; font-size:11.8px; font-weight:700; border:1px solid #334155; background:#0f172a; color:#94a3b8; transition:all 0.15s;">
-          <input type="radio" name="titlePasteModeRadio" id="radioModeKeepOriginal" value="keep_original" onchange="syncTitleModeSelection('keep_original')" style="accent-color:#10b981; cursor:pointer;" />
-          <span>🎯 Dùng luôn Tiêu đề đã dán (Chạy thẳng Bàn #1.5)</span>
-        </label>
-      </div>
-      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-        <span style="font-size:11.5px; font-weight:800; color:#00ff88;">🎬 Sau khi viết xong (Bàn #7):</span>
-        <select id="embeddedAutoVideoMode" onchange="syncEmbeddedBridgeMode(this.value)" style="padding:4px 9px; font-size:11.5px; font-weight:800; color:#00ff88; background:#06281e; border:1px solid #00ff88; border-radius:6px; cursor:pointer;">
-          <option value="STREAMING_VIDEO" selected>⚡ Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn</option>
-          <option value="BATCH_VIDEO">📦 Đợi viết xong cả lô ➔ Tạo Voice + Làm Video 1 lượt</option>
-          <option value="STREAMING_VOICE">🎙️ Viết Kịch Bản Xong ➔ Chỉ Tạo Voice (.wav)</option>
-          <option value="DISABLED">📝 Chỉ Viết Kịch Bản (.txt) — Không tự tạo Video</option>
+        <button id="btnToggleComposer" class="btn btn-dark btn-sm" style="border-color:var(--gold); color:var(--gold); font-weight:700;" onclick="toggleComposerBody()" title="Thu gọn hoặc mở rộng khung nhập tiêu đề">
+          <span id="composerToggleLabel">🔽 Thu nhỏ ô nhập</span>
+        </button>
+        <b style="font-size:13px; color:var(--gold);">📝 GIAO VIỆC:</b>
+        <select id="nicheSelector" onchange="switchChannel(this.value)" style="font-weight:700; color:#fde68a; border-color:var(--gold); padding:5px 9px; font-size:12px;">
+          <option value="01_Nhom_Ong_Gia_Tra_Dua_My_US">🇺🇸 01_Nhom_Ong_Gia_Tra_Dua_My_US (Ông già trả đũa - Mỹ US)</option>
+          <option value="02_Nhom_Phu_Nu_Bao_Thu_My_US">🇺🇸 02_Nhom_Phu_Nu_Bao_Thu_My_US (Phụ nữ báo thù - Mỹ US)</option>
+          <option value="03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico">🇲🇽 03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico (Bà già Drama Gia đình - Mexico)</option>
+          <option value="04_Nhom_Ong_Gia_Trung_Tri_Mexico">🇲🇽 04_Nhom_Ong_Gia_Trung_Tri_Mexico (Ông già trừng trị con bất hiếu - Mexico)</option>
+          <option value="05_Nhom_Manga_Doc_Than_Japan">🇯🇵 05_Nhom_Manga_Doc_Than_Japan (Manga Đàn ông Độc thân - Nhật Bản)</option>
+          <option value="06_Huu_Tri_Viec_Lam_Japan">🇯🇵 06_Huu_Tri_Viec_Lam_Japan (Hưu trí &amp; Việc làm Kuchikomi - Nhật Bản)</option>
+          <option value="07_Dong_Que_Co_Dien_Mexico">🇲🇽 07_Dong_Que_Co_Dien_Mexico (Truyện xưa Đồng quê Cổ điển - Mexico)</option>
+          <option value="08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico">🇲🇽 08_Tinh_Yeu_Ngoai_Tinh_Phan_Boi_Mexico (Tình yêu Ngoại tình Phản bội - Mexico)</option>
+          <option value="09_Tieu_Su_Goc_Khuat_Sao_Mexico">🇲🇽 09_Tieu_Su_Goc_Khuat_Sao_Mexico (Tiểu sử Góc khuất Sao - Mexico)</option>
+          <option value="10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US">🇺🇸 10_Nguoi_Cha_Da_Mau_CEO_Ngam_My_US (Người cha da màu CEO ngầm - Mỹ US)</option>
+          <option value="11_Chuyen_Tinh_Dan_Ong_My_US">🇺🇸 11_Chuyen_Tinh_Dan_Ong_My_US (Chuyện tình Đàn ông POV - Mỹ US)</option>
+          <option value="12_Kinh_Di_Dem_Khuya_My_US">🇺🇸 12_Kinh_Di_Dem_Khuya_My_US (Kinh dị Đêm khuya - Mỹ US)</option>
+          <option value="mexico">🇲🇽 MEXICO BÀ CÔ (7 Parts, 70k–80k ký tự, es-MX + Bàn 1.5 &amp; Bàn 7 Check TTS)</option>
+          <option value="homeless">🏚️ BÊN HOMELESS V12 (7 Parts, 70k–80k ký tự)</option>
+          <option value="mafia" selected>🎩 BÊN MAFIA (5–6 Parts, 44k–48k ký tự)</option>
+        </select>
+        <select id="maxWorkers" style="padding:5px 8px; font-size:11.8px;" title="Chế độ chia tải luồng">
+          <option value="0" selected>⚡ Tự động (&le;3 KB/Acc)</option>
+          <option value="1">1 Luồng</option>
+          <option value="2">2 Luồng</option>
+          <option value="3">3 Luồng (1 Acc)</option>
+          <option value="6">6 Luồng (2 Acc)</option>
+          <option value="9">9 Luồng (3 Acc)</option>
+        </select>
+        <select id="thinkingEffort" style="padding:5px 8px; font-size:11.8px;" title="Độ sâu suy luận ChatGPT">
+          <option value="medium" selected>Effort: Medium</option>
+          <option value="high">Effort: High</option>
+          <option value="low">Effort: Low</option>
+        </select>
+        <select id="titleModeSelector" onchange="syncTitleModeSelection(this.value)" style="padding:5px 9px; font-size:11.8px; font-weight:700; color:#fde68a; border-color:var(--gold); background:#0f172a;" title="Chọn chế độ xử lý khi dán Tiêu đề: Viết lại ở Bàn #1 hoặc Dùng luôn Tiêu đề đã dán (Bỏ qua Bàn #1 ➔ Chạy thẳng Bàn #1.5)">
+          <option value="rewrite" selected>🔥 Chế độ: Viết lại Tiêu đề (Chạy từ Bàn #1)</option>
+          <option value="keep_original">🎯 Chế độ: Dùng luôn Tiêu đề đã dán — Không viết lại (Bỏ qua Bàn #1 ➔ Chạy thẳng Bàn #1.5)</option>
         </select>
       </div>
-      <span id="titleModeHintBadge" style="display:none;">📌 Đang chọn: Viết lại 5 tiêu đề mới tại Bàn #1 (&ge;97đ)</span>
+
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <button class="btn btn-green btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #34d399;" onclick="openChatGPTWebLogin('acc_1')" title="Mở trình duyệt Chrome để đăng nhập tài khoản ChatGPT">🔑 Đăng Nhập ChatGPT</button>
+        <button class="btn btn-blue btn-sm" style="padding:6px 10px; font-size:11.8px; font-weight:700;" onclick="addTitlesOnly()">📥 Lưu Tiêu Đề &amp; Mã</button>
+        <button id="btnUpdateTitlesMain" class="btn btn-dark btn-sm" style="padding:6px 11px; font-size:11.8px; font-weight:800; border:1px solid #38bdf8; color:#38bdf8; background:rgba(14,165,233,0.14);" onclick="updateTitlesFromComposerNow()" title="Cập nhật lại Tiêu đề & Mã kịch bản cho danh sách hiện tại (Nếu ô nhập đang trống, bấm lần 1 để nạp danh sách Tiêu đề hiện tại lên ô nhập, sửa xong bấm lần 2 để lưu đè!)">🔄 Cập Nhật Tiêu Đề</button>
+        <button class="btn btn-gold btn-sm" style="padding:6px 12px; font-size:11.8px; font-weight:800; background:linear-gradient(135deg,#00ff88,#10b981); color:#04130b; border-color:#00ff88;" onclick="addAndRunWithAutoVideoNow()" title="Lưu Tiêu đề + Mã kịch bản, tự động viết kịch bản qua 9 Bàn AI rồi tự động Tạo Voice + Phụ đề + Render Video MP4 luôn!">🎬 Viết Kịch Bản ➔ Làm Video Luôn</button>
+        <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
+        <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
+        <button class="btn btn-red btn-sm" style="padding:6px 10px; font-size:11.8px;" onclick="stopWorker()">⏹️ Dừng</button>
+        <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #38bdf8; color:#38bdf8;" onclick="switchStudioSubTab('render')" title="Chuyển sang Tab nhỏ Render Video để quan sát tiến độ tạo Voice & Video">🎬 Tab Render Video</button>
+        <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #fde68a; color:#fde68a;" onclick="switchStudioSubTab('logs')" title="Chuyển sang Tab Nhật ký Log riêng biệt để kiểm tra chi tiết">📡 Tab Log</button>
+      </div>
     </div>
 
-    <div style="display:grid; grid-template-columns: 0.28fr 0.72fr; gap:8px;">
-      <div style="display:flex; flex-direction:column;">
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; font-weight:700; color:#38bdf8; margin-bottom:4px;">
-          <span>🏷️ TÊN KỊCH BẢN (Tùy chọn)</span>
-          <span style="font-size:10.5px; color:var(--muted); font-weight:400;">Trống = 001, 002...</span>
+    <!-- KHUNG 2 Ô NHẬP TIÊU ĐỀ + CHỌN CHẾ ĐỘ TIÊU ĐỀ KHI DÁN (CÓ THỂ THU NHỎ BẰNG NÚT TRÊN) -->
+    <div id="composerBody" style="margin-top:8px; padding-top:8px; border-top:1px solid #1e293b;">
+      <!-- THANH CHỌN NHANH CHẾ ĐỘ TIÊU ĐỀ NGAY KHI DÁN + CHẾ ĐỘ TỰ ĐỘNG LÀM VIDEO LUÔN -->
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px; padding:7px 10px; border-radius:8px; background:rgba(15,23,42,0.85); border:1px solid #334155;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span style="font-size:12px; font-weight:700; color:#f8fafc;">⚡ Chế độ Tiêu đề:</span>
+          <label id="lblModeRewrite" onclick="syncTitleModeSelection('rewrite')" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; cursor:pointer; font-size:11.8px; font-weight:700; border:1px solid var(--gold); background:rgba(245,185,66,0.18); color:#fde68a; transition:all 0.15s;">
+            <input type="radio" name="titlePasteModeRadio" id="radioModeRewrite" value="rewrite" checked onchange="syncTitleModeSelection('rewrite')" style="accent-color:#f5b942; cursor:pointer;" />
+            <span>🔥 Viết lại Tiêu đề (Bàn #1)</span>
+          </label>
+          <label id="lblModeKeepOriginal" onclick="syncTitleModeSelection('keep_original')" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; cursor:pointer; font-size:11.8px; font-weight:700; border:1px solid #334155; background:#0f172a; color:#94a3b8; transition:all 0.15s;">
+            <input type="radio" name="titlePasteModeRadio" id="radioModeKeepOriginal" value="keep_original" onchange="syncTitleModeSelection('keep_original')" style="accent-color:#10b981; cursor:pointer;" />
+            <span>🎯 Dùng luôn Tiêu đề đã dán (Chạy thẳng Bàn #1.5)</span>
+          </label>
         </div>
-        <textarea id="customNamesInput"
-          onscroll="syncTwoColScroll(this, 'titlesInput')"
-          onpaste="handleSmartTwoColPaste(event)"
-          style="height:74px; padding:7px 9px; font-size:12px; border-color:#1e3a5f; color:#fde68a; font-weight:600; font-family:Consolas, monospace; white-space:pre;"
-          placeholder="VD:&#10;KB01&#10;KB02"></textarea>
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <span style="font-size:11.5px; font-weight:800; color:#00ff88;">🎬 Sau khi viết xong (Bàn #7):</span>
+          <select id="embeddedAutoVideoMode" onchange="syncEmbeddedBridgeMode(this.value)" style="padding:4px 9px; font-size:11.5px; font-weight:800; color:#00ff88; background:#06281e; border:1px solid #00ff88; border-radius:6px; cursor:pointer;">
+            <option value="STREAMING_VIDEO" selected>⚡ Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn</option>
+            <option value="BATCH_VIDEO">📦 Đợi viết xong cả lô ➔ Tạo Voice + Làm Video 1 lượt</option>
+            <option value="STREAMING_VOICE">🎙️ Viết Kịch Bản Xong ➔ Chỉ Tạo Voice (.wav)</option>
+            <option value="DISABLED">📝 Chỉ Viết Kịch Bản (.txt) — Không tự tạo Video</option>
+          </select>
+        </div>
+        <span id="titleModeHintBadge" style="display:none;">📌 Đang chọn: Viết lại 5 tiêu đề mới tại Bàn #1 (&ge;97đ)</span>
       </div>
-      <div style="display:flex; flex-direction:column;">
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; font-weight:700; color:var(--gold); margin-bottom:4px; gap:6px; flex-wrap:wrap;">
-          <span id="titlesInputHeaderLabel">🎯 DANH SÁCH TIÊU ĐỀ GỐC TIẾNG ANH / TÂY BAN NHA MEXICO (Mỗi dòng 1 tiêu đề — Hỗ trợ dán 2 cột từ Excel)</span>
-          <div style="display:flex; gap:5px; align-items:center;">
-            <button type="button" class="btn btn-dark btn-sm" style="padding:2px 8px; font-size:10.5px; border-color:#38bdf8; color:#38bdf8;" onclick="loadQueueTitlesToComposer()" title="Nạp danh sách Tiêu đề & Mã đang có trong hàng đợi lên 2 ô này để chỉnh sửa rồi bấm Cập Nhật Tiêu Đề">📥 Nạp Tiêu Đề Đang Có Lên Sửa</button>
-            <button type="button" class="btn btn-dark btn-sm" style="padding:2px 7px; font-size:10.5px;" onclick="autoSplitMergedInputNow()">🪄 Tự Tách 2 Cột</button>
-            <button type="button" class="btn btn-dark btn-sm" style="padding:2px 7px; font-size:10.5px; border-color:rgba(239,68,68,0.5); color:#fca5a5;" onclick="clearComposerInputsNow()" title="Xóa trắng 2 ô nhập Mã & Tiêu đề">🧹 Xóa Ô Nhập</button>
+
+      <div style="display:grid; grid-template-columns: 0.28fr 0.72fr; gap:8px;">
+        <div style="display:flex; flex-direction:column;">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; font-weight:700; color:#38bdf8; margin-bottom:4px;">
+            <span>🏷️ TÊN KỊCH BẢN (Tùy chọn)</span>
+            <span style="font-size:10.5px; color:var(--muted); font-weight:400;">Trống = 001, 002...</span>
+          </div>
+          <textarea id="customNamesInput"
+            onscroll="syncTwoColScroll(this, 'titlesInput')"
+            onpaste="handleSmartTwoColPaste(event)"
+            style="height:74px; padding:7px 9px; font-size:12px; border-color:#1e3a5f; color:#fde68a; font-weight:600; font-family:Consolas, monospace; white-space:pre;"
+            placeholder="VD:&#10;KB01&#10;KB02"></textarea>
+        </div>
+        <div style="display:flex; flex-direction:column;">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; font-weight:700; color:var(--gold); margin-bottom:4px; gap:6px; flex-wrap:wrap;">
+            <span id="titlesInputHeaderLabel">🎯 DANH SÁCH TIÊU ĐỀ GỐC TIẾNG ANH / TÂY BAN NHA MEXICO (Mỗi dòng 1 tiêu đề — Hỗ trợ dán 2 cột từ Excel)</span>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button type="button" class="btn btn-dark btn-sm" style="padding:2px 8px; font-size:10.5px; border-color:#38bdf8; color:#38bdf8;" onclick="loadQueueTitlesToComposer()" title="Nạp danh sách Tiêu đề & Mã đang có trong hàng đợi lên 2 ô này để chỉnh sửa rồi bấm Cập Nhật Tiêu Đề">📥 Nạp Tiêu Đề Đang Có Lên Sửa</button>
+              <button type="button" class="btn btn-dark btn-sm" style="padding:2px 7px; font-size:10.5px;" onclick="autoSplitMergedInputNow()">🪄 Tự Tách 2 Cột</button>
+              <button type="button" class="btn btn-dark btn-sm" style="padding:2px 7px; font-size:10.5px; border-color:rgba(239,68,68,0.5); color:#fca5a5;" onclick="clearComposerInputsNow()" title="Xóa trắng 2 ô nhập Mã & Tiêu đề">🧹 Xóa Ô Nhập</button>
+            </div>
+          </div>
+          <textarea id="titlesInput"
+            onscroll="syncTwoColScroll(this, 'customNamesInput')"
+            onpaste="handleSmartTwoColPaste(event)"
+            style="height:74px; padding:7px 9px; font-size:12px; white-space:pre;"
+            placeholder="Dán danh sách Tiêu đề gốc vào đây rồi bấm [📥 Lưu Tiêu Đề & Mã] hoặc [🔄 Cập Nhật Tiêu Đề] hoặc [🎬 Viết Kịch Bản ➔ Làm Video Luôn]..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- DÒNG THÔNG BÁO NHANH & LOG 1 DÒNG (CLICK ĐỂ SANG TAB LOG RIÊNG) -->
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap;">
+      <div id="actionMsg" style="font-size:11.8px; font-weight:600; color:#34d399;"></div>
+      <div id="miniLatestLogLine" class="mini-log-ticker" style="flex:1; min-width:240px;" onclick="switchStudioSubTab('logs')" title="Click vào đây để chuyển sang Tab 📡 Nhật Ký Log Hệ Thống xem chi tiết">
+        📡 Log mới nhất: Đang chờ lệnh... (Click để mở Tab Log riêng)
+      </div>
+    </div>
+  </div>
+
+  <!-- KHUNG CHÍNH SỐ 2: DANH SÁCH KỊCH BẢN GỌN GÀNG (HIỂN THỊ NGAY TRƯỚC MẮT KHÔNG CẦN CUỘN QUA LOG HAY AGENT) -->
+  <div class="panel" style="padding:10px 14px;">
+    <div class="panel-title" style="flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; background:#0d1320; border:1px solid #2b3650; padding:4px 9px; border-radius:6px; font-size:11.8px; color:#e2e8f0; user-select:none;" title="Tích chọn hoặc bỏ chọn tất cả kịch bản đang hiển thị bên dưới">
+          <input id="selectAllProjectsCb" type="checkbox" onchange="toggleSelectAllProjects(this.checked)" style="width:14px; height:14px; accent-color:var(--gold); cursor:pointer;" />
+          <span>Chọn tất cả</span>
+        </label>
+        <span style="font-size:13.5px;">📋 DANH SÁCH KỊCH BẢN (<span id="projChannelBadge" style="color:#38bdf8;">🎩 BÊN MAFIA</span>: <span id="projCount">0</span>)</span>
+        <button class="btn btn-dark btn-sm" style="padding:4px 10px; font-size:11.5px; border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="loadQueueTitlesToComposer()" title="Nạp toàn bộ Tiêu đề & Mã của danh sách bên dưới lên ô nhập phía trên để sửa hàng loạt rồi bấm Cập Nhật Tiêu Đề">
+          🔄 Cập Nhật Tiêu Đề Hàng Loạt
+        </button>
+        <button id="btnBulkDeleteSelected" class="btn btn-dark btn-sm" style="padding:4px 10px; font-size:11.5px; border-color:rgba(239,68,68,0.5); color:#fca5a5;" onclick="bulkDeleteSelectedProjects()" title="Xóa toàn bộ các kịch bản đã tích chọn và xóa vĩnh viễn luôn cả Folder chứa kịch bản + file trong TONG HOP">
+          🗑️ Xóa Đã Chọn (<span id="selectedProjCount">0</span>) &amp; Xóa Folder
+        </button>
+        <button class="btn btn-red btn-sm" style="padding:4px 10px; font-size:11.5px; font-weight:700;" onclick="deleteAllProjectsInChannel()" title="Xóa sạch toàn bộ Tiêu đề & Folder kịch bản đang có trong danh sách của Key này chỉ với 1 click">
+          🗑️ Xóa Tất Cả Tiêu Đề
+        </button>
+        <button id="btnClearSelection" class="btn btn-dark btn-sm" style="display:none; padding:4px 8px; font-size:11px;" onclick="clearSelectedProjects()">✖ Bỏ chọn</button>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+        <input id="projSearchInput" type="text" placeholder="🔍 Tìm STT, tên, tiêu đề..." oninput="fetchStatus()" style="width:185px; padding:4px 8px; font-size:11.5px; border-radius:6px; background:#090d14; border:1px solid var(--border); color:#fff;" />
+        <select id="projFilterSelect" onchange="fetchStatus()" style="padding:4px 8px; font-size:11.5px; border-radius:6px; background:#090d14; border:1px solid var(--border); color:#fff;">
+          <option value="all">Tất cả trạng thái</option>
+          <option value="running">⚡ Đang chạy</option>
+          <option value="completed">✅ Đã hoàn tất</option>
+          <option value="queued">⏳ Đang chờ</option>
+        </select>
+        <button class="btn btn-dark btn-sm" style="padding:4px 8px; font-size:11px;" onclick="expandOrCollapseAllProjects(true)">🔽 Mở tất cả</button>
+        <button class="btn btn-dark btn-sm" style="padding:4px 8px; font-size:11px;" onclick="expandOrCollapseAllProjects(false)">🔼 Thu gọn tất cả</button>
+        <button class="btn btn-dark btn-sm" style="padding:4px 8px; font-size:11px;" onclick="openProjectFolder('')">📂 Thư Mục Gốc</button>
+      </div>
+    </div>
+    <div id="projectsContainer"></div>
+  </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- TAB NHỎ 2: QUAN SÁT & ĐIỀU KHIỂN RENDER VIDEO (BÀN #7 & BATCH GPU)      -->
+<!-- ======================================================================= -->
+<div id="subtabPane_render" class="studio-subtab-pane">
+  <div class="panel" style="padding:12px 14px; margin-bottom:10px; border:1px solid rgba(0,255,136,0.35);">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+      <div>
+        <b style="font-size:14px; color:var(--gold);">🎬 BÀN #7 — TRUNG TÂM QUAN SÁT TIẾN ĐỘ TẠO VOICE (.WAV) &amp; RENDER VIDEO GPU (.MP4)</b>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">
+          Theo dõi trực tiếp trạng thái xuất kịch bản sạch TTS (<code>_KB.txt</code>), tổng hợp giọng đọc AI (<code>VoiceStudio :3900</code>), phụ đề Whisper GPU (<code>.srt</code>) và ghép Video (<code>.mp4</code>).
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
+        <button class="btn btn-gold btn-sm" style="padding:6px 12px; font-size:11.8px; font-weight:800;" onclick="sendAllReadyProjectsToVideoStudio()">
+          🚀 Đẩy Tất Cả Kịch Bản Đã Có KB Sang Render Video
+        </button>
+        <button class="btn btn-blue btn-sm" style="padding:6px 12px; font-size:11.8px; font-weight:700;" onclick="openFullBatchVideoConfigInParent()">
+          🎛️ Mở Cấu Hình &amp; Tiến Độ Batch GPU Chi Tiết
+        </button>
+        <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.5px; border-color:var(--gold); color:var(--gold);" onclick="openProjectFolder('TONG_HOP')">
+          📂 Mở Folder TONG HOP
+        </button>
+        <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.5px;" onclick="switchStudioSubTab('scripts')">
+          ✍️ Quay Lại Tab Viết Kịch Bản
+        </button>
+      </div>
+    </div>
+
+    <div class="render-stats-grid">
+      <div class="render-stat-card">
+        <span>📋 TỔNG KỊCH BẢN TRONG KÊNH</span>
+        <b id="renderStatTotal">0</b>
+      </div>
+      <div class="render-stat-card" style="border-left-color:#38bdf8;">
+        <span>📄 ĐÃ CÓ FILE TTS SẠCH (_KB.TXT)</span>
+        <b id="renderStatReadyKb" style="color:#38bdf8;">0</b>
+      </div>
+      <div class="render-stat-card" style="border-left-color:#f59e0b;">
+        <span>⚡ ĐANG TẠO VOICE / ĐỢI GPU RENDER</span>
+        <b id="renderStatRunning" style="color:#fde68a;">0</b>
+      </div>
+      <div class="render-stat-card" style="border-left-color:#10b981;">
+        <span>✅ ĐÃ XUẤT VIDEO .MP4 HOÀN TẤT</span>
+        <b id="renderStatCompleted" style="color:#34d399;">0</b>
+      </div>
+    </div>
+
+    <div id="renderSubTabProjectsContainer"></div>
+  </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- TAB NHỎ 3: NHẬT KÝ LOG HỆ THỐNG RIÊNG BIỆT (FULL-HEIGHT, DỄ QUAN SÁT)  -->
+<!-- ======================================================================= -->
+<div id="subtabPane_logs" class="studio-subtab-pane">
+  <div id="drawerLogs" class="top-drawer open" style="margin-bottom:0;">
+    <div class="panel" style="padding:12px 14px; margin-bottom:0; border:1px solid rgba(56,189,248,0.4);">
+      <div class="panel-title" style="margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span style="color:#38bdf8; font-size:14px;">📡 NHẬT KÝ TIẾN TRÌNH &amp; TRẠNG THÁI CHẠY TRỰC TIẾP (LIVE CONSOLE LOG)</span>
+          <span id="logLineCountBadge" class="badge" style="color:#00ff88; border-color:rgba(0,255,136,0.4);">0 dòng</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <input id="logSearchInput" type="text" placeholder="🔍 Lọc theo Mã kịch bản, Acc #1, Bàn #3, lỗi..." oninput="refreshFilteredLogDisplay()" style="width:230px; padding:5px 9px; font-size:11.5px; border-radius:6px; background:#090d14; border:1px solid #334155; color:#fff;" />
+          <select id="logCategorySelect" onchange="refreshFilteredLogDisplay()" style="padding:5px 9px; font-size:11.5px; border-radius:6px; background:#090d14; border:1px solid #334155; color:#e2e8f0;">
+            <option value="ALL">📋 Tất cả dòng Log</option>
+            <option value="SCRIPT">✍️ Chỉ Log Viết Kịch Bản &amp; Chấm Điểm (Bàn #1 ➔ #6)</option>
+            <option value="VIDEO">🎬 Chỉ Log Tạo Voice &amp; Render Video (Bàn #7)</option>
+            <option value="ERROR">⚠️ Chỉ Cảnh Báo &amp; Lỗi (Error / Warning)</option>
+          </select>
+          <label style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:#cbd5e1; cursor:pointer; background:#0d1320; padding:4px 9px; border-radius:6px; border:1px solid #2b3650;">
+            <input id="logAutoScrollCb" type="checkbox" checked style="width:14px; height:14px; accent-color:var(--gold); cursor:pointer;" />
+            <span>Tự cuộn xuống cuối</span>
+          </label>
+          <button class="btn btn-dark btn-sm" onclick="copyLiveLogsNow()">📋 Copy Log</button>
+          <button class="btn btn-red btn-sm" onclick="clearLogs()">🧹 Xóa bớt Log</button>
+          <button class="btn btn-dark btn-sm" onclick="switchStudioSubTab('scripts')">✍️ Về Tab Kịch Bản</button>
+        </div>
+      </div>
+      <div id="liveLogBox" class="log-box" style="height:calc(100vh - 195px); min-height:480px; font-size:12.2px; line-height:1.55;">Đang tải log hệ thống...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- TAB NHỎ 4: ĐĂNG NHẬP 3 TÀI KHOẢN CHATGPT & SƠ ĐỒ 9 BÀN AGENT AI        -->
+<!-- ======================================================================= -->
+<div id="subtabPane_agents" class="studio-subtab-pane">
+  <div id="drawerAccounts" class="top-drawer open">
+    <div id="portabilityBanner" class="portability-banner" style="flex-direction:column; align-items:stretch; gap:8px; margin-bottom:0; padding:10px 14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div style="font-size:12px; color:var(--text);">
+          <b style="color:#38bdf8;">🌐 ĐĂNG NHẬP &amp; QUẢN LÝ 3 TÀI KHOẢN CHATGPT WEB (Giới hạn &le; 3 Kịch bản/Acc &amp; &le; 5 Tab/Acc):</b>
+          Kho lưu: <b id="activeStorageInfo" style="color:var(--gold);">D:\ZC_TEAM\TOOL_ZC_TEAM\PROJECTS</b>
+          <div id="envErrorDetails" style="font-size:11.5px; color:#fca5a5; margin-top:4px; font-weight:600; display:none;"></div>
+        </div>
+        <div class="env-pills">
+          <span id="agyStatusPill" class="env-pill" style="font-size:11px; padding:3px 8px;">✅ 15 Key Skills: SẴN SÀNG</span>
+          <span id="chatgptStatusPill" class="env-pill" style="font-size:11px; padding:3px 8px;">🔍 3 Acc ChatGPT...</span>
+          <button class="btn btn-green btn-sm" onclick="openChatGPTWebLogin('acc_1')">🔑 Mở Chrome Đăng Nhập Acc #1</button>
+          <button class="btn btn-dark btn-sm" onclick="setChromeVisibility(true)" style="border-color:#10b981; color:#34d399;">👁️ Hiện Chrome</button>
+          <button class="btn btn-dark btn-sm" onclick="setChromeVisibility(false)" style="border-color:#38bdf8; color:#38bdf8;">👻 Ẩn Tất Cả Chrome</button>
+          <button class="btn btn-dark btn-sm" onclick="syncNewMachine()">🔧 Đồng bộ Skill</button>
+          <button class="btn btn-dark btn-sm" onclick="switchStudioSubTab('scripts')">✍️ Về Tab Kịch Bản</button>
+        </div>
+      </div>
+      <div id="multiAccountsGrid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; padding-top:6px; border-top:1px solid var(--border);">
+        <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <b style="color:var(--gold); font-size:12.8px;">👤 Acc #1 (Port 9222)</b>
+            <span style="color:#fde68a; font-weight:700;">⚪ Bấm nút dưới để Đăng nhập</span>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+            <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_1')">🔑 Đăng Nhập Acc #1</button>
           </div>
         </div>
-        <textarea id="titlesInput"
-          onscroll="syncTwoColScroll(this, 'customNamesInput')"
-          onpaste="handleSmartTwoColPaste(event)"
-          style="height:74px; padding:7px 9px; font-size:12px; white-space:pre;"
-          placeholder="Dán danh sách Tiêu đề gốc vào đây rồi bấm [📥 Lưu Tiêu Đề & Mã] hoặc [🔄 Cập Nhật Tiêu Đề] hoặc [🎬 Viết Kịch Bản ➔ Làm Video Luôn]..."></textarea>
+        <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <b style="color:var(--gold); font-size:12.8px;">👤 Acc #2 (Port 9223)</b>
+            <span style="color:#94a3b8;">⚪ Tùy chọn (Chạy 6 luồng)</span>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+            <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_2')">🔑 Đăng Nhập Acc #2</button>
+          </div>
+        </div>
+        <div class="slot-card" style="border-color:var(--border); background:#0d111a;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <b style="color:var(--gold); font-size:12.8px;">👤 Acc #3 (Port 9224)</b>
+            <span style="color:#94a3b8;">⚪ Tùy chọn (Chạy 9 luồng)</span>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+            <button class="btn btn-green btn-sm" style="padding:5px 10px; font-size:11.5px;" onclick="openChatGPTWebLogin('acc_3')">🔑 Đăng Nhập Acc #3</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- DÒNG THÔNG BÁO NHANH & LOG 1 DÒNG -->
-  <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap;">
-    <div id="actionMsg" style="font-size:11.8px; font-weight:600; color:#34d399;"></div>
-    <div id="miniLatestLogLine" class="mini-log-ticker" style="flex:1; min-width:240px;" onclick="toggleTopDrawer('Logs')" title="Click để mở/đóng toàn bộ Nhật ký Log">
-      📡 Log: Đang chờ lệnh...
-    </div>
-  </div>
-</div>
-
-<!-- KHUNG NHẬT KÝ HỆ THỐNG TRỰC TIẾP (HIỂN THỊ NGAY DƯỚI NÚT CHẠY ĐỂ THEO DÕI TIẾN TRÌNH & LỖI) -->
-<div id="drawerLogs" class="top-drawer open" style="margin-bottom:10px;">
-  <div class="panel" style="padding:10px 14px; margin-bottom:0; border:1px solid rgba(56,189,248,0.35);">
-    <div class="panel-title" style="margin-bottom:6px;">
-      <span style="color:#38bdf8;">📡 NHẬT KÝ TIẾN TRÌNH &amp; TRẠNG THÁI CHẠY TRỰC TIẾP (LIVE CONSOLE LOG)</span>
-      <div style="display:flex; gap:6px;">
-        <button class="btn btn-dark btn-sm" onclick="clearLogs()">🧹 Xóa bớt Log</button>
-        <button class="btn btn-dark btn-sm" onclick="toggleTopDrawer('Logs')">✖ Thu gọn / Mở rộng</button>
+  <div id="drawerMonitor" class="top-drawer open">
+    <div class="panel" style="padding:10px 14px; margin-bottom:0;">
+      <div class="section-label" style="margin-bottom:8px;">
+        <span>🤖 SƠ ĐỒ 9 BÀN NHÂN VIÊN AGENT AI (<span id="deskChannelLabel">🇲🇽 MEXICO BÀ CÔ</span>) — TỪ BÀN #0 ➔ BÀN #1.5 ➔ BÀN #7 &amp; ⚡ KHE ĐA LUỒNG</span>
+        <span id="navMonitorSummary" class="badge" style="color:#00ff88; border-color:rgba(0,255,136,0.4);">9 Agent</span>
       </div>
+      <div id="desksContainer" class="desks-grid" style="margin-bottom:8px; gap:8px;"></div>
+      <div id="threadsContainer" class="threads-bar" style="margin-bottom:0; gap:8px;"></div>
     </div>
-    <div id="liveLogBox" class="log-box" style="height:125px;">Đang tải log hệ thống...</div>
   </div>
 </div>
 
-<!-- KHUNG CHÍNH SỐ 2: DANH SÁCH KỊCH BẢN GỌN GÀNG (HIỂN THỊ NGAY TRƯỚC MẮT KHÔNG CẦN CUỘN) -->
-<div class="panel" style="padding:10px 14px;">
-  <div class="panel-title" style="flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      <label style="display:inline-flex; align-items:center; gap:5px; cursor:pointer; background:#0d1320; border:1px solid #2b3650; padding:4px 9px; border-radius:6px; font-size:11.8px; color:#e2e8f0; user-select:none;" title="Tích chọn hoặc bỏ chọn tất cả kịch bản đang hiển thị bên dưới">
-        <input id="selectAllProjectsCb" type="checkbox" onchange="toggleSelectAllProjects(this.checked)" style="width:14px; height:14px; accent-color:var(--gold); cursor:pointer;" />
-        <span>Chọn tất cả</span>
-      </label>
-      <span style="font-size:13.5px;">📋 DANH SÁCH KỊCH BẢN (<span id="projChannelBadge" style="color:#38bdf8;">🎩 BÊN MAFIA</span>: <span id="projCount">0</span>)</span>
-      <button class="btn btn-dark btn-sm" style="padding:4px 10px; font-size:11.5px; border-color:#38bdf8; color:#38bdf8; font-weight:700;" onclick="loadQueueTitlesToComposer()" title="Nạp toàn bộ Tiêu đề & Mã của danh sách bên dưới lên ô nhập phía trên để sửa hàng loạt rồi bấm Cập Nhật Tiêu Đề">
-        🔄 Cập Nhật Tiêu Đề Hàng Loạt
-      </button>
-      <button id="btnBulkDeleteSelected" class="btn btn-dark btn-sm" style="padding:4px 10px; font-size:11.5px; border-color:rgba(239,68,68,0.5); color:#fca5a5;" onclick="bulkDeleteSelectedProjects()" title="Xóa toàn bộ các kịch bản đã tích chọn và xóa vĩnh viễn luôn cả Folder chứa kịch bản + file trong TONG HOP">
-        🗑️ Xóa Đã Chọn (<span id="selectedProjCount">0</span>) &amp; Xóa Folder
-      </button>
-      <button class="btn btn-red btn-sm" style="padding:4px 10px; font-size:11.5px; font-weight:700;" onclick="deleteAllProjectsInChannel()" title="Xóa sạch toàn bộ Tiêu đề & Folder kịch bản đang có trong danh sách của Key này chỉ với 1 click">
-        🗑️ Xóa Tất Cả Tiêu Đề
-      </button>
-      <button id="btnClearSelection" class="btn btn-dark btn-sm" style="display:none; padding:4px 8px; font-size:11px;" onclick="clearSelectedProjects()">✖ Bỏ chọn</button>
-    </div>
-    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-      <input id="projSearchInput" type="text" placeholder="🔍 Tìm STT, tên, tiêu đề..." oninput="fetchStatus()" style="width:185px; padding:4px 8px; font-size:11.5px; border-radius:6px; background:#090d14; border:1px solid var(--border); color:#fff;" />
-      <select id="projFilterSelect" onchange="fetchStatus()" style="padding:4px 8px; font-size:11.5px; border-radius:6px; background:#090d14; border:1px solid var(--border); color:#fff;">
-        <option value="all">Tất cả trạng thái</option>
-        <option value="running">⚡ Đang chạy</option>
-        <option value="completed">✅ Đã hoàn tất</option>
-        <option value="queued">⏳ Đang chờ</option>
-      </select>
-      <button class="btn btn-dark btn-sm" style="padding:4px 8px; font-size:11px;" onclick="expandOrCollapseAllProjects(true)">🔽 Mở tất cả</button>
-      <button class="btn btn-dark btn-sm" style="padding:4px 8px; font-size:11px;" onclick="expandOrCollapseAllProjects(false)">🔼 Thu gọn tất cả</button>
-      <button class="btn btn-dark btn-sm" style="padding:4px 8px; font-size:11px;" onclick="openProjectFolder('')">📂 Thư Mục Gốc</button>
-    </div>
-  </div>
-  <div id="projectsContainer"></div>
-</div>
 </div><!-- end #mainStudioWorkspace -->
 
 <!-- Modal Xem Nội Dung File -->
@@ -2187,25 +2351,119 @@ HTML_PAGE = r"""<!DOCTYPE html>
 <script>
 let CURRENT_NICHE = (new URLSearchParams(window.location.search).get('channel') || '').trim();
 let _nicheSwitchSeq = 0;
-window.OPEN_TOP_DRAWERS = new Set(['Accounts', 'Monitor']);
+window.ACTIVE_STUDIO_SUBTAB = 'scripts';
 window.COMPOSER_COLLAPSED = false;
+window._LAST_RAW_STUDIO_LOGS = '';
+
+function switchStudioSubTab(tabName, opts = {}) {
+  const validTabs = ['scripts', 'render', 'logs', 'agents'];
+  const nextTab = validTabs.includes(tabName) ? tabName : 'scripts';
+  window.ACTIVE_STUDIO_SUBTAB = nextTab;
+
+  for (const t of validTabs) {
+    const pane = document.getElementById('subtabPane_' + t);
+    const btn = document.getElementById('btnSubTab_' + t);
+    if (pane) pane.classList.toggle('active', t === nextTab);
+    if (btn) btn.classList.toggle('active', t === nextTab);
+  }
+
+  if (nextTab === 'logs') {
+    refreshFilteredLogDisplay(true);
+  }
+
+  if (opts.notifyParent !== false) {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'ZC_STUDIO_SUBTAB_CHANGED', subtab: nextTab }, '*');
+      }
+    } catch (e) {}
+  }
+}
+
+function openFullBatchVideoConfigInParent() {
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'ZC_OPEN_FULL_BATCH_RENDER_SUBTAB' }, '*');
+      return;
+    }
+  } catch (e) {}
+  showMsg('🎬 Bạn đang ở chế độ trình duyệt Web. Hãy xem bảng tiến độ Bàn #7 ngay bên dưới!');
+}
+
+async function sendAllReadyProjectsToVideoStudio() {
+  const list = (window.LAST_PROJECTS_LIST || []).filter(p => p.has_script);
+  if (list.length === 0) {
+    showMsg('⚠️ Hiện chưa có kịch bản nào đã xuất xong file _KB.txt để đẩy sang Bàn #7!', true);
+    return;
+  }
+  showMsg(`🚀 Đang đẩy ${list.length} kịch bản đã có file _KB.txt sang Bàn #7 để Tạo Voice & Render Video...`, false);
+  let sent = 0;
+  for (const p of list) {
+    const r = await apiPost('/api/send_to_video_studio', {niche: CURRENT_NICHE, project_id: p.project_id});
+    if (r && r.ok) sent++;
+  }
+  showMsg(`✅ Đã đẩy ${sent}/${list.length} kịch bản sang Bàn #7 (Tạo Voice & Render Video GPU)!`, false);
+  await fetchStatus();
+}
+
+function copyLiveLogsNow() {
+  const lb = document.getElementById('liveLogBox');
+  const txt = lb ? lb.innerText : (window._LAST_RAW_STUDIO_LOGS || '');
+  navigator.clipboard.writeText(txt || '');
+  showMsg('📋 Đã copy nội dung Nhật ký Log vào Clipboard!', false);
+}
+
+function refreshFilteredLogDisplay(forceScroll = false) {
+  const logBox = document.getElementById('liveLogBox');
+  if (!logBox) return;
+  const raw = window._LAST_RAW_STUDIO_LOGS || '';
+  const allLines = raw ? raw.split(/\r?\n/).filter(Boolean) : [];
+  const q = ((document.getElementById('logSearchInput') || {}).value || '').trim().toLowerCase();
+  const cat = ((document.getElementById('logCategorySelect') || {}).value || 'ALL');
+
+  const filtered = allLines.filter(line => {
+    const low = line.toLowerCase();
+    if (cat === 'VIDEO') {
+      if (!/(bàn #7|ban #7|voice|video|mp4|wav|srt|whisper|nvenc|render|bridge)/i.test(line)) return false;
+    } else if (cat === 'SCRIPT') {
+      if (/(bàn #7|ban #7|nvenc)/i.test(line) && !/(bàn #[1-6]|bước [1-6]|step [1-6])/i.test(line)) return false;
+    } else if (cat === 'ERROR') {
+      if (!/(❌|⚠️|lỗi|error|warn|fail|timeout|refusal)/i.test(line)) return false;
+    }
+    if (q && !low.includes(q)) return false;
+    return true;
+  });
+
+  const badge = document.getElementById('logLineCountBadge');
+  if (badge) {
+    badge.innerText = filtered.length === allLines.length
+      ? `${allLines.length} dòng`
+      : `${filtered.length}/${allLines.length} dòng`;
+  }
+  const topLogBadge = document.getElementById('subtabLogBadge');
+  if (topLogBadge) {
+    topLogBadge.innerText = allLines.length > 0 ? `${allLines.length} dòng` : 'Live';
+  }
+
+  const nextText = filtered.length > 0
+    ? filtered.join('\n')
+    : (allLines.length > 0
+        ? '(Không có dòng log nào khớp bộ lọc hiện tại. Hãy xóa từ khóa tìm kiếm hoặc chọn "Tất cả dòng Log".)'
+        : 'Chưa có lệnh nào đang chạy. Hãy chọn Key sản xuất và bấm nút chạy ở Tab 1!');
+
+  const prevLen = logBox.innerText.length;
+  logBox.innerText = nextText;
+  const autoScroll = document.getElementById('logAutoScrollCb')?.checked !== false;
+  if (forceScroll || (autoScroll && logBox.innerText.length !== prevLen)) {
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+}
 
 function toggleTopDrawer(name) {
-  const dr = document.getElementById('drawer' + name);
-  const btn = document.getElementById('btnDrawer' + name);
-  const chev = document.getElementById('chev' + name);
-  if (!dr) return;
-  if (window.OPEN_TOP_DRAWERS.has(name)) {
-    window.OPEN_TOP_DRAWERS.delete(name);
-    dr.classList.remove('open');
-    if (btn) btn.classList.remove('active');
-    if (chev) chev.innerText = '▾';
-  } else {
-    window.OPEN_TOP_DRAWERS.add(name);
-    dr.classList.add('open');
-    if (btn) btn.classList.add('active');
-    if (chev) chev.innerText = '▴';
-  }
+  if (name === 'Logs') switchStudioSubTab('logs');
+  else if (name === 'Accounts' || name === 'Monitor') switchStudioSubTab('agents');
+  else if (name === 'Render') switchStudioSubTab('render');
+  else switchStudioSubTab('scripts');
 }
 
 function toggleComposerBody() {
@@ -2260,8 +2518,17 @@ window.addEventListener('message', (ev) => {
     if (ev.data.channel !== CURRENT_NICHE) {
       switchChannel(ev.data.channel, true);
     }
+  } else if (ev?.data?.type === 'ZC_SWITCH_STUDIO_SUBTAB' && ev.data.subtab) {
+    switchStudioSubTab(ev.data.subtab, { notifyParent: false });
+  } else if (ev?.data?.type === 'ZC_TRIGGER_ALL_READY_TO_VIDEO') {
+    sendAllReadyProjectsToVideoStudio();
   }
 });
+try {
+  if (window.parent && window.parent !== window) {
+    document.body.classList.add('embedded-electron');
+  }
+} catch (e) {}
 
 function updateChannelTabsUI(data) {
   const niche = data.selected_niche || CURRENT_NICHE || 'mafia';
@@ -2619,8 +2886,7 @@ async function addAndRunNow(isAutoVideo = false) {
   const max_workers = parseInt(document.getElementById('maxWorkers').value || '0');
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
   const skip_title_rewrite = (document.getElementById('titleModeSelector')?.value === 'keep_original');
-  const dl = document.getElementById('drawerLogs');
-  if (dl) dl.classList.add('open');
+  // Giữ nguyên Tab Viết Kịch Bản gọn gàng, không tự bung Log đè lên danh sách
   showMsg(
     titles.length > 0
       ? `🚀 Đang lưu ${titles.length} tiêu đề & khởi chạy Pipeline 9 Bàn AI (${niche})${isAutoVideo ? ' ➔ Tự động Làm Video MP4' : ''}...`
@@ -2686,6 +2952,12 @@ function loadQueueTitlesToComposer() {
   showMsg(`✏️ Đã nạp ${targetList.length} tiêu đề từ danh sách lên ô nhập! Hãy sửa nội dung rồi bấm [💾 Lưu Cập Nhật Tiêu Đề]!`, false);
 }
 
+function getSelectedTitlePasteMode() {
+  return (document.getElementById('titleModeSelector')?.value === 'keep_original') ? 'keep_original' : 'rewrite';
+}
+function collectTwoColumnInputs() {
+  return collectTitlesAndCustomNamesFromUI();
+}
 async function updateTitlesFromComposerNow() {
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
   const skip_title_rewrite = getSelectedTitlePasteMode() === 'keep_original';
@@ -2784,8 +3056,7 @@ async function runQueueNow() {
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
   const max_workers = parseInt(document.getElementById('maxWorkers').value || '0');
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
-  const dl = document.getElementById('drawerLogs');
-  if (dl) dl.classList.add('open');
+  // Giữ nguyên Tab Viết Kịch Bản gọn gàng, không tự bung Log đè lên danh sách
   showMsg(`⏳ Đang kích hoạt chạy Hàng đợi kịch bản (${niche})...`);
   const r = await apiPost('/api/run_queue', {max_workers, thinking, niche});
   showMsg(r.message || (r.ok ? `🚀 Đã kích hoạt chạy Hàng đợi (${niche})!` : `❌ Lỗi khởi chạy Hàng đợi`), !r.ok);
@@ -2795,8 +3066,7 @@ async function runQueueNow() {
 async function runSingleProject(project_dir, project_id = '') {
   const niche = document.getElementById('nicheSelector').value || CURRENT_NICHE;
   const thinking = document.getElementById('thinkingEffort').value || 'medium';
-  const dl = document.getElementById('drawerLogs');
-  if (dl) dl.classList.add('open');
+  // Giữ nguyên Tab Viết Kịch Bản gọn gàng, không tự bung Log đè lên danh sách
   showMsg(`⏳ Đang kích hoạt chạy dự án ${project_id || project_dir} (${niche})...`);
   const r = await apiPost('/api/run_single', {project_dir, project_id, thinking, niche});
   showMsg(r.message || (r.ok ? `🚀 Đã kích hoạt chạy dự án ${project_id || project_dir}!` : `❌ Lỗi khởi chạy dự án`), !r.ok);
@@ -3273,6 +3543,98 @@ function renderLicenseUI(lic) {
   }
 }
 
+function renderSubTabVideoProjects(projs) {
+  const list = Array.isArray(projs) ? projs : [];
+  const total = list.length;
+  let readyKb = 0;
+  let runningVideo = 0;
+  let doneVideo = 0;
+
+  for (const p of list) {
+    if (p.has_script) readyKb++;
+    const vst = String(p.video_bridge_status || '').toUpperCase();
+    const isV7Done = (vst === 'DONE' || (p.completed_steps || []).includes('STEP_7_DONE') || Boolean(p.video_output_path));
+    if (isV7Done) doneVideo++;
+    else if (vst === 'RUNNING' || vst === 'QUEUED') runningVideo++;
+  }
+
+  if (document.getElementById('renderStatTotal')) document.getElementById('renderStatTotal').innerText = total;
+  if (document.getElementById('renderStatReadyKb')) document.getElementById('renderStatReadyKb').innerText = readyKb;
+  if (document.getElementById('renderStatRunning')) document.getElementById('renderStatRunning').innerText = runningVideo;
+  if (document.getElementById('renderStatCompleted')) document.getElementById('renderStatCompleted').innerText = doneVideo;
+
+  const badgeEl = document.getElementById('subtabCountRender');
+  if (badgeEl) {
+    if (runningVideo > 0) {
+      badgeEl.innerText = `🟢 ${runningVideo} đang render · ${doneVideo}/${total} MP4`;
+      badgeEl.style.color = '#00ff88';
+    } else if (doneVideo > 0 || readyKb > 0) {
+      badgeEl.innerText = `${doneVideo}/${readyKb || total} MP4`;
+      badgeEl.style.color = '#38bdf8';
+    } else {
+      badgeEl.innerText = 'Bàn #7';
+    }
+  }
+
+  const box = document.getElementById('renderSubTabProjectsContainer');
+  if (!box) return;
+  if (list.length === 0) {
+    box.innerHTML = `<div style="padding:24px; text-align:center; color:var(--muted); border:1px dashed #1e293b; border-radius:8px;">Chưa có kịch bản nào trong kênh này. Hãy thêm tiêu đề ở Tab <b>✍️ 1. Viết Kịch Bản</b> trước!</div>`;
+    return;
+  }
+
+  let html = '';
+  for (const p of list) {
+    const sttNum = (p.project_id.match(/^(\d+)/) || ['','000'])[1];
+    const exportPrefix = p.export_prefix || p.custom_name || sttNum;
+    const displayTitle = p.winner_title || p.source_title || p.project_id;
+    const sm = p.script_metrics || {};
+    const chars = sm.char_count ? sm.char_count.toLocaleString() : '—';
+    const vst = String(p.video_bridge_status || '').toUpperCase();
+    const isV7Done = (vst === 'DONE' || (p.completed_steps || []).includes('STEP_7_DONE') || Boolean(p.video_output_path));
+    const isV7Run = (vst === 'RUNNING' || vst === 'QUEUED');
+
+    let vBadge = '';
+    if (isV7Done) {
+      vBadge = `<span class="proj-status-pill" style="background:rgba(16,185,129,0.18); border:1px solid #10b981; color:#6ee7b7;">✅ ĐÃ XUẤT MP4</span>`;
+    } else if (vst === 'RUNNING') {
+      vBadge = `<span class="proj-status-pill" style="background:rgba(56,189,248,0.18); border:1px solid #38bdf8; color:#7dd3fc;">🟢 ĐANG RENDER GPU</span>`;
+    } else if (vst === 'QUEUED') {
+      vBadge = `<span class="proj-status-pill" style="background:rgba(245,185,66,0.18); border:1px solid var(--gold); color:#fde68a;">⏳ ĐỢI HÀNG ĐỢI BÀN #7</span>`;
+    } else if (vst === 'FAILED') {
+      vBadge = `<span class="proj-status-pill" style="background:rgba(239,68,68,0.18); border:1px solid #ef4444; color:#fca5a5;">❌ LỖI RENDER</span>`;
+    } else if (p.has_script) {
+      vBadge = `<span class="proj-status-pill" style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.4); color:#93c5fd;">📄 ĐÃ CÓ KB.TXT — SẴN SÀNG LÀM VIDEO</span>`;
+    } else {
+      vBadge = `<span class="proj-status-pill" style="background:#161f30; border:1px solid #334155; color:#94a3b8;">⏳ ĐANG ĐỢI VIẾT KỊCH BẢN (BÀN #${p.active_stage || 1})</span>`;
+    }
+
+    const mp4Info = p.video_output_path
+      ? `<div style="font-size:11px; color:#34d399; margin-top:4px; font-family:'JetBrains Mono',monospace;">🎬 File MP4: ${p.video_output_path}</div>`
+      : '';
+
+    html += `
+      <div class="project-card ${isV7Done ? 'completed' : (isV7Run ? 'running' : '')}" style="margin-bottom:7px; padding:9px 12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+            <span class="proj-code-pill">#${exportPrefix}</span>
+            ${vBadge}
+            <span class="proj-meta-chip">📝 ${chars} ký tự</span>
+            <span class="proj-title-compact" style="font-weight:700;">${displayTitle}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            ${p.has_script ? `<button class="btn btn-gold btn-sm" style="padding:4px 10px; font-size:11.2px; font-weight:800;" onclick="sendProjectToVideoStudio('${p.project_id}')">🎬 Tạo Voice &amp; Render Video Ngay</button>` : `<button class="btn btn-dark btn-sm" style="padding:4px 9px; font-size:11px;" onclick="runSingleProject('${(p.project_dir || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")}', '${(p.project_id || '').replace(/'/g, "\\'")}')">▶️ Viết Kịch Bản Trước</button>`}
+            ${p.has_script ? `<button class="btn btn-green btn-sm" style="padding:4px 8px; font-size:11px;" onclick="downloadProjectFile('${p.project_id}', 'kb')">⬇️ KB.txt</button>` : ''}
+            <button class="btn btn-dark btn-sm" style="padding:4px 8px; font-size:11px; border-color:var(--gold); color:var(--gold);" onclick="openProjectFolder('${p.project_id}')">📂 Folder</button>
+          </div>
+        </div>
+        ${mp4Info}
+      </div>
+    `;
+  }
+  box.innerHTML = html;
+}
+
 async function fetchStatus() {
   try {
     const reqSeq = _nicheSwitchSeq;
@@ -3305,23 +3667,35 @@ async function fetchStatus() {
       navMonSum.innerText = runningSlots > 0 ? `🟢 ${runningSlots} luồng · ${runningDesks}/${totalDesks} Bàn` : `${totalDesks} Agent Sẵn sàng`;
     }
 
-    const logBox = document.getElementById('liveLogBox');
-    const prevLen = logBox.innerText.length;
-    logBox.innerText = data.recent_logs || 'Chưa có lệnh nào đang chạy. Hãy chọn Bên Mafia hoặc Bên Homeless V12 và bấm nút chạy!';
-    if (logBox.innerText.length !== prevLen) {
-      logBox.scrollTop = logBox.scrollHeight;
-    }
+    window._LAST_RAW_STUDIO_LOGS = data.recent_logs || '';
+    refreshFilteredLogDisplay(false);
 
     const miniLog = document.getElementById('miniLatestLogLine');
     if (miniLog) {
       const rawLogLines = (data.recent_logs || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      const lastLine = rawLogLines.length > 0 ? rawLogLines[rawLogLines.length - 1] : 'Sẵn sàng nhận lệnh — Click vào đây nếu muốn mở xem toàn bộ Nhật ký Log';
+      const lastLine = rawLogLines.length > 0 ? rawLogLines[rawLogLines.length - 1] : 'Sẵn sàng nhận lệnh — Click vào đây để mở Tab 📡 Nhật Ký Log riêng biệt';
       miniLog.innerText = '📡 ' + lastLine;
     }
 
     const projs = data.projects || [];
     window.LAST_PROJECTS_LIST = projs;
     document.getElementById('projCount').innerText = projs.length;
+    if (document.getElementById('subtabCountScripts')) {
+      document.getElementById('subtabCountScripts').innerText = projs.length;
+    }
+    renderSubTabVideoProjects(projs);
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'ZC_STUDIO_TELEMETRY_SYNC',
+          scriptsCount: projs.length,
+          renderBadge: document.getElementById('subtabCountRender')?.innerText || 'Bàn #7',
+          logBadge: document.getElementById('subtabLogBadge')?.innerText || 'Live',
+          agentsBadge: document.getElementById('navAccSummary')?.innerText || '9 Agent',
+          currentNiche: CURRENT_NICHE
+        }, '*');
+      }
+    } catch (e) {}
     const container = document.getElementById('projectsContainer');
     const isMexico = (data.selected_niche === 'mexico');
     const isHomeless = (data.selected_niche === 'homeless');
@@ -3620,7 +3994,14 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/" or parsed.path == "/index.html":
-            raw = HTML_PAGE.encode("utf-8")
+            ext_html_path = Path(__file__).resolve().parent / "assets" / "script_studio_dashboard.html"
+            if ext_html_path.exists():
+                try:
+                    raw = ext_html_path.read_text(encoding="utf-8", errors="ignore").encode("utf-8")
+                except Exception:
+                    raw = HTML_PAGE.encode("utf-8")
+            else:
+                raw = HTML_PAGE.encode("utf-8")
             try:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")

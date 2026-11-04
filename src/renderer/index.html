@@ -69,13 +69,13 @@
           <span>SẢN XUẤT KHÉP KÍN</span>
           <span class="stitch-count-tag">5</span>
         </div>
-        <button class="nav" data-page="script-studio">
+        <button class="nav active" data-page="script-studio">
           <span class="nav-idx">01</span>
           <span class="material-symbols-outlined nav-icon">auto_stories</span>
-          <span class="nav-label">Viết Kịch Bản AI</span>
-          <span class="nav-badge">9 Bàn</span>
+          <span class="nav-label">Viết Kịch Bản &amp; Render</span>
+          <span class="nav-badge">9 Bàn + GPU</span>
         </button>
-        <button class="nav active" data-page="batch">
+        <button class="nav" data-page="batch" style="display:none;">
           <span class="nav-idx">02</span>
           <span class="material-symbols-outlined nav-icon">movie_filter</span>
           <span class="nav-label">Tạo Batch Video</span>
@@ -156,22 +156,22 @@
 
     <main class="main">
       <!-- ================================================================= -->
-      <!-- TAB 01: VIẾT KỊCH BẢN AI & TỰ ĐỘNG HÓA 9 BÀN                      -->
+      <!-- TAB 01: VIẾT KỊCH BẢN & RENDER VIDEO AI (4 SUB-TABS TÁCH BIỆT)    -->
       <!-- ================================================================= -->
-      <section class="page" id="page-script-studio">
-        <div class="stitch-command-bar">
+      <section class="page active" id="page-script-studio">
+        <div class="stitch-command-bar" style="margin-bottom:8px;">
           <div class="stitch-cmd-left">
             <div class="stitch-icon-box">
               <span class="material-symbols-outlined">auto_stories</span>
             </div>
             <div>
               <div class="stitch-title-inline">
-                <h2>VIẾT KỊCH BẢN AI &amp; TỰ ĐỘNG HÓA 9 BÀN</h2>
+                <h2>VIẾT KỊCH BẢN &amp; RENDER VIDEO AI</h2>
                 <span id="scriptStudioServerBadge" class="badge" style="background:#065f46;color:#34d399;">🟢 Engine Kịch Bản: Đang kết nối...</span>
-                <span class="stitch-chip">PIPELINE BÀN #1 ➔ #9</span>
+                <span class="stitch-chip">PIPELINE BÀN #1 ➔ #7 · GPU NVENC</span>
               </div>
               <div id="bridgeLockedConfigSummaryText" class="stitch-locked-summary">
-                <span>📌 <strong>Cấu hình Video đã khóa:</strong> Đang đồng bộ từ tab Tạo Batch Video...</span>
+                <span>📌 <strong>Cấu hình Video đã khóa:</strong> Đang đồng bộ từ tab Render Video...</span>
               </div>
             </div>
           </div>
@@ -179,15 +179,15 @@
           <div class="stitch-cmd-right">
             <label class="stitch-inline-control" title="Cài đặt Project cố định riêng cho Key đang chọn (Chỉ cần chọn 1 lần cho mỗi Key)">
               <span>📁 Project của Key:</span>
-              <select id="bridgeKeyProjectSelect" style="width:auto;min-width:165px;"></select>
+              <select id="bridgeKeyProjectSelect" style="width:auto;min-width:155px;"></select>
             </label>
             <label class="stitch-inline-control" title="Cài đặt Giọng đọc (Voice AI) cố định riêng cho Key đang chọn (Chỉ cần chọn 1 lần cho mỗi Key)">
               <span>🎙️ Voice của Key:</span>
-              <select id="bridgeKeyVoiceSelect" style="width:auto;min-width:165px;"></select>
+              <select id="bridgeKeyVoiceSelect" style="width:auto;min-width:155px;"></select>
             </label>
             <label class="stitch-inline-control">
               <span>🔄 Tự động Bàn #7:</span>
-              <select id="bridgeModeSelect" style="width:auto;min-width:235px;">
+              <select id="bridgeModeSelect" style="width:auto;min-width:225px;">
                 <option value="STREAMING_VIDEO">⚡ Xong bài nào ➔ Tạo Voice + Render Video ngay</option>
                 <option value="BATCH_VIDEO">📦 Đợi xong cả lô ➔ Tạo Voice + Render Video</option>
                 <option value="STREAMING_VOICE">🎙️ Chỉ tự động tạo file Voice (.wav)</option>
@@ -201,8 +201,8 @@
             <button id="btnInspectLockedConfig" type="button" class="stitch-btn-amber">
               <span class="material-symbols-outlined">fact_check</span> Xem Cấu Hình &amp; Folder
             </button>
-            <button id="btnGoToVideoConfigTab" type="button">
-              <span class="material-symbols-outlined">tune</span> Đổi Cấu Hình Video
+            <button id="btnGoToVideoConfigTab" type="button" onclick="window.switchWorkspaceSubTab('render')">
+              <span class="material-symbols-outlined">movie_filter</span> Tab Render Video
             </button>
             <button id="btnManualRunTongHopToVideo" type="button" class="stitch-btn-emerald">
               <span class="material-symbols-outlined">play_circle</span> Chọn Folder TONG HOP ➔ Tạo Video
@@ -213,64 +213,174 @@
           </div>
         </div>
 
-        <div id="bridgeQueueBox" class="panel stitch-bridge-queue" style="display:none;">
-          <div class="stitch-section-head">
-            <strong id="bridgeQueueTitle">🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice &amp; Render Video GPU</strong>
-            <div class="actions">
-              <button id="btnOpenBridgeOutputFolder" type="button"><span class="material-symbols-outlined">folder_open</span> Mở Folder Output Video</button>
-              <button id="btnClearBridgeCompleted" type="button"><span class="material-symbols-outlined">cleaning_services</span> Dọn mục đã xong</button>
-            </div>
+        <!-- THANH 4 TAB NHỎ (SUB-TABS) CỦA PHẦN VIẾT KỊCH BẢN & RENDER -->
+        <div id="zcWorkspaceSubTabBar" class="zc-workspace-subtab-bar">
+          <div class="zc-subtab-buttons">
+            <button type="button" id="zcBtnSubTab_scripts" class="zc-subtab-btn active" onclick="window.switchWorkspaceSubTab('scripts')">
+              <span class="material-symbols-outlined">edit_note</span>
+              <span>1. Viết Kịch Bản &amp; Tiêu Đề</span>
+              <span id="zcBadgeSubTab_scripts" class="zc-subtab-badge">0</span>
+            </button>
+            <button type="button" id="zcBtnSubTab_render" class="zc-subtab-btn" onclick="window.switchWorkspaceSubTab('render')">
+              <span class="material-symbols-outlined">movie_filter</span>
+              <span>2. Render Video &amp; Tiến Độ GPU</span>
+              <span id="zcBadgeSubTab_render" class="zc-subtab-badge">Bàn #7 · GPU</span>
+            </button>
+            <button type="button" id="zcBtnSubTab_logs" class="zc-subtab-btn" onclick="window.switchWorkspaceSubTab('logs')">
+              <span class="material-symbols-outlined">terminal</span>
+              <span>3. Nhật Ký Log Hệ Thống</span>
+              <span id="zcBadgeSubTab_logs" class="zc-subtab-badge">Live</span>
+            </button>
+            <button type="button" id="zcBtnSubTab_agents" class="zc-subtab-btn" onclick="window.switchWorkspaceSubTab('agents')">
+              <span class="material-symbols-outlined">smart_toy</span>
+              <span>4. 9 Bàn Agent &amp; 3 Acc ChatGPT</span>
+              <span id="zcBadgeSubTab_agents" class="zc-subtab-badge">Acc #1..#3</span>
+            </button>
           </div>
-          <div id="bridgeQueueList" class="stitch-bridge-queue-list"></div>
+          <div class="zc-subtab-right-info">
+            <span id="zcSubTabHintText">✍️ Đang ở Tab 1: Soạn &amp; Quản lý Danh sách Kịch bản (Đã tách riêng Render &amp; Log sang Tab 2, 3)</span>
+          </div>
         </div>
 
-        <div class="panel stitch-iframe-shell">
+        <!-- THANH CHỌN CHẾ ĐỘ XEM LOG (CHỈ HIỆN KHI Ở TAB NHỎ SỐ 3: NHẬT KÝ LOG) -->
+        <div id="zcLogModeToolbar" class="zc-log-mode-toolbar" style="display:none;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <strong style="color:#38bdf8;font-size:12.5px;">📡 CHẾ ĐỘ XEM NHẬT KÝ LOG:</strong>
+            <button type="button" id="zcBtnLogMode_SPLIT" class="zc-log-mode-btn active" onclick="window.setWorkspaceLogViewMode('SPLIT')">
+              📋 Xem Cả 2 Log Cùng Lúc (Viết Kịch Bản AI + Render Video GPU)
+            </button>
+            <button type="button" id="zcBtnLogMode_SCRIPT" class="zc-log-mode-btn" onclick="window.setWorkspaceLogViewMode('SCRIPT')">
+              ✍️ Chỉ Xem Log Viết Kịch Bản &amp; 9 Bàn Agent (Toàn màn hình)
+            </button>
+            <button type="button" id="zcBtnLogMode_RENDER" class="zc-log-mode-btn" onclick="window.setWorkspaceLogViewMode('RENDER')">
+              🎬 Chỉ Xem Log Render Video &amp; NVENC GPU (Toàn màn hình)
+            </button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button type="button" onclick="window.copyNvencRenderLog()" style="padding:5px 10px;font-size:11.5px;">📋 Copy Log Render GPU</button>
+            <button type="button" class="danger" onclick="window.clearNvencRenderLog()" style="padding:5px 10px;font-size:11.5px;">🧹 Xóa Log Render GPU</button>
+          </div>
+        </div>
+
+        <!-- KHUNG IFRAME SCRIPT STUDIO (HIỂN THỊ CHO TAB 1: VIẾT KỊCH BẢN, TAB 3: LOG AI, TAB 4: 9 AGENT) -->
+        <div id="zcStudioIframeShell" class="panel stitch-iframe-shell">
           <iframe id="scriptStudioIframe" src="about:blank" style="width:100%;height:100%;border:0;background:#090b10;" allow="clipboard-read; clipboard-write"></iframe>
         </div>
-      </section>
 
-      <!-- ================================================================= -->
-      <!-- TAB 02: TẠO BATCH VIDEO HÀNG LOẠT (STITCH SCREEN 04)              -->
-      <!-- ================================================================= -->
-      <section class="page active" id="page-batch">
-        <!-- Top Action Bar (Stitch Screen 04) -->
-        <div class="stitch-page-header">
-          <div class="stitch-header-left">
-            <div class="stitch-icon-box neon">
-              <span class="material-symbols-outlined">movie_filter</span>
-              <span class="corner-dot"></span>
+        <!-- KHUNG LOG RENDER VIDEO GPU NVENC (CHỈ HIỂN THỊ Ở TAB NHỎ SỐ 3: NHẬT KÝ LOG HỆ THỐNG) -->
+        <div id="zcNvencLogContainer" class="panel stitch-card" style="display:none;margin-top:10px;">
+          <div class="stitch-card-header">
+            <div class="stitch-card-title">
+              <span class="material-symbols-outlined text-neon">terminal</span>
+              <h3>NHẬT KÝ RENDER VIDEO &amp; VOICE GPU (NVENC HARDWARE RENDER LOG &amp; COMPOSITOR STREAM)</h3>
             </div>
-            <div>
-              <div class="stitch-title-inline">
-                <h2>TẠO BATCH VIDEO HÀNG LOẠT</h2>
-                <span class="stitch-chip neon">HARDWARE ACCELERATED</span>
-              </div>
-              <p class="stitch-subtitle">Trung tâm điều phối sản xuất GPU · Ghép Voice + Subtitle + Stock + Green Screen đa luồng</p>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="stitch-live-indicator"><span class="pulse-dot"></span> STREAMING 60 FPS</span>
+              <button type="button" onclick="window.copyNvencRenderLog()" style="padding:4px 9px;font-size:11px;">📋 Copy</button>
+              <button type="button" class="danger" onclick="window.clearNvencRenderLog()" style="padding:4px 9px;font-size:11px;">🧹 Xóa</button>
             </div>
           </div>
-
-          <div class="stitch-header-actions">
-            <button id="btnLockConfigForScriptStudio" type="button" class="stitch-btn-amber" title="Lưu & Khóa toàn bộ cấu hình Template, Giọng đọc, Kho Stock và Output hiện tại để tự động dùng khi Viết Kịch Bản AI xong">
-              <span class="material-symbols-outlined">lock</span> Khóa Cấu Hình ➔ Kịch Bản AI
-            </button>
-            <button id="scanBatch" type="button">
-              <span class="material-symbols-outlined">fact_check</span> Kiểm Tra Đầu Vào (Preflight)
-            </button>
-            <button class="primary" id="startBatch" type="button">
-              <span class="material-symbols-outlined">bolt</span> Bắt Đầu Render Batch
-            </button>
-            <span class="stitch-divider"></span>
-            <button id="pauseBatch" type="button">
-              <span class="material-symbols-outlined">pause</span> Tạm Dừng
-            </button>
-            <button class="danger" id="cancelBatch" type="button">
-              <span class="material-symbols-outlined">close</span> Hủy
-            </button>
-            <button id="btnOpenCurrentBatchOutput" type="button" title="Mở thư mục Output">
-              <span class="material-symbols-outlined">folder_open</span>
-            </button>
-          </div>
+          <pre id="renderLog" class="console" style="min-height:240px;">Chưa có tiến trình Render Video GPU nào chạy. Khi Bàn #7 hoặc Batch Render hoạt động, log FFmpeg/NVENC/Whisper sẽ hiển thị trực tiếp tại đây...</pre>
         </div>
+
+        <!-- ================================================================= -->
+        <!-- TAB NHỎ SỐ 2: RENDER VIDEO & TIẾN ĐỘ GPU (BÀN #7 + BATCH VIDEO)   -->
+        <!-- ================================================================= -->
+        <div id="zcRenderSubTabContainer" style="display:none;">
+          <!-- KHỐI 1: TIẾN ĐỘ TỰ ĐỘNG BÀN #7 (TỪ KỊCH BẢN AI SANG VOICE & VIDEO) -->
+          <div id="bridgeQueueBox" class="panel stitch-bridge-queue" style="display:block;margin-bottom:12px;">
+            <div class="stitch-section-head" style="flex-wrap:wrap;gap:8px;">
+              <div>
+                <strong id="bridgeQueueTitle" style="font-size:13.5px;color:#00ff88;">🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice (.wav), Phụ Đề (.srt) &amp; Render Video GPU (.mp4)</strong>
+                <div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">Tự động nhận kịch bản sạch <code>_KB.txt</code> từ Tab 1 (Viết Kịch Bản) để tạo Voice AI, khớp phụ đề Whisper GPU và xuất Video MP4.</div>
+              </div>
+              <div class="actions" style="flex-wrap:wrap;gap:6px;">
+                <button id="btnPushAllReadyScriptsToBridge" type="button" class="stitch-btn-emerald" onclick="window.triggerAllReadyScriptsToBridge()">
+                  <span class="material-symbols-outlined">rocket_launch</span> Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render
+                </button>
+                <button id="btnOpenBridgeOutputFolder" type="button"><span class="material-symbols-outlined">folder_open</span> Mở Folder Output Video</button>
+                <button id="btnClearBridgeCompleted" type="button"><span class="material-symbols-outlined">cleaning_services</span> Dọn mục đã xong</button>
+              </div>
+            </div>
+            <div id="bridgeQueueList" class="stitch-bridge-queue-list">
+              <div style="padding:10px 12px;background:#0d1320;border:1px dashed #334155;border-radius:6px;color:#94a3b8;font-size:12px;">
+                ⏳ Hàng đợi Bàn #7 đang rảnh. Khi kịch bản ở Tab 1 viết xong (hoặc khi bạn bấm <strong>"🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render"</strong>), tiến độ tạo Voice &amp; Render Video sẽ hiển thị trực tiếp tại đây.
+              </div>
+            </div>
+          </div>
+
+          <!-- KHỐI 2: TẠO BATCH VIDEO HÀNG LOẠT & BẢNG TIẾN ĐỘ RENDER ĐẶT NGAY TRÊN ĐẦU -->
+          <div id="page-batch" class="zc-batch-embedded-pane">
+            <!-- Top Action Bar -->
+            <div class="stitch-page-header" style="margin-bottom:12px;">
+              <div class="stitch-header-left">
+                <div class="stitch-icon-box neon">
+                  <span class="material-symbols-outlined">movie_filter</span>
+                  <span class="corner-dot"></span>
+                </div>
+                <div>
+                  <div class="stitch-title-inline">
+                    <h2>ĐIỀU KHIỂN &amp; TIẾN ĐỘ RENDER BATCH VIDEO HÀNG LOẠT</h2>
+                    <span class="stitch-chip neon">HARDWARE ACCELERATED</span>
+                  </div>
+                  <p class="stitch-subtitle">Quan sát trực tiếp từng file Voice/SRT đang Render GPU NVENC và tùy chỉnh cấu hình đầu ra</p>
+                </div>
+              </div>
+
+              <div class="stitch-header-actions">
+                <button id="btnLockConfigForScriptStudio" type="button" class="stitch-btn-amber" title="Lưu & Khóa toàn bộ cấu hình Template, Giọng đọc, Kho Stock và Output hiện tại để tự động dùng khi Viết Kịch Bản AI xong">
+                  <span class="material-symbols-outlined">lock</span> Lưu &amp; Khóa Cấu Hình Video
+                </button>
+                <button id="scanBatch" type="button">
+                  <span class="material-symbols-outlined">fact_check</span> Kiểm Tra Đầu Vào (Preflight)
+                </button>
+                <button class="primary" id="startBatch" type="button">
+                  <span class="material-symbols-outlined">bolt</span> Bắt Đầu Render Batch
+                </button>
+                <span class="stitch-divider"></span>
+                <button id="pauseBatch" type="button">
+                  <span class="material-symbols-outlined">pause</span> Tạm Dừng
+                </button>
+                <button class="danger" id="cancelBatch" type="button">
+                  <span class="material-symbols-outlined">close</span> Hủy
+                </button>
+                <button id="btnOpenCurrentBatchOutput" type="button" title="Mở thư mục Output">
+                  <span class="material-symbols-outlined">folder_open</span>
+                </button>
+                <button type="button" onclick="window.switchWorkspaceSubTab('logs');window.setWorkspaceLogViewMode('RENDER');" title="Xem Nhật ký Log Render GPU NVENC ở Tab 3">
+                  <span class="material-symbols-outlined">terminal</span> Xem Log Render
+                </button>
+              </div>
+            </div>
+
+            <!-- ĐƯA BẢNG TIẾN ĐỘ RENDER THEO LÔ LÊN NGAY ĐẦU ĐỂ DỄ QUAN SÁT NHẤT -->
+            <div class="panel stitch-card" style="margin-bottom:14px;border:1px solid rgba(0,255,136,0.35);">
+              <div class="stitch-card-header">
+                <div class="stitch-card-title">
+                  <span class="material-symbols-outlined text-neon">queue_play_next</span>
+                  <h3>TIẾN ĐỘ RENDER THEO LÔ (BATCH PIPELINE)</h3>
+                </div>
+                <div class="muted" id="batchProgressLabel" style="margin:0;">Chưa quét dữ liệu đầu vào (Bấm "Kiểm Tra Đầu Vào" hoặc chạy từ Kịch Bản AI).</div>
+              </div>
+              <div class="progress-shell"><div class="progress-bar" id="batchProgress"></div></div>
+              <div class="table-wrap" style="max-height:320px;overflow-y:auto;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>VOICE SOURCE</th>
+                      <th>SRT SUBTITLE</th>
+                      <th>ẢNH / GREEN THEO VOICE</th>
+                      <th>THỜI LƯỢNG</th>
+                      <th>TRẠNG THÁI</th>
+                      <th>THỜI GIAN RENDER</th>
+                      <th>OUTPUT FILE</th>
+                    </tr>
+                  </thead>
+                  <tbody id="batchJobs"></tbody>
+                </table>
+              </div>
+            </div>
 
         <!-- Main 2-Column Workspace (Stitch Screen 04: Left Input & Script / Right GPU & Export) -->
         <div class="stitch-batch-grid">
@@ -631,46 +741,7 @@
             </details>
           </div>
         </div>
-
-        <!-- BOTTOM SECTION 1: TIẾN ĐỘ RENDER THEO LÔ (BATCH PIPELINE - STITCH SCREEN 04) -->
-        <div class="panel stitch-card" style="margin-bottom:14px;">
-          <div class="stitch-card-header">
-            <div class="stitch-card-title">
-              <span class="material-symbols-outlined text-neon">queue_play_next</span>
-              <h3>TIẾN ĐỘ RENDER THEO LÔ (BATCH PIPELINE)</h3>
-            </div>
-            <div class="muted" id="batchProgressLabel" style="margin:0;">Chưa quét dữ liệu đầu vào (Bấm "Kiểm Tra Đầu Vào" để quét).</div>
           </div>
-          <div class="progress-shell"><div class="progress-bar" id="batchProgress"></div></div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>VOICE SOURCE</th>
-                  <th>SRT SUBTITLE</th>
-                  <th>ẢNH / GREEN THEO VOICE</th>
-                  <th>THỜI LƯỢNG</th>
-                  <th>TRẠNG THÁI</th>
-                  <th>THỜI GIAN RENDER</th>
-                  <th>OUTPUT FILE</th>
-                </tr>
-              </thead>
-              <tbody id="batchJobs"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- BOTTOM SECTION 2: NVENC HARDWARE RENDER LOG (STITCH SCREEN 04) -->
-        <div class="panel stitch-card">
-          <div class="stitch-card-header">
-            <div class="stitch-card-title">
-              <span class="material-symbols-outlined text-neon">terminal</span>
-              <h3>NVENC HARDWARE RENDER LOG &amp; COMPOSITOR STREAM</h3>
-            </div>
-            <span class="stitch-live-indicator"><span class="pulse-dot"></span> STREAMING 60 FPS</span>
-          </div>
-          <pre id="renderLog" class="console"></pre>
         </div>
       </section>
 

@@ -359,3 +359,30 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
    - Chuẩn hóa điểm tiêu đề trong cả `parse_winner_title_and_score()`, khi đọc `STATE.json` và trên `mafia_dashboard_server.py`.
    - Bổ sung cơ chế tự động thử lại từ Checkpoint (`2 lần`) trong `run_single_project_pipeline` nếu gặp lỗi mạng tạm thời.
 
+
+
+---
+
+## 31. Nâng Cấp Bản `V1.0.3 (Build #117)` — Tách Biệt Không Gian `Viết Kịch Bản & Render` Thành 4 Tab Nhỏ (Sub-Tabs) Độc Lập: Viết Kịch Bản / Render Video GPU / Nhật Ký Log / 9 Bàn Agent
+
+### 31.1. Yêu cầu thực tế từ người dùng
+- Chuyển phần **Render Video** sang 1 **Tab nhỏ (`Sub-Tab`)** nằm ngay trong không gian **`01 Viết Kịch Bản & Render`** để dễ quan sát tiến độ tạo Voice & Render Video.
+- Tách toàn bộ phần **Nhật ký Log** sang 1 **Tab Log riêng biệt (`📡 3. Nhật Ký Log Hệ Thống`)** để kiểm tra độc lập, không xếp chồng chung vào màn hình Viết Kịch Bản hay màn hình Render Video gây rối mắt và khó quan sát.
+
+### 31.2. Kiến trúc 4 Tab Nhỏ (`Sub-Tabs`) đã triển khai (`V1.0.3 Build #117`)
+1. **Tab Nhỏ 1 — `✍️ 1. Viết Kịch Bản & Tiêu Đề` (`#zcBtnSubTab_scripts` / `#subtabPane_scripts`):**
+   - Chỉ hiển thị duy nhất **Khung Giao Việc & Nhập Tiêu Đề (`📝 GIAO VIỆC`)** và **Danh Sách Kịch Bản (`📋 DANH SÁCH KỊCH BẢN`)** ngay bên dưới.
+   - Đã loại bỏ hoàn toàn các hộp Log, hộp 3 Acc ChatGPT, hộp 9 Bàn Agent và hộp Tiến độ Bàn #7 khỏi màn hình này, giúp danh sách kịch bản luôn gọn gàng, thoáng đãng 100%.
+2. **Tab Nhỏ 2 — `🎬 2. Render Video & Tiến Độ GPU` (`#zcBtnSubTab_render` / `#zcRenderSubTabContainer`):**
+   - Tích hợp toàn bộ trung tâm **Render Video (`Bàn #7` + `Tạo Batch Video Hàng Loạt`)** thành Tab nhỏ số 2 ngay trong mục `01 Viết Kịch Bản & Render`.
+   - Đưa **Khối Tiến Độ Tự Động Bàn #7 (`#bridgeQueueBox`)** và **Bảng `TIẾN ĐỘ RENDER THEO LÔ (BATCH PIPELINE)` (`#batchProgress` + `#batchJobs`)** lên ngay đầu trang (phía trên 2 cột cấu hình `1. Nguồn Dữ Liệu` & `2. Cấu Hình GPU NVENC`), kèm nút **`🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render`** để quan sát trực tiếp từng bài đang tạo Voice/SRT/MP4 ngay khi mở Tab.
+3. **Tab Nhỏ 3 — `📡 3. Nhật Ký Log Hệ Thống` (`#zcBtnSubTab_logs` / `#subtabPane_logs` + `#zcNvencLogContainer`):**
+   - Màn hình kiểm tra Log chuyên dụng, tách rời 100% khỏi màn hình Viết Kịch Bản và màn hình Render Video.
+   - Hỗ trợ 3 chế độ quan sát linh hoạt:
+     - **`📋 Xem Cả 2 Log Cùng Lúc`**: Hiển thị song song **Log Viết Kịch Bản AI (9 Bàn)** ở nửa trên và **Log Render Video GPU NVENC (`#renderLog`)** ở nửa dưới.
+     - **`✍️ Chỉ Xem Log Viết Kịch Bản & 9 Bàn Agent (Toàn màn hình)`**: Tích hợp ô tìm kiếm từ khóa (`#logSearchInput`), bộ lọc danh mục (`Tất cả`, `Chỉ Kịch Bản`, `Chỉ Voice & Video`, `Chỉ Cảnh Báo & Lỗi`), tự cuộn (`Auto-scroll`), Copy và Xóa bớt Log.
+     - **`🎬 Chỉ Xem Log Render Video & NVENC GPU (Toàn màn hình)`**: Hiển thị toàn màn hình luồng FFmpeg/NVENC/Whisper GPU.
+4. **Tab Nhỏ 4 — `🤖 4. 9 Bàn Agent & 3 Acc ChatGPT` (`#zcBtnSubTab_agents` / `#subtabPane_agents`):**
+   - Quản lý tập trung 3 tài khoản ChatGPT Web (`Acc #1`, `Acc #2`, `Acc #3` — bật/ẩn Chrome, đồng bộ Skill) và sơ đồ trạng thái trực tiếp của 9 Bàn Nhân viên Agent AI (`Bàn #0` ➔ `Bàn #7`).
+5. **Đồng bộ & Phát hành OTA `V1.0.3 (Build #117)`:**
+   - Cập nhật đồng bộ trên [`assets/script_studio_dashboard.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/assets/script_studio_dashboard.html), [`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py), [`src/renderer/index.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/index.html), [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js), [`src/renderer/styles.css`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/styles.css), đóng gói `Ban-Giao-Khach-Hang-EXE/VideoBatchStudio` và đẩy bản cập nhật `V1.0.3 (Build #117)` lên GitHub OTA.
