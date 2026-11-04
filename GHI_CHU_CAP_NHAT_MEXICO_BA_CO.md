@@ -386,3 +386,29 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
    - Quản lý tập trung 3 tài khoản ChatGPT Web (`Acc #1`, `Acc #2`, `Acc #3` — bật/ẩn Chrome, đồng bộ Skill) và sơ đồ trạng thái trực tiếp của 9 Bàn Nhân viên Agent AI (`Bàn #0` ➔ `Bàn #7`).
 5. **Đồng bộ & Phát hành OTA `V1.0.3 (Build #117)`:**
    - Cập nhật đồng bộ trên [`assets/script_studio_dashboard.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/assets/script_studio_dashboard.html), [`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py), [`src/renderer/index.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/index.html), [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js), [`src/renderer/styles.css`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/styles.css), đóng gói `Ban-Giao-Khach-Hang-EXE/VideoBatchStudio` và đẩy bản cập nhật `V1.0.3 (Build #117)` lên GitHub OTA.
+
+---
+
+## 32. Nâng Cấp Bản `V1.0.4 (Build #118)` — Sửa Triệt Để Lỗi Dính Nhãn `Pasted text(YYYYMMDD-HHMMSS).txtDocument` & Lỗi Dính Liền Các Đoạn Văn `<p>` (`...them.Bracken...`) Khi Thu Hoạch Kịch Bản Trên ChatGPT Web
+
+### 32.1. Nguyên nhân gốc rễ từ kịch bản thực tế người dùng báo cáo (`Pasted text(20261104-125645).txtDocumentRuthie Mercer...`)
+1. **Nguyên nhân #1 — Vì sao Tầng 1 (`/backend-api/conversation/`) bị bỏ qua khi Prompt > 12.000 ký tự:**
+   - Khi hệ thống dán một Prompt dài (`> 12.000 ký tự`, ví dụ ở các lượt viết/sửa từng Part của Homeless V12), ChatGPT Web tự động gom văn bản dán vào 1 thẻ file đính kèm `Pasted text(20261104-125645).txt` (`msg.metadata.attachments`), làm cho `msg.content.parts` của lượt `user` chỉ còn chuỗi rỗng `[""]`.
+   - Trong [`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py), Tầng 1 trước đây kiểm tra `if (role === 'user' && ... && txt)`. Vì `txt` rỗng nên lượt `user` bị bỏ qua (`turnsChrono.length === 0`), kéo theo lượt `assistant` cũng bị bỏ qua và rơi xuống Tầng 2 (`domToMarkdown`).
+2. **Nguyên nhân #2 — Vì sao Tầng 2 (`domToMarkdown`) dính nhãn `Pasted text(20261104-...).txtDocument` và mất dấu xuống dòng giữa các thẻ `<p>` (`...outlasted them.Bracken stumbled...`):**
+   - Trong DOM của ChatGPT Web, thẻ chip đính kèm `Pasted text(20261104-125645).txt` + `Document` nằm ngoài `[data-user-message-bubble="true"]`. Khi `cloneT = tNode.cloneNode(true)` chỉ xóa `[data-user-message-bubble="true"]`, thẻ chip đính kèm của user vẫn nằm lại ở đầu `cloneT`.
+   - Đồng thời, trong trình duyệt Chromium/Blink, khi gọi `clone.innerText` trên một nút DOM đã tách rời (`root.cloneNode(true)` chưa gắn vào `document`), trình duyệt không tính toán CSS `display: block` cho thẻ `<p>`, khiến các đoạn văn `<p>...</p><p>...</p>` bị nối sát vào nhau không có dấu xuống dòng (`...outlasted them.Bracken stumbled...`, `Pasted text(20261104-125645).txtDocument[PART 1]Ruthie...`).
+   - Sau đó ở Bàn #6 (`tts_post_director.py`), bộ lọc ngoặc vuông xóa `[PART 1]`, để lại `Pasted text(20261104-125645).txtDocumentRuthie Mercer found...` đi thẳng sang tạo Voice & Render Video.
+
+### 32.2. Giải pháp kỹ thuật 3 Lớp đã triển khai (`V1.0.4 Build #118`)
+1. **Lớp 1 — Sửa tận gốc tại [`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py) (`read_full_thread` & `domToMarkdown`):**
+   - **Tầng 1 (`/backend-api/conversation/`):** Chấp nhận mọi lượt `user` có `msg.metadata.attachments` ngay cả khi `content.parts` rỗng (`txt || '[Pasted Prompt]'`), giúp thu hoạch trực tiếp 100% văn bản Markdown gốc từ máy chủ OpenAI (đầy đủ `\n\n`, tuyệt đối không bao giờ dính DOM chip).
+   - **Tầng 2 (`domToMarkdown`):**
+     - Chỉ trích xuất phản hồi từ thẻ `[data-message-author-role="assistant"], .agent-turn` (không bao giờ quét nhầm vùng chứa file đính kèm của User).
+     - Chèn tường minh `\n\n` vào trước và sau mọi thẻ `p, blockquote, pre, hr, tr` (`el.insertAdjacentText('beforebegin', '\n\n')`) trước khi đọc `clone.textContent`, bảo toàn 100% ngắt đoạn văn trên nút DOM tách rời.
+     - Lọc bỏ mọi chuỗi `Pasted text(...).txtDocument` ngay tại tầng JS DOM.
+2. **Lớp 2 — Bổ sung bộ làm sạch & khôi phục đoạn văn `clean_chatgpt_web_artifacts_and_paragraphs()` trong [`engine/mafia_chatgpt_pipeline.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/mafia_chatgpt_pipeline.py):**
+   - Tích hợp trực tiếp vào `extract_clean_script_text()`, `strip_part_headers_for_tts()`, `split_script_into_part_dict()` và `ai_diagnose_and_complete_part()`.
+   - Tự động xóa sạch mọi biến thể `Pasted text(YYYYMMDD-HHMMSS).txtDocument`, tách riêng nhãn `[PART N]` nếu bị dính chữ, và tự động khôi phục dấu xuống dòng đoạn văn `\n\n` tại mọi vị trí câu kết thúc (`.`, `!`, `?`, `."`, `.”`) bị dính sát vào chữ cái viết hoa đầu câu tiếp theo (`them.Bracken` ➔ `them.\n\nBracken`).
+3. **Lớp 3 — Bổ sung cổng làm sạch hậu kỳ tại Bàn #6 / Bàn #7 ([`engine/tts_post_director.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/tts_post_director.py)):**
+   - Cả `sanitize_and_normalize_tts_script()` (Mafia / Homeless / 12 Key US) và `sanitize_and_normalize_mexico_spanish_tts()` (Mexico `es-MX`) đều quét xóa `Pasted text(...).txtDocument` và khôi phục ngắt đoạn `\n\n` trước khi xuất `FULL_SCRIPT.txt` và `TONG HOP/{TenKichBan}_KB.txt` sang Phòng Thu Voice & Render Video.

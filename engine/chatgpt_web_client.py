@@ -2125,17 +2125,26 @@ class ChatGPTWebMultiTabClient:
                                 const ctype = content.content_type || '';
                                 const parts = Array.isArray(content.parts) ? content.parts.filter(p => typeof p === 'string') : [];
                                 const txt = parts.join('\\n').trim();
-                                if (role === 'user' && (ctype === 'text' || ctype === 'multimodal_text') && txt) {{
+                                const hasAtt = Boolean(msg.metadata && Array.isArray(msg.metadata.attachments) && msg.metadata.attachments.length > 0);
+                                if (role === 'user' && (ctype === 'text' || ctype === 'multimodal_text' || hasAtt)) {{
                                     turnsChrono.push({{
                                         id: msg.id || nd.id,
-                                        user_text: txt,
+                                        user_text: txt || (hasAtt ? '[Pasted Prompt]' : ''),
                                         agent_texts: [],
                                         status: 'completed'
                                     }});
-                                }} else if (turnsChrono.length > 0 && role === 'assistant' && (ctype === 'text' || ctype === 'multimodal_text')) {{
+                                }} else if (role === 'assistant' && (ctype === 'text' || ctype === 'multimodal_text') && txt) {{
                                     const rec = msg.recipient || 'all';
                                     const ch = msg.channel || 'final';
-                                    if ((rec === 'all' || !msg.recipient) && (ch === 'final' || !msg.channel) && txt) {{
+                                    if ((rec === 'all' || !msg.recipient) && (ch === 'final' || !msg.channel)) {{
+                                        if (turnsChrono.length === 0) {{
+                                            turnsChrono.push({{
+                                                id: msg.id || nd.id,
+                                                user_text: '[Prompt]',
+                                                agent_texts: [],
+                                                status: 'completed'
+                                            }});
+                                        }}
                                         turnsChrono[turnsChrono.length - 1].agent_texts.push(txt);
                                         if (msg.status && msg.status !== 'finished_successfully') {{
                                             turnsChrono[turnsChrono.length - 1].status = 'running';
@@ -2164,17 +2173,26 @@ class ChatGPTWebMultiTabClient:
                 }} catch (e) {{}}
             }}
 
-            // 2. Đọc trực tiếp từ DOM của Tab (Nhanh 0ms, không tốn bất kỳ HTTP request nào!)
+            // 2. Đọc trực tiếp từ DOM của Tab (Nhanh 0ms, bảo toàn 100% xuống dòng <p> và loại bỏ tuyệt đối thẻ Pasted text(...).txtDocument)
             function domToMarkdown(root) {{
                 if (!root) return '';
                 const clone = root.cloneNode(true);
-                clone.querySelectorAll('button, svg, style, script').forEach(el => el.remove());
-                clone.querySelectorAll('h1').forEach(el => el.replaceWith('\\n# ' + el.innerText.trim() + '\\n'));
-                clone.querySelectorAll('h2').forEach(el => el.replaceWith('\\n## ' + el.innerText.trim() + '\\n'));
-                clone.querySelectorAll('h3').forEach(el => el.replaceWith('\\n### ' + el.innerText.trim() + '\\n'));
-                clone.querySelectorAll('strong, b').forEach(el => el.replaceWith('**' + el.innerText + '**'));
-                clone.querySelectorAll('li').forEach(el => el.replaceWith('\\n- ' + el.innerText.trim()));
-                return (clone.innerText || '').trim();
+                clone.querySelectorAll('button, svg, style, script, [data-user-message-bubble="true"], [data-message-author-role="user"]').forEach(el => el.remove());
+                clone.querySelectorAll('br').forEach(el => el.replaceWith('\\n'));
+                clone.querySelectorAll('h1').forEach(el => el.replaceWith('\\n\\n# ' + (el.textContent || '').trim() + '\\n\\n'));
+                clone.querySelectorAll('h2').forEach(el => el.replaceWith('\\n\\n## ' + (el.textContent || '').trim() + '\\n\\n'));
+                clone.querySelectorAll('h3').forEach(el => el.replaceWith('\\n\\n### ' + (el.textContent || '').trim() + '\\n\\n'));
+                clone.querySelectorAll('strong, b').forEach(el => el.replaceWith('**' + (el.textContent || '') + '**'));
+                clone.querySelectorAll('li').forEach(el => el.replaceWith('\\n- ' + (el.textContent || '').trim()));
+                clone.querySelectorAll('p, blockquote, pre, hr, tr').forEach(el => {{
+                    el.insertAdjacentText('beforebegin', '\\n\\n');
+                    el.insertAdjacentText('afterend', '\\n\\n');
+                }});
+                let outTxt = (clone.textContent || clone.innerText || '');
+                outTxt = outTxt.replace(/Pasted\\s+text\\s*\\([^)\\n]{{1,40}}\\)(?:\\.(?:txt|md|json|doc|docx|pdf|csv))?\\s*(?:Document|Tài liệu|Archivo|Documento)?/gi, '\\n\\n');
+                outTxt = outTxt.replace(/(\\[\\s*PART\\s+\\d+\\s*\\])(?=[A-ZÁÉÍÓÚÑÜ"“‘¡¿])/gi, '$1\\n\\n');
+                outTxt = outTxt.replace(/\\n{{3,}}/g, '\\n\\n').trim();
+                return outTxt;
             }}
 
             const turnNodes = Array.from(document.querySelectorAll('[data-turn-key]'));
@@ -2185,9 +2203,14 @@ class ChatGPTWebMultiTabClient:
                     const items = [];
                     const uNode = tNode.querySelector('[data-user-message-bubble="true"], [data-message-author-role="user"]');
                     if (uNode) items.push({{ type: 'userMessage', text: (uNode.innerText || '').trim() }});
-                    const cloneT = tNode.cloneNode(true);
-                    cloneT.querySelectorAll('[data-user-message-bubble="true"], [data-message-author-role="user"], h4').forEach(e => e.remove());
-                    const mdTxt = domToMarkdown(cloneT);
+                    const asstNodes = Array.from(tNode.querySelectorAll('[data-message-author-role="assistant"], .agent-turn'));
+                    let mdTxt = '';
+                    if (asstNodes.length > 0) {{
+                        mdTxt = asstNodes.map(an => domToMarkdown(an.querySelector('.markdown') || an)).filter(Boolean).join('\\n\\n').trim();
+                    }} else if (!uNode) {{
+                        const mdOnly = tNode.querySelector('.markdown');
+                        if (mdOnly) mdTxt = domToMarkdown(mdOnly);
+                    }}
                     if (mdTxt) items.push({{ type: 'agentMessage', text: mdTxt }});
                     const tStateEl = tNode.querySelector('[data-talvt-turn-state]');
                     const tState = tStateEl ? tStateEl.getAttribute('data-talvt-turn-state') : 'complete';

@@ -66,8 +66,41 @@ def sanitize_and_normalize_tts_script(raw_text: str) -> tuple[str, dict]:
             examples.append(f"[{cat}] `{before.strip()}` -> `{after.strip()}`")
 
     # ------------------------------------------------------------------
-    # 1. XÓA KÝ TỰ ẨN UNICODE, THẺ HTML/XML, NGOẶC VUÔNG, MARKDOWN LẠ
+    # 1. XÓA KÝ TỰ ẨN UNICODE, NHÃN PASTED TEXT DOM, THẺ HTML/XML, NGOẶC VUÔNG, MARKDOWN LẠ
     # ------------------------------------------------------------------
+    pasted_chip_matches = re.findall(
+        r"Pasted[ \t]+text[ \t]*\([^)\n]{1,40}\)(?:\.(?:txt|md|json|doc|docx|pdf|csv))?[ \t]*(?:Document|Tài liệu|Archivo|Documento)?",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if pasted_chip_matches:
+        strange_chars_removed += len(pasted_chip_matches)
+        _record_example("ChatGPT Paste Chip", pasted_chip_matches[0], "(removed)")
+        text = re.sub(
+            r"Pasted[ \t]+text[ \t]*\([^)\n]{1,40}\)(?:\.(?:txt|md|json|doc|docx|pdf|csv))?[ \t]*(?:Document|Tài liệu|Archivo|Documento)?",
+            "\n\n",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+    # Khôi phục ngắt đoạn (\n\n) nếu các thẻ <p> bị dính liền nhau
+    glued_quote_m = re.findall(r'([.!?]+["”\'\u2019])(?=["“‘\'\u2018¡¿]?[A-ZÁÉÍÓÚÑÜ])', text)
+    if glued_quote_m:
+        punctuation_normalized += len(glued_quote_m)
+        text = re.sub(r'([.!?]+["”\'\u2019])(?=["“‘\'\u2018¡¿]?[A-ZÁÉÍÓÚÑÜ])', r"\1\n\n", text)
+
+    glued_sent_m = re.findall(
+        r'(?<=[a-záéíóúñü\)\]])(?<!\bPh)(?<!\bMr)(?<!\bMs)(?<!\bDr)(?<!\bSt)(?<!\bJr)(?<!\bSr)([.!?]+)(?=(?:["“‘\'\u2018¡¿][A-ZÁÉÍÓÚÑÜ]|[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]|[A-ZÁÉÍÓÚÑÜ][ \t]))',
+        text,
+    )
+    if glued_sent_m:
+        punctuation_normalized += len(glued_sent_m)
+        text = re.sub(
+            r'(?<=[a-záéíóúñü\)\]])(?<!\bPh)(?<!\bMr)(?<!\bMs)(?<!\bDr)(?<!\bSt)(?<!\bJr)(?<!\bSr)([.!?]+)(?=(?:["“‘\'\u2018¡¿][A-ZÁÉÍÓÚÑÜ]|[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]|[A-ZÁÉÍÓÚÑÜ][ \t]))',
+            r"\1\n\n",
+            text,
+        )
+
     inv_matches = re.findall(r"[\u200b\u200c\u200d\ufeff\u00ad\u2060]", text)
     if inv_matches:
         strange_chars_removed += len(inv_matches)
@@ -361,8 +394,40 @@ def sanitize_and_normalize_mexico_spanish_tts(raw_text: str) -> tuple[str, dict]
             examples.append(f"[{cat}] `{before.strip()}` -> `{after.strip()}`")
 
     # ------------------------------------------------------------------
-    # 1. XÓA KÝ TỰ ẨN UNICODE, THẺ HTML/XML, NGOẶC VUÔNG [PART 1..7], MARKDOWN
+    # 1. XÓA KÝ TỰ ẨN UNICODE, NHÃN PASTED TEXT DOM, THẺ HTML/XML, NGOẶC VUÔNG [PART 1..7], MARKDOWN
     # ------------------------------------------------------------------
+    pasted_chip_mx = re.findall(
+        r"Pasted[ \t]+text[ \t]*\([^)\n]{1,40}\)(?:\.(?:txt|md|json|doc|docx|pdf|csv))?[ \t]*(?:Document|Tài liệu|Archivo|Documento)?",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if pasted_chip_mx:
+        strange_chars_removed += len(pasted_chip_mx)
+        _record_example("ChatGPT Paste Chip", pasted_chip_mx[0], "(removed)")
+        text = re.sub(
+            r"Pasted[ \t]+text[ \t]*\([^)\n]{1,40}\)(?:\.(?:txt|md|json|doc|docx|pdf|csv))?[ \t]*(?:Document|Tài liệu|Archivo|Documento)?",
+            "\n\n",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+    glued_quote_mx = re.findall(r'([.!?]+["”\'\u2019])(?=["“‘\'\u2018¡¿]?[A-ZÁÉÍÓÚÑÜ])', text)
+    if glued_quote_mx:
+        punctuation_normalized += len(glued_quote_mx)
+        text = re.sub(r'([.!?]+["”\'\u2019])(?=["“‘\'\u2018¡¿]?[A-ZÁÉÍÓÚÑÜ])', r"\1\n\n", text)
+
+    glued_sent_mx = re.findall(
+        r'(?<=[a-záéíóúñü\)\]])(?<!\bDr)(?<!\bSr)(?<!\bDn)([.!?]+)(?=(?:["“‘\'\u2018¡¿][A-ZÁÉÍÓÚÑÜ]|[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]|[A-ZÁÉÍÓÚÑÜ][ \t]))',
+        text,
+    )
+    if glued_sent_mx:
+        punctuation_normalized += len(glued_sent_mx)
+        text = re.sub(
+            r'(?<=[a-záéíóúñü\)\]])(?<!\bDr)(?<!\bSr)(?<!\bDn)([.!?]+)(?=(?:["“‘\'\u2018¡¿][A-ZÁÉÍÓÚÑÜ]|[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]|[A-ZÁÉÍÓÚÑÜ][ \t]))',
+            r"\1\n\n",
+            text,
+        )
+
     inv_matches = re.findall(r"[\u200b\u200c\u200d\ufeff\u00ad\u2060]", text)
     if inv_matches:
         strange_chars_removed += len(inv_matches)

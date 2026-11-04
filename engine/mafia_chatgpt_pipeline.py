@@ -2322,13 +2322,52 @@ STANDALONE_PART_HEADING_RE = re.compile(
 )
 
 
+def clean_chatgpt_web_artifacts_and_paragraphs(raw_text: str) -> str:
+    """
+    Làm sạch triệt để các nhãn đính kèm DOM của ChatGPT Web (`Pasted text(YYYYMMDD-HHMMSS).txtDocument`)
+    và khôi phục dấu xuống dòng đoạn văn (`\\n\\n`) nếu các thẻ `<p>` bị dính liền nhau (`...them.Bracken...`).
+    """
+    if not raw_text:
+        return ""
+    text = raw_text.replace("\r\n", "\n").replace("\r", "\n")
+    # 1. Xóa triệt để nhãn chip file đính kèm của ChatGPT Web: Pasted text(20261104-125645).txtDocument
+    text = re.sub(
+        r"Pasted[ \t]+text[ \t]*\([^)\n]{1,40}\)(?:\.(?:txt|md|json|doc|docx|pdf|csv))?[ \t]*(?:Document|Tài liệu|Archivo|Documento)?",
+        "\n\n",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # 2. Tách nhãn [PART N] nếu bị dính liền vào chữ phía trước hoặc phía sau
+    text = re.sub(r"(\[\s*PART\s+\d{1,2}\s*\])(?=\S)", r"\1\n\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?<=\S)(\[\s*PART\s+\d{1,2}\s*\])", r"\n\n\1", text, flags=re.IGNORECASE)
+    # 3. Khôi phục ngắt đoạn (\n\n) khi câu kết thúc bằng dấu chấm/thán/hỏi + dấu ngoặc kép bị dính sát vào câu tiếp theo
+    text = re.sub(
+        r'([.!?]+["”\'\u2019])(?=["“‘\'\u2018¡¿]?[A-ZÁÉÍÓÚÑÜ])',
+        r"\1\n\n",
+        text,
+    )
+    # 4. Khôi phục ngắt đoạn (\n\n) khi từ viết thường cuối câu + dấu chấm (.!?) bị dính sát vào chữ cái viết hoa đầu đoạn mới
+    text = re.sub(
+        r'(?<=[a-záéíóúñü\)\]])(?<!\bPh)(?<!\bMr)(?<!\bMs)(?<!\bDr)(?<!\bSt)(?<!\bJr)(?<!\bSr)([.!?]+)(?=(?:["“‘\'\u2018¡¿][A-ZÁÉÍÓÚÑÜ]|[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]|[A-ZÁÉÍÓÚÑÜ][ \t]))',
+        r"\1\n\n",
+        text,
+    )
+    text = re.sub(
+        r'(?<=\b(?:18|19|20)\d\d)([.!?]+)(?=(?:["“‘\'\u2018¡¿]?[A-ZÁÉÍÓÚÑÜ]))',
+        r"\1\n\n",
+        text,
+    )
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text
+
+
 def extract_clean_script_text(raw_response: str, start_part: int = 1) -> str:
     """
     Tách phần nội dung Kịch bản thuần túy (bắt đầu từ Part `start_part`, mặc định Part 1)
     và loại bỏ các khối báo cáo cổng kiểm tra ở đầu/cuối nếu ChatGPT in kèm.
     Hỗ trợ cả `# PART 1`, `PART 1`, `[PART 1]`, `\\[PART 1\\]`, `<escape>[PART 1]</escape>` và `<text preserveWhitespace>{`[PART 1]...`}</text>` (Homeless V12 / Mexico V1.3).
     """
-    text = raw_response.replace("\r\n", "\n").replace("\r", "\n").strip()
+    text = clean_chatgpt_web_artifacts_and_paragraphs(raw_response).strip()
     # Loại bỏ các thẻ JSX / DIL v2 của ChatGPT Desktop như <escape>[PART 1]</escape>, <text preserveWhitespace>{`...`}</text>
     text = re.sub(r"<escape>\s*(.*?)\s*</escape>", r"\1", text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r"<text[^>]*>\s*\{\s*`", "", text, flags=re.IGNORECASE)
@@ -2336,6 +2375,7 @@ def extract_clean_script_text(raw_response: str, start_part: int = 1) -> str:
     text = re.sub(r"</?(?:text|escape|box|row|column|title|caption|list|list-item)[^>]*>", "", text, flags=re.IGNORECASE)
     # Loại bỏ ký tự escape Markdown thừa trước dấu câu và dấu ngoặc vuông (như \[, \], \!, \?, \-, \.) ngay từ đầu
     text = re.sub(r"\\([!?.—\-*#'\"()\[\]])", r"\1", text)
+    text = clean_chatgpt_web_artifacts_and_paragraphs(text).strip()
 
     lines = text.splitlines()
     start_idx = 0
@@ -2924,11 +2964,13 @@ def strip_part_headers_for_tts(script_text: str) -> str:
     """
     Xóa toàn bộ các dòng tiêu đề phân đoạn `Part 1..N` / `[PART 1]..[PART 7]` / `Beat 1..N`
     (ví dụ `# PART 1 — ...`, `[PART 1]`, `## Part 2: ...`, `**PART 3**`, `PART 1`, dòng kẻ `---`)
+    và làm sạch triệt để `Pasted text(...).txtDocument` + khôi phục xuống dòng đoạn văn `\n\n`
     để file kịch bản xuất ra (`FULL_SCRIPT.txt` và `{STT}_KB.txt`) chỉ giữ lại 100% văn bản
     truyện thuần túy phục vụ chạy TTS trực tiếp.
     """
     if not script_text:
         return ""
+    script_text = clean_chatgpt_web_artifacts_and_paragraphs(script_text)
     script_text = re.sub(r"\\([!?.—\-*#'\"()\[\]])", r"\1", script_text)
     cleaned_lines = []
     for line in script_text.splitlines():
@@ -4212,7 +4254,7 @@ Hãy thiết kế và xuất trọn vẹn **FULL STORY OUTLINE** cho `CURRENT FI
     def split_script_into_part_dict(raw_txt: str, max_p: int = 7) -> dict[int, str]:
         cleaned = extract_clean_script_text(raw_txt, start_part=1)
         if not cleaned or len(cleaned) < 800:
-            cleaned = raw_txt or ""
+            cleaned = clean_chatgpt_web_artifacts_and_paragraphs(raw_txt or "")
         lines = cleaned.splitlines()
         pmap: dict[int, str] = {}
         cur_p = None
@@ -4327,15 +4369,17 @@ Hãy thiết kế và xuất trọn vẹn **FULL STORY OUTLINE** cho `CURRENT FI
         - Lưu ngay lập tức vào `checkpoints/PART_{part_num}.txt` sau khi hoàn tất!
         """
         td_out = {}
-        body_clean = re.sub(
-            r"\[(?![ \t]*PART[ \t]+\d+[ \t]*\])[^\]\n]{1,120}\]",
-            "",
-            (current_part_body or "").strip(),
-            flags=re.IGNORECASE,
+        body_clean = clean_chatgpt_web_artifacts_and_paragraphs(
+            re.sub(
+                r"\[(?![ \t]*PART[ \t]+\d+[ \t]*\])[^\]\n]{1,120}\]",
+                "",
+                (current_part_body or "").strip(),
+                flags=re.IGNORECASE,
+            )
         ).strip()
         saved_part_disk_path = os.path.join(ckpt_dir, f"PART_{part_num}.txt")
         if len(body_clean) < 7500 and os.path.exists(saved_part_disk_path) and "BƯỚC 4" not in step_context_label.upper():
-            saved_disk_raw = read_text_file(saved_part_disk_path)
+            saved_disk_raw = clean_chatgpt_web_artifacts_and_paragraphs(read_text_file(saved_part_disk_path) or "")
             saved_disk_body = re.sub(
                 r"^\s*(?:#+\s*)?(?:\*\*|__)?\s*\[?\s*PART\s+\d+[^\n\]]*\]?(?:\*\*|__)?(?:\s*[:\-–—][^\n]*)?\s*",
                 "",
