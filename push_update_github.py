@@ -105,13 +105,20 @@ def main():
         if not note:
             note = f"Cập nhật tính năng và tối ưu hóa hệ thống ({new_ver})."
 
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     v_data["version"] = new_ver
     v_data["build_number"] = new_build
     v_data["release_date"] = now_str
+    v_data["released_at"] = now_str
     if note:
-        changelog = list(v_data.get("changelog") or [])
-        entry = f"[{new_ver} - {now_str}] {note}"
+        raw_cl = v_data.get("changelog") or []
+        if isinstance(raw_cl, str):
+            changelog = [s.strip() for s in raw_cl.splitlines() if s.strip()]
+        elif isinstance(raw_cl, list):
+            changelog = [str(x).strip() for x in raw_cl if str(x).strip()]
+        else:
+            changelog = []
+        entry = f"[{new_ver} (Build #{new_build}) - {now_str}] {note}"
         if not changelog or changelog[0] != entry:
             changelog.insert(0, entry)
         v_data["changelog"] = changelog[:15]
@@ -120,17 +127,24 @@ def main():
     print(f"✅ Đã ghi nhận version.json: {new_ver} (Build #{new_build}) — {now_str}")
 
     # Đồng bộ sang Ban-Giao-Khach-Hang-EXE nếu tồn tại
+    import shutil
     exe_app_dir = os.path.join(ROOT_DIR, "Ban-Giao-Khach-Hang-EXE", "VideoBatchStudio")
-    if os.path.isdir(exe_app_dir):
-        try:
-            with open(os.path.join(exe_app_dir, "version.json"), "w", encoding="utf-8") as f:
-                json.dump(v_data, f, ensure_ascii=False, indent=2)
-            unpacked_dir = os.path.join(exe_app_dir, "resources", "app")
-            if os.path.isdir(unpacked_dir):
-                with open(os.path.join(unpacked_dir, "version.json"), "w", encoding="utf-8") as f:
-                    json.dump(v_data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"[WARN] Đồng bộ version.json sang bản EXE: {e}")
+    unpacked_dir = os.path.join(exe_app_dir, "resources", "app")
+    for dst_base in (exe_app_dir, unpacked_dir):
+        if os.path.isdir(dst_base):
+            try:
+                for root_f in ("version.json", "package.json", "mafia_dashboard_server.py", "GHI_CHU_CAP_NHAT_MEXICO_BA_CO.md"):
+                    sf = os.path.join(ROOT_DIR, root_f)
+                    if os.path.isfile(sf):
+                        shutil.copy2(sf, os.path.join(dst_base, root_f))
+                for eng_f in ("mafia_chatgpt_pipeline.py", "chatgpt_web_client.py", "license_manager.py", "channel_memory_guard.py", "tts_post_director.py", "auto_tab_sweeper_daemon.py"):
+                    sf = os.path.join(ROOT_DIR, "engine", eng_f)
+                    df = os.path.join(dst_base, "engine", eng_f)
+                    if os.path.isfile(sf):
+                        os.makedirs(os.path.dirname(df), exist_ok=True)
+                        shutil.copy2(sf, df)
+            except Exception as e:
+                print(f"[WARN] Đồng bộ sang {dst_base}: {e}")
 
     print("\n⏳ Đang đẩy mã nguồn cập nhật lên GitHub...")
     subprocess.run(["git", "add", "-A"], cwd=ROOT_DIR, check=True)
