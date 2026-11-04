@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 113,
-  "released_at": "2026-11-04 11:15:00",
+  "build_number": 114,
+  "released_at": "2026-11-04 11:36:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản V1.0.0 (Build #113): Sửa triệt để lỗi 'Could not load this ChatGPT conversation' và treo (0 ký tự) khi chuyển Bàn/Vòng kiểm định & sửa bài (Bước 4A/4B). Chặn tuyệt đối điều hướng vào URL tạm /c/webtab_...; tách đoạn chat độc lập gọn nhẹ cho từng vòng sửa (REPAIR_DESK_4B_R1..R5 & CALIB_DESK_4) để hội thoại không bị phình 700KB; tích hợp cơ chế Auto-Heal tự động mở đoạn chat sạch mới tại https://chatgpt.com/ và gửi lại lệnh ngay lập tức nếu phát hiện lỗi tải hội thoại hoặc đứng 0 ký tự quá 28 giây."
+  "changelog": "Phiên bản V1.0.0 (Build #114): Sửa triệt để 100% lỗi 'The messages you submitted were too long, please edit them and resubmit.' trên ChatGPT Web: (1) Loại bỏ đính kèm trùng lặp 02_STORY_OUTLINE.md trong _build_checkpoint_context_preamble khi Prompt đã có sẵn Giàn ý/Kịch bản; (2) Khóa cứng ngân sách ký tự <= 82.000–84.000 ký tự/tin nhắn ở Bước 2, Bước 3, Bước 4A (Vòng 1..6), Bước 4B và Bước 5 cho cả 15 Key mà vẫn BẢO TOÀN 100% văn bản kịch bản truyện (CURRENT REVISION BASELINE / CURRENT WORKING SCRIPT); (3) Xóa sạch triệt để ô .ProseMirror và bỏ dán trùng headLine trước khi dán Prompt để không bao giờ nhân đôi văn bản khi cửa sổ Chrome chạy ngầm; (4) Tích hợp Auto-Heal tự động phát hiện 'The messages you submitted were too long', tự động nén gọn khối Reference phụ trợ và gửi lại ngay lập tức trên hội thoại sạch."
 }

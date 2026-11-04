@@ -1854,6 +1854,16 @@ class ChatGPTDesktopThreadSafeClient:
 # CÁC HÀM NẠP TRỌN BỘ SKILL & REFERENCES CHO TỪNG BƯỚC
 # ==============================================================================
 
+def _smart_trim_ref_text(txt: str, max_chars: int = 9000) -> str:
+    """Rút gọn thông minh các file Reference/DNA quá dài mà vẫn giữ trọn phần đầu (quy tắc cốt lõi) và phần cuối (checklist/output contract)."""
+    s = (txt or "").strip()
+    if len(s) <= max_chars or max_chars <= 800:
+        return s
+    head_c = int(max_chars * 0.72)
+    tail_c = max(400, max_chars - head_c - 120)
+    return s[:head_c] + "\n\n...[Đã cô đọng phần ví dụ giữa để tối ưu giới hạn ký tự ChatGPT Web]...\n\n" + s[-tail_c:]
+
+
 def _load_12_key_step_bundle(step_folder: str, adapt_inline: bool = False) -> str:
     """Nạp trọn bộ SKILL.md + references + _shared + examples cho bất kỳ Key nào trong 12 Key mới (`skills_12_keys/<KeyFolderName>/<step_folder>`)."""
     if ACTIVE_KEY_ID not in KEY_PROFILES_12:
@@ -1862,19 +1872,21 @@ def _load_12_key_step_bundle(step_folder: str, adapt_inline: bool = False) -> st
     s_dir = os.path.join(SKILLS_12_KEYS_ROOT, ACTIVE_KEY_ID, step_folder)
     if not os.path.exists(s_dir):
         return ""
+    per_ref_cap = 5500 if step_folder in ("03_WRITER", "04_AUDITOR") else 8000
+    max_bundle_cap = 22000 if step_folder == "04_AUDITOR" else (34000 if step_folder in ("03_WRITER", "05_SEO") else 44000)
     raw_skill = read_text_file(os.path.join(s_dir, "SKILL.md"))
     if adapt_inline:
         raw_skill = _adapt_homeless_skill_for_inline_pipeline(raw_skill)
     parts = [
         f"=== ACTIVE CHANNEL KEY OVERRIDE: {meta['label']} (Ngôn ngữ: {meta['locale']} | Số Part: {meta['default_parts']} | Độ dài mục tiêu: {meta['target_min_chars']:,}–{meta['target_max_chars']:,} ký tự) ===\n"
         f"QUAN TRỌNG: Tuân thủ 100% ngôn ngữ `{meta['locale']}`, bối cảnh, nhân vật và cấu trúc của bộ Skill thuộc Key `{ACTIVE_KEY_ID}` dưới đây!\n\n"
-        f"=== FILE 1: SKILL.md ({ACTIVE_KEY_ID} / {step_folder}) ===\n{raw_skill}"
+        f"=== FILE 1: SKILL.md ({ACTIVE_KEY_ID} / {step_folder}) ===\n{_smart_trim_ref_text(raw_skill, 12000)}"
     ]
     idx = 2
     if step_folder == "02_OUTLINE":
         cg_md = os.path.join(SKILLS_12_KEYS_ROOT, ACTIVE_KEY_ID, "01_5_CANON_GUARD", "SKILL.md")
         if os.path.exists(cg_md):
-            parts.append(f"=== FILE 1.5: SKILL.md ({ACTIVE_KEY_ID} / 01_5_CANON_GUARD) ===\n{read_text_file(cg_md)}")
+            parts.append(f"=== FILE 1.5: SKILL.md ({ACTIVE_KEY_ID} / 01_5_CANON_GUARD) ===\n{_smart_trim_ref_text(read_text_file(cg_md), 6000)}")
     ref_dir = os.path.join(s_dir, "references")
     if os.path.exists(ref_dir):
         for fname in sorted(os.listdir(ref_dir)):
@@ -1883,7 +1895,7 @@ def _load_12_key_step_bundle(step_folder: str, adapt_inline: bool = False) -> st
                 rtxt = read_text_file(fpath)
                 if adapt_inline:
                     rtxt = _adapt_homeless_skill_for_inline_pipeline(rtxt)
-                parts.append(f"=== FILE {idx}: references/{fname} ===\n{rtxt}")
+                parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(rtxt, per_ref_cap)}")
                 idx += 1
         ref_shared = os.path.join(ref_dir, "_shared")
         if os.path.exists(ref_shared):
@@ -1893,14 +1905,14 @@ def _load_12_key_step_bundle(step_folder: str, adapt_inline: bool = False) -> st
                     rtxt = read_text_file(fpath)
                     if adapt_inline:
                         rtxt = _adapt_homeless_skill_for_inline_pipeline(rtxt)
-                    parts.append(f"=== FILE {idx}: references/_shared/{fname} ===\n{rtxt}")
+                    parts.append(f"=== FILE {idx}: references/_shared/{fname} ===\n{_smart_trim_ref_text(rtxt, per_ref_cap)}")
                     idx += 1
     ex_dir = os.path.join(s_dir, "examples")
-    if os.path.exists(ex_dir):
+    if os.path.exists(ex_dir) and step_folder != "04_AUDITOR":
         for fname in sorted(os.listdir(ex_dir)):
             fpath = os.path.join(ex_dir, fname)
             if os.path.isfile(fpath) and fname.endswith((".md", ".txt")):
-                parts.append(f"=== FILE {idx}: examples/{fname} ===\n{read_text_file(fpath)}")
+                parts.append(f"=== FILE {idx}: examples/{fname} ===\n{_smart_trim_ref_text(read_text_file(fpath), 5000)}")
                 idx += 1
     if step_folder == "04_AUDITOR":
         parts.append(
@@ -1910,7 +1922,8 @@ def _load_12_key_step_bundle(step_folder: str, adapt_inline: bool = False) -> st
             "3. TUYỆT ĐỐI KHÔNG xuất bất kỳ khối code JSON (` ```json ... ``` `) nào trong câu trả lời! Hãy trình bày toàn bộ Báo cáo Kiểm định, Bảng điểm Pháp y và Bảng Patch Ledger bằng văn bản Markdown thuần túy.\n"
             "4. BẮT BUỘC chấm điểm số cụ thể theo thang /100 và in rõ dòng `**Current Absolute Forensic Score:** XX/100` (kèm `FINAL_QA_SCORE: XX/100`) ngay trong phản hồi này!"
         )
-    return "\n\n".join(parts)
+    joined_b = "\n\n".join(parts)
+    return _smart_trim_ref_text(joined_b, max_bundle_cap)
 
 
 def load_skill_1_title_bundle() -> str:
@@ -1926,17 +1939,17 @@ def load_skill_1_title_bundle() -> str:
         if os.path.exists(ref_dir):
             for fname in sorted(os.listdir(ref_dir)):
                 if fname.endswith((".md", ".txt")):
-                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{read_text_file(os.path.join(ref_dir, fname))}")
+                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(read_text_file(os.path.join(ref_dir, fname)), 9000)}")
                     idx += 1
         ex_file = os.path.join(s_dir, "examples", "TITLE_REWRITE_EXAMPLES.md")
         if os.path.exists(ex_file):
-            parts.append(f"=== FILE {idx}: examples/TITLE_REWRITE_EXAMPLES.md ===\n{read_text_file(ex_file)}")
-        return "\n\n".join(parts)
+            parts.append(f"=== FILE {idx}: examples/TITLE_REWRITE_EXAMPLES.md ===\n{_smart_trim_ref_text(read_text_file(ex_file), 7000)}")
+        return _smart_trim_ref_text("\n\n".join(parts), 38000)
     if ACTIVE_NICHE == "homeless":
         s_dir = os.path.join(HOMELESS_SKILLS_ROOT, "Viet-Tieu-De-HOMELESS-V12", "viral-title-rewriter-v1.2")
         skill_md = read_text_file(os.path.join(s_dir, "SKILL.md"))
-        ref_dna = read_text_file(os.path.join(s_dir, "references", "VIRAL_DNA_TITLE_ARCHITECTURE.md"))
-        examples = read_text_file(os.path.join(s_dir, "examples", "TITLE_REWRITE_EXAMPLES.md"))
+        ref_dna = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "VIRAL_DNA_TITLE_ARCHITECTURE.md")), 12000)
+        examples = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "examples", "TITLE_REWRITE_EXAMPLES.md")), 9000)
         return (
             f"=== FILE 1: SKILL.md (viral-title-rewriter v1.2 — HOMELESS V12) ===\n{skill_md}\n\n"
             f"=== FILE 2: references/VIRAL_DNA_TITLE_ARCHITECTURE.md ===\n{ref_dna}\n\n"
@@ -1944,8 +1957,8 @@ def load_skill_1_title_bundle() -> str:
         )
     s_dir = os.path.join(SKILLS_ROOT, "Viet-Lai-Tieu-De-Mafia-Nguoi-Hau")
     skill_md = read_text_file(os.path.join(s_dir, "SKILL.md"))
-    ref_dna = read_text_file(os.path.join(s_dir, "references", "BASELINE_MAFIA_MAID_TITLE_DNA.md"))
-    examples = read_text_file(os.path.join(s_dir, "examples", "USAGE_EXAMPLES.md"))
+    ref_dna = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "BASELINE_MAFIA_MAID_TITLE_DNA.md")), 14000)
+    examples = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "examples", "USAGE_EXAMPLES.md")), 10000)
     return (
         f"=== FILE 1: SKILL.md (Viet-Lai-Tieu-De-Mafia-Nguoi-Hau v1.2) ===\n{skill_md}\n\n"
         f"=== FILE 2: references/BASELINE_MAFIA_MAID_TITLE_DNA.md ===\n{ref_dna}\n\n"
@@ -1966,14 +1979,14 @@ def load_skill_2_outline_bundle() -> str:
         ]
         if os.path.exists(os.path.join(cg_dir, "SKILL.md")):
             parts.append(
-                f"=== FILE 1.5: SKILL.md (canon-guard-drama-familiar-mexico v1.3.0 — BÀN 1.5) ===\n{read_text_file(os.path.join(cg_dir, 'SKILL.md'))}"
+                f"=== FILE 1.5: SKILL.md (canon-guard-drama-familiar-mexico v1.3.0 — BÀN 1.5) ===\n{_smart_trim_ref_text(read_text_file(os.path.join(cg_dir, 'SKILL.md')), 7000)}"
             )
         ref_dir = os.path.join(s_dir, "references")
         if os.path.exists(ref_dir):
             for idx, fname in enumerate(sorted(os.listdir(ref_dir)), start=2):
                 if fname.endswith((".md", ".txt")):
-                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{read_text_file(os.path.join(ref_dir, fname))}")
-        return "\n\n".join(parts)
+                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(read_text_file(os.path.join(ref_dir, fname)), 6500)}")
+        return _smart_trim_ref_text("\n\n".join(parts), 48000)
     if ACTIVE_NICHE == "homeless":
         s_dir = os.path.join(HOMELESS_SKILLS_ROOT, "viet-gian-y-homeless-V12", "viet-gian-y-homeless")
         parts = [f"=== FILE 1: SKILL.md (viet-gian-y-homeless v2.4.0 — HOMELESS V12) ===\n{read_text_file(os.path.join(s_dir, 'SKILL.md'))}"]
@@ -1981,17 +1994,18 @@ def load_skill_2_outline_bundle() -> str:
         if os.path.exists(ref_dir):
             for idx, fname in enumerate(sorted(os.listdir(ref_dir)), start=2):
                 if fname.endswith((".md", ".txt")):
-                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{read_text_file(os.path.join(ref_dir, fname))}")
-        return "\n\n".join(parts)
+                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(read_text_file(os.path.join(ref_dir, fname)), 6500)}")
+        return _smart_trim_ref_text("\n\n".join(parts), 48000)
     s_dir = os.path.join(SKILLS_ROOT, "Viet_Gian_Y_Nguoi_Hau_Skill")
     skill_md = read_text_file(os.path.join(s_dir, "SKILL.md"))
-    shared = read_text_file(os.path.join(s_dir, "references", "SHARED_PRODUCTION_CONTRACT.md"))
-    master = read_text_file(
-        os.path.join(s_dir, "references", "MASTER_PROMPT_UNIVERSAL_DNA_TO_STORY_OUTLINE_ENGINE.md")
+    shared = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "SHARED_PRODUCTION_CONTRACT.md")), 8500)
+    master = _smart_trim_ref_text(
+        read_text_file(os.path.join(s_dir, "references", "MASTER_PROMPT_UNIVERSAL_DNA_TO_STORY_OUTLINE_ENGINE.md")),
+        14000,
     )
-    dna_a = read_text_file(os.path.join(s_dir, "references", "DNA_A_Mafia_Boss_Archives.txt"))
-    dna_b = read_text_file(os.path.join(s_dir, "references", "DNA_B_Mafia_Boss_Romance.txt"))
-    dna_c = read_text_file(os.path.join(s_dir, "references", "DNA_C_The_Mafias_Hidden_Heart.txt"))
+    dna_a = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "DNA_A_Mafia_Boss_Archives.txt")), 4200)
+    dna_b = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "DNA_B_Mafia_Boss_Romance.txt")), 4200)
+    dna_c = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "DNA_C_The_Mafias_Hidden_Heart.txt")), 4200)
     return (
         f"=== FILE 1: SKILL.md (Viet_Gian_Y_Nguoi_Hau_Skill v1.1) ===\n{skill_md}\n\n"
         f"=== FILE 2: references/SHARED_PRODUCTION_CONTRACT.md ===\n{shared}\n\n"
@@ -2064,8 +2078,8 @@ def load_skill_3_script_bundle() -> str:
             fpath = os.path.join(ref_dir, fname)
             if os.path.exists(fpath):
                 raw_ref = read_text_file(fpath)
-                parts.append(f"=== FILE {idx}: references/{fname} ===\n{_adapt_homeless_skill_for_inline_pipeline(raw_ref)}")
-        return "\n\n".join(parts)
+                parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(_adapt_homeless_skill_for_inline_pipeline(raw_ref), 6500)}")
+        return _smart_trim_ref_text("\n\n".join(parts), 34000)
     if ACTIVE_NICHE == "homeless":
         s_dir = os.path.join(HOMELESS_SKILLS_ROOT, "Viet-kich-ban-homeless-V12-THREE-STAGE-REPAIR", "viet-kich-ban-homeless")
         core_refs = [
@@ -2082,12 +2096,12 @@ def load_skill_3_script_bundle() -> str:
             fpath = os.path.join(ref_dir, fname)
             if os.path.exists(fpath):
                 raw_ref = read_text_file(fpath)
-                parts.append(f"=== FILE {idx}: references/{fname} ===\n{_adapt_homeless_skill_for_inline_pipeline(raw_ref)}")
-        return "\n\n".join(parts)
+                parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(_adapt_homeless_skill_for_inline_pipeline(raw_ref), 7500)}")
+        return _smart_trim_ref_text("\n\n".join(parts), 34000)
     s_dir = os.path.join(SKILLS_ROOT, "Viet_Kich_Ban_Nguoi_Hau_Tu_Gian_Y_Skill_v1.4")
     skill_md = read_text_file(os.path.join(s_dir, "SKILL.md"))
-    shared = read_text_file(os.path.join(s_dir, "references", "SHARED_PRODUCTION_CONTRACT.md"))
-    master = read_text_file(os.path.join(s_dir, "references", "MASTER_PROMPT_WRITE_SCRIPT_FROM_OUTLINE.md"))
+    shared = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "SHARED_PRODUCTION_CONTRACT.md")), 8500)
+    master = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "MASTER_PROMPT_WRITE_SCRIPT_FROM_OUTLINE.md")), 15000)
     return (
         f"=== FILE 1: SKILL.md (Viet_Kich_Ban_Nguoi_Hau_Tu_Gian_Y_Skill v1.4) ===\n{skill_md}\n\n"
         f"=== FILE 2: references/SHARED_PRODUCTION_CONTRACT.md ===\n{shared}\n\n"
@@ -2150,11 +2164,18 @@ def load_skill_4_audit_bundle() -> str:
         )
         return "\n\n".join(parts)
     s_dir = os.path.join(SKILLS_ROOT, "Kiem_Tra_Kich_Ban_Nguoi_Hau_v1.1")
+    core_mafia_audit_refs = [
+        "FORENSIC_REVIEW_ENGINE.md",
+        "FORENSIC_SCORE_RUBRIC.md",
+        "OUTPUT_TEMPLATES.md",
+        "SHARED_PRODUCTION_CONTRACT.md",
+    ]
     parts = [f"=== FILE 1: SKILL.md (Kiem_Tra_Kich_Ban_Nguoi_Hau v1.1) ===\n{read_text_file(os.path.join(s_dir, 'SKILL.md'))}"]
     ref_dir = os.path.join(s_dir, "references")
-    for idx, fname in enumerate(sorted(os.listdir(ref_dir)), start=2):
-        if fname.endswith(".md"):
-            parts.append(f"=== FILE {idx}: references/{fname} ===\n{read_text_file(os.path.join(ref_dir, fname))}")
+    for idx, fname in enumerate(core_mafia_audit_refs, start=2):
+        fpath = os.path.join(ref_dir, fname)
+        if os.path.exists(fpath):
+            parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(read_text_file(fpath), 3800)}")
     parts.append(
         "=== PRODUCTION PIPELINE OVERRIDE (SINGLE-TURN MODE A) ===\n"
         "Trong hệ thống tự động này, mỗi lượt gọi MODE A bắt buộc phải thực hiện trọn vẹn cả READ1 + READ2_AND_SCORE ngay trong 1 phản hồi duy nhất. "
@@ -2176,12 +2197,12 @@ def load_skill_5_seo_bundle() -> str:
         if os.path.exists(ref_dir):
             for fname in sorted(os.listdir(ref_dir)):
                 if fname.endswith((".md", ".txt")):
-                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{read_text_file(os.path.join(ref_dir, fname))}")
+                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(read_text_file(os.path.join(ref_dir, fname)), 6500)}")
                     idx += 1
         ex_file = os.path.join(s_dir, "examples", "SAMPLE_FULL_OUTPUT.md")
         if os.path.exists(ex_file):
-            parts.append(f"=== FILE {idx}: examples/SAMPLE_FULL_OUTPUT.md ===\n{read_text_file(ex_file)}")
-        return "\n\n".join(parts)
+            parts.append(f"=== FILE {idx}: examples/SAMPLE_FULL_OUTPUT.md ===\n{_smart_trim_ref_text(read_text_file(ex_file), 5500)}")
+        return _smart_trim_ref_text("\n\n".join(parts), 34000)
     if ACTIVE_NICHE == "homeless":
         s_dir = os.path.join(HOMELESS_SKILLS_ROOT, "seo-homeless-V12", "seo-homeless-story-v2.1")
         parts = [f"=== FILE 1: SKILL.md (seo-homeless-story v2.1.0 — HOMELESS V12) ===\n{read_text_file(os.path.join(s_dir, 'SKILL.md'))}"]
@@ -2190,16 +2211,16 @@ def load_skill_5_seo_bundle() -> str:
         if os.path.exists(ref_dir):
             for fname in sorted(os.listdir(ref_dir)):
                 if fname.endswith((".md", ".txt")):
-                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{read_text_file(os.path.join(ref_dir, fname))}")
+                    parts.append(f"=== FILE {idx}: references/{fname} ===\n{_smart_trim_ref_text(read_text_file(os.path.join(ref_dir, fname)), 6500)}")
                     idx += 1
         ex_file = os.path.join(s_dir, "examples", "SAMPLE_FULL_OUTPUT.md")
         if os.path.exists(ex_file):
-            parts.append(f"=== FILE {idx}: examples/SAMPLE_FULL_OUTPUT.md ===\n{read_text_file(ex_file)}")
-        return "\n\n".join(parts)
+            parts.append(f"=== FILE {idx}: examples/SAMPLE_FULL_OUTPUT.md ===\n{_smart_trim_ref_text(read_text_file(ex_file), 5500)}")
+        return _smart_trim_ref_text("\n\n".join(parts), 34000)
     s_dir = os.path.join(SKILLS_ROOT, "viet-seo-nguoi-hau")
     skill_md = read_text_file(os.path.join(s_dir, "SKILL.md"))
-    master = read_text_file(os.path.join(s_dir, "references", "MASTER_SYSTEM_V1_3_LOCKED.md"))
-    classifier = read_text_file(os.path.join(s_dir, "references", "CHANNEL_DNA_AND_CLASSIFIER.md"))
+    master = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "MASTER_SYSTEM_V1_3_LOCKED.md")), 11000)
+    classifier = _smart_trim_ref_text(read_text_file(os.path.join(s_dir, "references", "CHANNEL_DNA_AND_CLASSIFIER.md")), 8000)
     template = read_text_file(os.path.join(s_dir, "references", "PRODUCTION_OUTPUT_TEMPLATE.md"))
     vlock = read_text_file(os.path.join(s_dir, "references", "VERSION_LOCK.txt"))
     return (
@@ -3387,24 +3408,117 @@ def _run_single_project_pipeline_inner(
         d = client.read_full_thread(tid, state["host_id"])
         return max(min_known, len(d.get("turns", [])))
 
-    def _build_checkpoint_context_preamble() -> str:
+    def _build_checkpoint_context_preamble(prompt_body: str = "") -> str:
         niche_title = (
-            "HOMELESS × ABANDONED PROPERTY × HIDDEN LEGACY (HOMELESS V12)"
-            if ACTIVE_NICHE == "homeless"
-            else "MAFIA BOSS × MAID / WAITRESS / UNDERESTIMATED WOMAN"
+            "MEXICO FAMILY DRAMA (MEXICO BÀ CÔ V1.3.0)"
+            if ACTIVE_NICHE == "mexico"
+            else (
+                "HOMELESS × ABANDONED PROPERTY × HIDDEN LEGACY (HOMELESS V12)"
+                if ACTIVE_NICHE == "homeless"
+                else "MAFIA BOSS × MAID / WAITRESS / UNDERESTIMATED WOMAN"
+            )
         )
         parts_ctx = [
             f"BẠN ĐANG TIẾP TỤC DỰ ÁN STORYTELLING ({niche_title}) TỪ CHECKPOINT ĐÃ LƯU TRÊN ĐOẠN CHAT ĐỒNG BỘ MỚI.",
             f"- SOURCE TITLE: {state.get('source_title', '')}",
             f"- CURRENT FINAL TITLE (ĐÃ KHÓA): {state.get('winner_title', '')} ({state.get('winner_title_score', 98)}/100)",
         ]
+        # Tuyệt đối KHÔNG đính kèm trùng lặp 02_STORY_OUTLINE.md (22.000-30.000 ký tự) nếu bên trong prompt_body đã có sẵn Giàn ý hoặc Kịch bản Full (tránh lỗi "The messages you submitted were too long")!
+        pb_u = (prompt_body or "")
+        already_has_outline_or_script = any(
+            marker in pb_u
+            for marker in (
+                "02_STORY_OUTLINE.md",
+                "CURRENT REVISION BASELINE",
+                "CURRENT WORKING SCRIPT",
+                "LOCKED FULL SCRIPT",
+                "BƯỚC 1:",
+                "BƯỚC 2:",
+                "BƯỚC 4 (",
+                "BƯỚC 4-CALIB",
+                "BƯỚC 4B (",
+                "BƯỚC 5:",
+            )
+        )
         outline_p = os.path.join(ckpt_dir, "02_STORY_OUTLINE.md")
-        if os.path.exists(outline_p):
+        if not already_has_outline_or_script and os.path.exists(outline_p):
             raw_out_txt = read_text_file(outline_p)
-            if ACTIVE_NICHE == "homeless" and len(raw_out_txt) > 5500:
-                raw_out_txt = raw_out_txt[:5500] + "\n...[Tóm tắt phần đầu Giàn ý & Canon Handoff đã khóa]..."
+            if len(raw_out_txt) > 5500:
+                raw_out_txt = raw_out_txt[:4000] + "\n...[Tóm tắt phần giữa Giàn ý & Canon Handoff đã khóa]...\n" + raw_out_txt[-1400:]
             parts_ctx.append("=== GIÀN Ý ĐÃ KHÓA TỪ BƯỚC 2 (02_STORY_OUTLINE.md) ===\n" + raw_out_txt + "\n=== KẾT THÚC GIÀN Ý BƯỚC 2 ===")
         return "\n\n".join(parts_ctx) + "\n\n"
+
+    def _enforce_chatgpt_web_prompt_limit(raw_prompt: str, max_chars: int = 84000) -> str:
+        """
+        Khóa cứng tổng độ dài mỗi tin nhắn gửi lên ChatGPT Web <= 84.000 ký tự để triệt tiêu 100% lỗi
+        'The messages you submitted were too long, please edit them and resubmit.'
+        Tuyệt đối BẢO TOÀN 100% văn bản kịch bản truyện (CURRENT REVISION BASELINE / CURRENT WORKING SCRIPT),
+        chỉ cô đọng thông minh các khối Reference / Giàn ý đối chiếu / Patch Ledger phụ trợ nếu tổng độ dài vượt ngưỡng.
+        """
+        txt = raw_prompt or ""
+        if len(txt) <= max_chars:
+            return txt
+        orig_len = len(txt)
+        # 1. Rút gọn khối GIÀN Ý đối chiếu (nếu có) về tối đa 3.200 ký tự
+        def _shrink_outline_match(m: re.Match) -> str:
+            h, body, t = m.group(1), m.group(2), m.group(3)
+            if len(body) <= 3200:
+                return m.group(0)
+            return f"{h}{body[:2100]}\n...[Trích xuất Canon & Cấu trúc Giàn ý Bước 2]...\n{body[-950:]}{t}"
+
+        txt = re.sub(
+            r"(===\s*GIÀN Ý[^\n]*===\n)(.*?)(\n===\s*KẾT THÚC GIÀN Ý[^\n]*===)",
+            _shrink_outline_match,
+            txt,
+            flags=re.DOTALL,
+        )
+        if len(txt) <= max_chars:
+            log_msg(project_id, f"✂️ [PROMPT GUARD] Đã tự động cô đọng Giàn ý phụ trợ ({orig_len:,} -> {len(txt):,} ký tự <= {max_chars:,}) và giữ nguyên 100% kịch bản!")
+            return txt
+
+        # 2. Rút gọn từng khối === FILE X: ... === (Skill / Reference)
+        excess = len(txt) - max_chars
+        per_file_limit = 2200 if excess > 25000 else (3200 if excess > 12000 else 4500)
+
+        def _shrink_file_block(m: re.Match) -> str:
+            hdr, fbody = m.group(1), m.group(2)
+            if len(fbody) <= per_file_limit:
+                return m.group(0)
+            h_c = int(per_file_limit * 0.7)
+            t_c = max(300, per_file_limit - h_c - 90)
+            return f"{hdr}{fbody[:h_c]}\n...[Tóm tắt Reference]...\n{fbody[-t_c:]}\n"
+
+        txt = re.sub(
+            r"(===\s*FILE\s+[0-9.]+:[^\n]*===\n)(.*?)(?=\n===\s*(?:FILE\s+[0-9.]+:|PRODUCTION PIPELINE OVERRIDE|GIÀN Ý|THÔNG SỐ|TOÀN VĂN|VĂN BẢN|DANH SÁCH|BẢNG LỖI)|$)",
+            _shrink_file_block,
+            txt,
+            flags=re.DOTALL,
+        )
+        if len(txt) <= max_chars:
+            log_msg(project_id, f"✂️ [PROMPT GUARD] Đã tự động cô đọng khối Skill/Reference ({orig_len:,} -> {len(txt):,} ký tự <= {max_chars:,}) và giữ nguyên 100% kịch bản!")
+            return txt
+
+        # 3. Nếu vẫn vượt ngưỡng (do kịch bản dài ~77.000-79.000 ký tự), rút gọn thêm khối Skill/Reference & Patch Ledger vòng trước
+        def _shrink_file_block_tight(m: re.Match) -> str:
+            hdr, fbody = m.group(1), m.group(2)
+            if len(fbody) <= 950:
+                return m.group(0)
+            return f"{hdr}{fbody[:650]}\n...[Core Rule]...\n{fbody[-220:]}\n"
+
+        txt = re.sub(
+            r"(===\s*FILE\s+[0-9.]+:[^\n]*===\n)(.*?)(?=\n===\s*(?:FILE\s+[0-9.]+:|PRODUCTION PIPELINE OVERRIDE|GIÀN Ý|THÔNG SỐ|TOÀN VĂN|VĂN BẢN|DANH SÁCH|BẢNG LỖI)|$)",
+            _shrink_file_block_tight,
+            txt,
+            flags=re.DOTALL,
+        )
+        txt = re.sub(
+            r"(===\s*(?:BẢNG LỖI|DANH SÁCH LỖI)\s+PATCH LEDGER[^\n]*===\n)(.*?)(\n===\s*KẾT THÚC[^\n]*PATCH LEDGER[^\n]*===)",
+            lambda m: m.group(0) if len(m.group(2)) <= 3600 else f"{m.group(1)}{m.group(2)[:2400]}\n...\n{m.group(2)[-1000:]}{m.group(3)}",
+            txt,
+            flags=re.DOTALL,
+        )
+        log_msg(project_id, f"✂️ [PROMPT GUARD] Đã tối ưu hóa kích thước tin nhắn ({orig_len:,} -> {len(txt):,} ký tự <= {max_chars:,}) bảo toàn 100% kịch bản!")
+        return txt
 
     state.setdefault("agent_chat_registry", {})
     if not state["agent_chat_registry"] and state.get("thread_id"):
@@ -3680,7 +3794,8 @@ def _run_single_project_pipeline_inner(
             except Exception:
                 pass
             log_msg(project_id, f"📨 Đang gửi lệnh [{step_label}] vào đoạn chat Agent [{active_desk}] threadId={tid} (Turn #{prev_turns + 1})...")
-            send_res = client.send_message(tid, state["host_id"], prompt, thinking=thinking, project_id=project_id)
+            safe_prompt_turn = _enforce_chatgpt_web_prompt_limit(prompt, max_chars=84000)
+            send_res = client.send_message(tid, state["host_id"], safe_prompt_turn, thinking=thinking, project_id=project_id)
             if "error" in send_res:
                 for same_tid_retry in range(2):
                     log_msg(
@@ -3688,7 +3803,7 @@ def _run_single_project_pipeline_inner(
                         f"⏳ Đoạn chat hiện tại ({tid}) đang bận hoặc chờ mở khóa, tự động đợi 18s rồi gửi lại (lần {same_tid_retry + 1}/2)...",
                     )
                     time.sleep(18.0)
-                    send_res = client.send_message(tid, state["host_id"], prompt, thinking=thinking, project_id=project_id)
+                    send_res = client.send_message(tid, state["host_id"], safe_prompt_turn, thinking=thinking, project_id=project_id)
                     if "error" not in send_res:
                         break
             if "error" not in send_res:
@@ -3715,7 +3830,7 @@ def _run_single_project_pipeline_inner(
             )
             state["thread_id"] = ""
 
-        full_prompt = _build_checkpoint_context_preamble() + prompt
+        full_prompt = _enforce_chatgpt_web_prompt_limit(_build_checkpoint_context_preamble(prompt) + prompt, max_chars=84000)
         resume_prefix = "Mexico Ba Co" if ACTIVE_NICHE == "mexico" else ("Homeless V12" if ACTIVE_NICHE == "homeless" else "Mafia Story")
         tid, hid = client.create_story_thread(
             title_label=f"{resume_prefix} [{project_id}] - {active_desk}",
@@ -5213,12 +5328,15 @@ QUY TẮC KIỂM ĐỊNH PHÁP Y ĐỘC LẬP & TRUNG THỰC (`{skill_4_tag}` �
 - **TUYỆT ĐỐI KHÔNG ĐƯỢC GHI `QA ABORTED — EXACT CURRENT-BODY LENGTH NOT VERIFIED` HAY `null/100`!**
 """
             outline_ref_txt = read_text_file(os.path.join(ckpt_dir, "02_STORY_OUTLINE.md"))
-            outline_excerpt_for_auditor = (
-                outline_ref_txt[:12000] + "\n...[Trích xuất Canon & Cấu trúc Giàn ý Bước 2]...\n" + outline_ref_txt[-6000:]
-                if len(outline_ref_txt) > 19000
-                else outline_ref_txt
-            )
+            # Khóa cứng ngân sách ký tự cho MODE A <= 82.000 ký tự để ChatGPT Web KHÔNG BAO GIỜ báo lỗi "The messages you submitted were too long"
+            # Bảo toàn 100% văn bản kịch bản `current_script`, chỉ điều chỉnh độ dài khối phụ trợ (Skill 4, Giàn ý đối chiếu, Patch Ledger vòng trước):
+            max_mode_a_chars = 82000
+            avail_aux_chars = max(3600, max_mode_a_chars - len(current_script) - len(homeless_qa_cert_block) - 3400)
             if audit_round == 1:
+                outline_cap_a = min(8000, max(1400, int(avail_aux_chars * 0.35)))
+                skill_cap_a = max(2200, avail_aux_chars - outline_cap_a)
+                outline_excerpt_for_auditor = _smart_trim_ref_text(outline_ref_txt, outline_cap_a)
+                skill_4_for_round = _smart_trim_ref_text(skill_4_content, skill_cap_a)
                 prompt_mode_a = f"""================================================================================
 BƯỚC 4 (VÒNG #{audit_round} - MODE A: EXHAUSTIVE FORENSIC REVIEW & STRONG-SPAN LOCK — ĐOẠN CHAT ĐỘC LẬP)
 ================================================================================
@@ -5226,7 +5344,7 @@ QUAN TRỌNG: KHÔNG gọi bất kỳ công cụ (tool), terminal hay lệnh đ�
 
 Dưới đây là toàn bộ nội dung Skill Kiểm tra Kịch bản và các file Reference bắt buộc:
 
-{skill_4_content}
+{skill_4_for_round}
 {homeless_qa_cert_block}
 === GIÀN Ý GỐC ĐÃ KHÓA TỪ BƯỚC 2 (`02_STORY_OUTLINE.md` — DÙNG ĐỂ ĐỐI CHIẾU CANON & BEAT) ===
 {outline_excerpt_for_auditor}
@@ -5263,10 +5381,16 @@ YÊU CẦU THỰC HIỆN NGAY Ở CHẾ ĐỘ `MODE A — EXHAUSTIVE REVIEW` TR�
                     prev_audit_txt,
                     flags=re.IGNORECASE | re.DOTALL,
                 )
-                prev_ledger_excerpt = (m_prev_ledger.group(0)[:8000] if m_prev_ledger else prev_audit_txt[-6000:]).strip()
+                raw_prev_ledger = (m_prev_ledger.group(0)[:8000] if m_prev_ledger else prev_audit_txt[-6000:]).strip()
+                ledger_cap_a = min(5500, max(1500, int(avail_aux_chars * 0.40)))
+                outline_cap_a = min(4500, max(1000, int(avail_aux_chars * 0.25)))
+                skill_cap_a = max(1600, avail_aux_chars - ledger_cap_a - outline_cap_a)
+                prev_ledger_excerpt = _smart_trim_ref_text(raw_prev_ledger, ledger_cap_a)
+                outline_excerpt_for_auditor = _smart_trim_ref_text(outline_ref_txt, outline_cap_a)
+                skill_4_for_round = _smart_trim_ref_text(skill_4_content, skill_cap_a)
                 outline_block_in_mode_a = (
                     f"Dưới đây là toàn bộ nội dung Skill Kiểm tra Kịch bản và các file Reference bắt buộc:\n\n"
-                    f"{skill_4_content}\n\n"
+                    f"{skill_4_for_round}\n\n"
                     f"=== GIÀN Ý GỐC ĐÃ KHÓA TỪ BƯỚC 2 (`02_STORY_OUTLINE.md`) ===\n"
                     f"{outline_excerpt_for_auditor}\n"
                     f"=== KẾT THÚC GIÀN Ý GỐC ===\n\n"

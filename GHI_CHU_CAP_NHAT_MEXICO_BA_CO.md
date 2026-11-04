@@ -305,3 +305,25 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
          - Ngay khi phát hiện, hệ thống tự động kích hoạt **`♻️ [AUTO-HEAL CHATGPT WEB]`**: điều hướng Tab về trang chủ sạch `https://chatgpt.com/`, gửi lại toàn bộ Prompt của bước hiện tại và tiếp tục thu hoạch kết quả mà không bao giờ bị treo!
       3. **Tách đoạn chat độc lập gọn nhẹ cho từng vòng sửa (`REPAIR_DESK_4B_R1..R5` & `CALIB_DESK_4_R{n}`) và bàn giao Tab mượt mà (`release_tab_from_active_duty`):**
          - Mỗi vòng sửa Bàn #4B và cân chỉnh độ dài đều chạy trên đoạn chat sạch 1 lượt riêng biệt (đã đính kèm đầy đủ `CURRENT WORKING SCRIPT` + `PATCH LEDGER`), giúp hội thoại luôn nhẹ (<65KB), tốc độ phản hồi nhanh gấp đôi và không bao giờ gặp lỗi quá tải lịch sử của ChatGPT.
+
+
+---
+
+## 29. Nâng Cấp Bản `V1.0.0 (Build #114)` — Sửa Triệt Để Lỗi `"The messages you submitted were too long, please edit them and resubmit."`
+
+### 29.1. Nguyên nhân gốc rễ đã phát hiện
+1. **Tổng độ dài tin nhắn (`full_prompt`) vượt ngưỡng giới hạn ~90.000 ký tự (32.768 tokens/message) của ChatGPT Web:**
+   - Ở **Bước 4A (`MODE A` — Vòng 1..6)**: `current_script` dài `50.000 – 78.000` ký tự, khi cộng thêm `_build_checkpoint_context_preamble()` (tự động chèn thêm `22.000 – 25.000` ký tự `02_STORY_OUTLINE.md`), cộng tiếp `load_skill_4_audit_bundle()` (`64.628` ký tự ở kênh Mafia do nối cả 14 file `.md` trong `references/`), `outline_excerpt_for_auditor` (`18.000` ký tự) và `prev_ledger_excerpt` (`8.000` ký tự) khiến tổng `full_prompt` vọt lên **`134.253 – 166.595` ký tự**!
+   - Ở **Bước 2 (Giàn ý)**: `load_skill_2_outline_bundle()` của Mafia nạp nguyên văn 3 kho `DNA_A` (`36.666` ký tự), `DNA_B` (`20.897` ký tự), `DNA_C` (`18.829` ký tự) khiến tổng Prompt Bước 2 lên tới **`135.836` ký tự**.
+2. **Dán chồng / nhân đôi văn bản trong ô `.ProseMirror` khi cửa sổ Chrome chạy ngầm (`_inject_and_send_prompt_on_ws`):**
+   - Khi cửa sổ Chrome bị ẩn hoặc mất focus trên Windows, lệnh `document.execCommand('delete')` đôi khi không xóa hết nháp cũ trong `.ProseMirror`, cộng thêm lệnh dán `dtHead` (`1.250` ký tự) trước `dtFull` khiến văn bản bị nối chồng vượt ngưỡng giới hạn của ChatGPT Web.
+
+### 29.2. Giải pháp kỹ thuật đã triển khai (`V1.0.0 Build #114`)
+1. **Loại bỏ đính kèm trùng lặp trong `_build_checkpoint_context_preamble(prompt_body)` ([`engine/mafia_chatgpt_pipeline.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/mafia_chatgpt_pipeline.py)):**
+   - Không bao giờ chèn lặp lại `02_STORY_OUTLINE.md` (`22.000–30.000` ký tự) nếu trong `prompt_body` đã có sẵn `02_STORY_OUTLINE.md`, `CURRENT REVISION BASELINE`, `CURRENT WORKING SCRIPT`, hoặc `LOCKED FULL SCRIPT`.
+2. **Cân bằng ngân sách ký tự thông minh (`<= 82.000 – 84.000` ký tự) & Bảo toàn 100% Kịch bản truyện ([`engine/mafia_chatgpt_pipeline.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/mafia_chatgpt_pipeline.py)):**
+   - Giữ nguyên **100% văn bản kịch bản (`current_script` / `CURRENT REVISION BASELINE`)** không cắt dù chỉ 1 ký tự.
+   - Tự động tính toán ngân sách còn trống (`avail_aux_chars = 82000 - len(current_script) - ...`) để co giãn thông minh phần phụ lục (`Skill 4`, `Giàn ý đối chiếu`, `Patch Ledger vòng trước`), cộng thêm bộ bảo vệ toàn cục `_enforce_chatgpt_web_prompt_limit(max_chars=84000)` cho tất cả 15 Key.
+3. **Làm sạch tuyệt đối `.ProseMirror` & Auto-Heal tức thì lỗi `"The messages you submitted were too long"` ([`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py)):**
+   - Xóa sạch `.ProseMirror` bằng cả `execCommand('delete')` lẫn `el.innerHTML = '<p><br></p>'` và bỏ bước dán trùng `dtHead`, đảm bảo mỗi lượt chỉ dán đúng 1 bản duy nhất.
+   - Tự động phát hiện thông báo `"The messages you submitted were too long, please edit them and resubmit."` ngay sau khi bấm Send và trong vòng lặp `wait_for_turn_completion`, tự động nén gọn các khối Reference phụ trợ (`_compact_overlong_prompt_preserving_script`), mở hội thoại sạch tại `https://chatgpt.com/` và gửi lại ngay lập tức.

@@ -1622,12 +1622,69 @@ class ChatGPTWebMultiTabClient:
             time.sleep(4.5)
             return new_t["id"], new_t["webSocketDebuggerUrl"]
 
+    def _compact_overlong_prompt_preserving_script(self, raw_prompt: str, max_chars: int = 80000) -> str:
+        """
+        Nén thông minh các khối phụ trợ (Skill / Reference / Giàn ý đối chiếu / Patch Ledger cũ)
+        khi tổng độ dài Prompt vượt ngưỡng giới hạn của ChatGPT Web, hoặc khi ChatGPT Web báo
+        'The messages you submitted were too long, please edit them and resubmit.'
+        Tuyệt đối BẢO TOÀN 100% văn bản kịch bản truyện (CURRENT REVISION BASELINE / CURRENT WORKING SCRIPT)!
+        """
+        txt = raw_prompt or ""
+        if len(txt) <= max_chars:
+            return txt
+        # 1. Rút gọn khối GIÀN Ý đối chiếu
+        txt = re.sub(
+            r"(===\s*GIÀN Ý[^\n]*===\n)(.*?)(\n===\s*KẾT THÚC GIÀN Ý[^\n]*===)",
+            lambda m: m.group(0)
+            if len(m.group(2)) <= 2200
+            else f"{m.group(1)}{m.group(2)[:1500]}\n...[Tóm tắt Giàn ý Bước 2]...\n{m.group(2)[-600:]}{m.group(3)}",
+            txt,
+            flags=re.DOTALL,
+        )
+        if len(txt) <= max_chars:
+            return txt
+
+        # 2. Rút gọn các khối === FILE X: ... === (Skill & Reference)
+        excess = len(txt) - max_chars
+        per_file_cap = 900 if excess > 18000 else (1600 if excess > 8000 else 2600)
+
+        def _shrink_file(m: re.Match) -> str:
+            hdr, body = m.group(1), m.group(2)
+            if len(body) <= per_file_cap:
+                return m.group(0)
+            h_len = int(per_file_cap * 0.72)
+            t_len = max(180, per_file_cap - h_len - 60)
+            return f"{hdr}{body[:h_len]}\n...[Core Rule]...\n{body[-t_len:]}\n"
+
+        txt = re.sub(
+            r"(===\s*FILE\s+[0-9.]+:[^\n]*===\n)(.*?)(?=\n===\s*(?:FILE\s+[0-9.]+:|PRODUCTION PIPELINE OVERRIDE|GIÀN Ý|THÔNG SỐ|TOÀN VĂN|VĂN BẢN|DANH SÁCH|BẢNG LỖI)|$)",
+            _shrink_file,
+            txt,
+            flags=re.DOTALL,
+        )
+        if len(txt) <= max_chars:
+            return txt
+
+        # 3. Rút gọn khối PATCH LEDGER vòng trước (nếu vẫn vượt ngưỡng)
+        txt = re.sub(
+            r"(===\s*(?:BẢNG LỖI|DANH SÁCH LỖI)\s+PATCH LEDGER[^\n]*===\n)(.*?)(\n===\s*KẾT THÚC[^\n]*PATCH LEDGER[^\n]*===)",
+            lambda m: m.group(0)
+            if len(m.group(2)) <= 2600
+            else f"{m.group(1)}{m.group(2)[:1800]}\n...\n{m.group(2)[-700:]}{m.group(3)}",
+            txt,
+            flags=re.DOTALL,
+        )
+        return txt
+
     def _inject_and_send_prompt_on_ws(self, ws_url: str, prompt: str) -> dict:
         """
-        Bơm toàn bộ Prompt (dù dài 80.000 ký tự) vào `.ProseMirror[contenteditable="true"]` / `#prompt-textarea`
-        trên Tab Web theo từng cụm dòng mượt mà (không tạo chip đính kèm, không treo renderer) và bấm nút Gửi (`aria-label="Send"`).
-        Đợi đến khi URL chuyển thành `/c/{conversation_id}` (nếu là đoạn chat mới) và trả về `{ok, thread_id, url}`.
+        Bơm toàn bộ Prompt vào `.ProseMirror[contenteditable="true"]` / `#prompt-textarea`
+        trên Tab Web (tự động xóa sạch ô nhập trước khi dán để không bao giờ nhân đôi văn bản,
+        và tự động giới hạn <= 83.500 ký tự để triệt tiêu lỗi 'The messages you submitted were too long')
+        rồi bấm nút Gửi (`aria-label="Send"`).
         """
+        if len(prompt or "") > 83500:
+            prompt = self._compact_overlong_prompt_preserving_script(prompt, max_chars=82000)
         js_send = f"""
         (async () => {{
             const promptText = {json.dumps(prompt)};
@@ -1643,6 +1700,14 @@ class ChatGPTWebMultiTabClient:
                     return true;
                 }}
                 return false;
+            }}
+            function hasTooLongMessageError() {{
+                const bodyTxt = ((document.body && document.body.innerText) || '').toLowerCase();
+                return (
+                    bodyTxt.includes('the messages you submitted were too long') ||
+                    bodyTxt.includes('the message you submitted was too long') ||
+                    bodyTxt.includes('please edit them and resubmit')
+                );
             }}
             if (hasConversationLoadError()) {{
                 window.onbeforeunload = null;
@@ -1721,7 +1786,7 @@ class ChatGPTWebMultiTabClient:
                 }}
             }} catch (e) {{}}
 
-            // Xóa sạch mọi chip đính kèm cũ hoặc chữ nháp còn sót trong ô nhập
+            // Xóa sạch 100% mọi chip đính kèm cũ hoặc chữ nháp còn sót trong ô nhập (chống nhân đôi độ dài khi cửa sổ chạy ngầm)
             Array.from(document.querySelectorAll('form button')).filter(
                 b => (b.getAttribute('aria-label') || '').includes('Remove pasted text')
             ).forEach(b => b.click());
@@ -1737,7 +1802,14 @@ class ChatGPTWebMultiTabClient:
                     }}
                     document.execCommand('delete', false, null);
                 }} catch (e) {{}}
-                await new Promise(r => setTimeout(r, 120));
+                await new Promise(r => setTimeout(r, 90));
+                if ((el.innerText || '').trim().length > 0 && el.tagName !== 'TEXTAREA') {{
+                    try {{
+                        el.innerHTML = '<p><br></p>';
+                        el.dispatchEvent(new InputEvent('input', {{ bubbles: true, inputType: 'deleteContentBackward' }}));
+                    }} catch (e) {{}}
+                    await new Promise(r => setTimeout(r, 90));
+                }}
             }}
 
             const prevUrlPath = window.location.pathname;
@@ -1747,15 +1819,9 @@ class ChatGPTWebMultiTabClient:
                 nativeSetter.call(el, promptText);
                 el.dispatchEvent(new Event('input', {{ bubbles: true }}));
             }} else {{
-                // Nếu prompt <= 12.000 ký tự: chia cụm dán inline.
-                // Nếu prompt > 12.000 ký tự (như Bước 4A): dán trực tiếp 1 lần phần thân + 1 lần dòng tiêu đề đầu.
+                // Dán trực tiếp đúng 1 bản duy nhất của promptText vào .ProseMirror (tuyệt đối không dán thêm headLine gây trùng lặp!)
                 focusAndSelectComposer(el);
                 if (promptText.length > 12000) {{
-                    const headLine = promptText.slice(0, 1200) + '\\n\\n[xem toàn bộ nội dung đính kèm bên dưới]';
-                    const dtHead = new DataTransfer();
-                    dtHead.setData('text/plain', headLine);
-                    el.dispatchEvent(new ClipboardEvent('paste', {{ clipboardData: dtHead, bubbles: true, cancelable: true }}));
-                    await new Promise(r => setTimeout(r, 40));
                     const dtFull = new DataTransfer();
                     dtFull.setData('text/plain', promptText);
                     el.dispatchEvent(new ClipboardEvent('paste', {{ clipboardData: dtFull, bubbles: true, cancelable: true }}));
@@ -1859,7 +1925,7 @@ class ChatGPTWebMultiTabClient:
                 return JSON.stringify({{ error: 'Nút Send chưa gửi được tin nhắn đi sau 32 lần thử, sẽ tự động thử lại!' }});
             }}
 
-            // Chờ URL cập nhật sang /c/<uuid> (nếu là đoạn chat mới, tối đa 22s)
+            // Chờ URL cập nhật sang /c/<uuid> (nếu là đoạn chat mới, tối đa 22s) và kiểm tra lỗi "messages you submitted were too long"
             let convId = '';
             for (let w = 0; w < 44; w++) {{
                 if (hasConversationLoadError()) {{
@@ -1867,12 +1933,22 @@ class ChatGPTWebMultiTabClient:
                     window.location.href = 'https://chatgpt.com/';
                     return JSON.stringify({{ error: 'CONVERSATION_LOAD_ERROR_REDIRECTED_HOME' }});
                 }}
+                if (w >= 3 && hasTooLongMessageError()) {{
+                    window.onbeforeunload = null;
+                    window.location.href = 'https://chatgpt.com/';
+                    return JSON.stringify({{ error: 'MESSAGE_TOO_LONG_ERROR' }});
+                }}
                 const m = window.location.pathname.match(/\\/c\\/([0-9a-fA-F\\-]{{20,}})/);
                 if (m && !m[1].toLowerCase().startsWith('webtab_')) {{
                     convId = m[1];
                     break;
                 }}
                 await new Promise(r => setTimeout(r, 500));
+            }}
+            if (hasTooLongMessageError()) {{
+                window.onbeforeunload = null;
+                window.location.href = 'https://chatgpt.com/';
+                return JSON.stringify({{ error: 'MESSAGE_TOO_LONG_ERROR' }});
             }}
             return JSON.stringify({{
                 ok: true,
@@ -1907,8 +1983,11 @@ class ChatGPTWebMultiTabClient:
         aid = acc_cfg["acc_id"]
         tab_id, ws_url = self._get_or_create_tab_ws(thread_id="", force_new_chat=True, acc_id=aid, project_id=project_id)
         res = {}
+        cur_prompt = self._compact_overlong_prompt_preserving_script(prompt, max_chars=82000) if len(prompt or "") > 83000 else prompt
         for attempt in range(4):
             if attempt > 0:
+                if "MESSAGE_TOO_LONG_ERROR" in str(res.get("error", "")):
+                    cur_prompt = self._compact_overlong_prompt_preserving_script(cur_prompt, max_chars=max(56000, 74000 - attempt * 6000))
                 with WEB_TAB_LOCK:
                     self._reserved_tab_ids.setdefault(aid, set()).discard(tab_id)
                     self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
@@ -1916,14 +1995,14 @@ class ChatGPTWebMultiTabClient:
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).add(tab_id)
                 self._tab_last_used_ts[tab_id] = time.time()
-            res = self._inject_and_send_prompt_on_ws(ws_url, prompt)
+            res = self._inject_and_send_prompt_on_ws(ws_url, cur_prompt)
             if "error" not in res and res.get("ok"):
                 tid = res.get("thread_id") or f"webtab_{aid}_{tab_id}"
                 with WEB_TAB_LOCK:
                     self._thread_to_tab.setdefault(aid, {})[tid] = tab_id
                     self._thread_to_acc[tid] = aid
                     self._tab_last_used_ts[tab_id] = time.time()
-                self._last_sent_prompt[tid] = prompt
+                self._last_sent_prompt[tid] = cur_prompt
                 return tid, f"chatgpt_web:{aid}"
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
@@ -1939,14 +2018,18 @@ class ChatGPTWebMultiTabClient:
         """
         acc_cfg = self._resolve_acc_cfg(thread_id=thread_id, host_id=host_id, project_id=project_id)
         aid = acc_cfg["acc_id"]
-        self._last_sent_prompt[thread_id] = prompt
+        cur_prompt = self._compact_overlong_prompt_preserving_script(prompt, max_chars=82000) if len(prompt or "") > 83000 else prompt
+        self._last_sent_prompt[thread_id] = cur_prompt
         tab_id, ws_url = self._get_or_create_tab_ws(thread_id=thread_id, force_new_chat=False, acc_id=aid, project_id=project_id)
         res = {}
         for attempt in range(4):
             if attempt > 0:
+                if "MESSAGE_TOO_LONG_ERROR" in str(res.get("error", "")):
+                    cur_prompt = self._compact_overlong_prompt_preserving_script(cur_prompt, max_chars=max(56000, 74000 - attempt * 6000))
+                    self._last_sent_prompt[thread_id] = cur_prompt
                 with WEB_TAB_LOCK:
                     self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
-                force_clean = "CONVERSATION_LOAD_ERROR" in str(res.get("error", ""))
+                force_clean = any(k in str(res.get("error", "")) for k in ("CONVERSATION_LOAD_ERROR", "MESSAGE_TOO_LONG_ERROR"))
                 tab_id, ws_url = self._get_or_create_tab_ws(
                     thread_id="" if force_clean else thread_id,
                     force_new_chat=force_clean,
@@ -1956,7 +2039,7 @@ class ChatGPTWebMultiTabClient:
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).add(tab_id)
                 self._tab_last_used_ts[tab_id] = time.time()
-            res = self._inject_and_send_prompt_on_ws(ws_url, prompt)
+            res = self._inject_and_send_prompt_on_ws(ws_url, cur_prompt)
             if "error" not in res and res.get("ok"):
                 real_tid = res.get("thread_id") or thread_id
                 with WEB_TAB_LOCK:
@@ -2254,6 +2337,11 @@ class ChatGPTWebMultiTabClient:
                         bodyLow.includes('unable to load conversation') ||
                         bodyLow.includes('conversation not found')
                     );
+                    const tooLongError = Boolean(
+                        bodyLow.includes('the messages you submitted were too long') ||
+                        bodyLow.includes('the message you submitted was too long') ||
+                        bodyLow.includes('please edit them and resubmit')
+                    );
                     const turnStates = Array.from(document.querySelectorAll('[data-talvt-turn-state]')).map(e => e.getAttribute('data-talvt-turn-state'));
                     const hasIncompleteTurn = turnStates.some(s => s && s !== 'complete');
                     const stopBtn = Boolean(
@@ -2287,6 +2375,7 @@ class ChatGPTWebMultiTabClient:
                         return JSON.stringify({
                             conv_id: convId,
                             load_error: loadError,
+                            too_long_error: tooLongError,
                             stream_error: streamError,
                             streaming: stopBtn,
                             asst_count: asstCount,
@@ -2301,6 +2390,7 @@ class ChatGPTWebMultiTabClient:
                     return JSON.stringify({
                         conv_id: convId,
                         load_error: loadError,
+                        too_long_error: tooLongError,
                         stream_error: streamError,
                         streaming: stopBtn,
                         asst_count: asstEls.length,
@@ -2334,6 +2424,7 @@ class ChatGPTWebMultiTabClient:
                 is_streaming = bool(dom_st.get("streaming"))
                 cur_chars = int(dom_st.get("char_len") or 0)
                 has_load_err = bool(dom_st.get("load_error"))
+                has_too_long_err = bool(dom_st.get("too_long_error"))
                 has_stream_err = bool(dom_st.get("stream_error"))
                 if cur_chars > 0 or is_streaming:
                     zero_char_since = time.time()
@@ -2342,19 +2433,28 @@ class ChatGPTWebMultiTabClient:
                     self._tab_last_used_ts[tab_id] = time.time()
 
                 # CƠ CHẾ TỰ CHỮA LÀNH TỨC THÌ (AUTO-HEAL):
-                # Nếu gặp lỗi "Could not load this ChatGPT conversation" / "/c/webtab_..." HOẶC đứng im 0 ký tự quá 28s mà không streaming:
+                # Nếu gặp lỗi "Could not load this ChatGPT conversation" / "The messages you submitted were too long" HOẶC đứng im 0 ký tự quá 28s mà không streaming:
                 zero_stuck_secs = time.time() - zero_char_since
-                if (has_load_err or has_stream_err or (not is_streaming and cur_chars == 0 and zero_stuck_secs >= 28.0)) and auto_heal_count < 3:
+                if (has_load_err or has_too_long_err or has_stream_err or (not is_streaming and cur_chars == 0 and zero_stuck_secs >= 28.0)) and auto_heal_count < 3:
                     auto_heal_count += 1
                     recovery_prompt = (
                         self._last_sent_prompt.get(thread_id)
                         or self._last_sent_prompt.get(orig_thread_id)
                         or ""
                     )
+                    if has_too_long_err and recovery_prompt:
+                        compact_target = max(55000, 72000 - auto_heal_count * 6000)
+                        recovery_prompt = self._compact_overlong_prompt_preserving_script(recovery_prompt, max_chars=compact_target)
+                        self._last_sent_prompt[thread_id] = recovery_prompt
+                        self._last_sent_prompt[orig_thread_id] = recovery_prompt
                     reason_str = (
                         "Could not load this ChatGPT conversation"
                         if has_load_err
-                        else ("Stream Error" if has_stream_err else f"0 ký tự sau {int(zero_stuck_secs)}s")
+                        else (
+                            "The messages you submitted were too long (Đã tự động nén gọn Reference & giữ 100% kịch bản)"
+                            if has_too_long_err
+                            else ("Stream Error" if has_stream_err else f"0 ký tự sau {int(zero_stuck_secs)}s")
+                        )
                     )
                     log_msg(
                         project_id,
