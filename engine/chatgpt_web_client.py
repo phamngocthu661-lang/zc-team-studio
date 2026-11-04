@@ -434,12 +434,27 @@ def force_close_or_recycle_tab(port: int, tab_id: str, ws_url: str = "", allow_c
         return "error"
 
 
+def _is_valid_chatgpt_uuid(tid: str) -> bool:
+    """Kiểm tra xem `tid` có phải là mã hội thoại UUID thật của ChatGPT (`/c/<uuid>`) hay chỉ là mã tạm `webtab_...`."""
+    s = str(tid or "").strip()
+    if not s or s.lower().startswith("webtab_"):
+        return False
+    return bool(re.match(r"^[0-9a-fA-F\-]{20,}$", s))
+
+
 def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[str] = None) -> dict:
     """
     Quét toàn bộ các Tab Chrome đang mở trên cả 3 Tài khoản (`Acc #1`, `Acc #2`, `Acc #3`):
     - CHỈ giữ lại các Tab đang thực sự được điều khiển (`active_threads`) và tối đa 1 Tab trang chủ `https://chatgpt.com/` dự phòng.
     - Toàn bộ các Tab `/c/` của dự án đã xong đều được đóng để giải phóng RAM!
+    - Đặc biệt: Nếu đang có kịch bản đang chạy tích cực (`GLOBAL_PROJECT_TO_ACC` không rỗng), không đóng các Tab trang chủ đang chuẩn bị gửi lệnh!
     """
+    # Nếu đang có luồng kịch bản đang chạy tích cực trong bộ nhớ, tránh đóng nhầm Tab trang chủ đang khởi tạo Desk mới
+    if GLOBAL_PROJECT_TO_ACC:
+        has_active_worker = True
+    else:
+        has_active_worker = False
+
     if not projects_root_list:
         projects_root_list = [
             r"D:\KEY NHẬT",
@@ -458,7 +473,8 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
 
     now = time.time()
     active_threads = set()
-    has_recently_starting_project = False
+    active_tab_ids = set()
+    has_recently_starting_project = has_active_worker
     for r_dir in projects_root_list:
         if not os.path.exists(r_dir):
             continue
@@ -480,12 +496,17 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
                             tid = str(st.get("thread_id") or "").strip()
                             if tid:
                                 active_threads.add(tid)
+                                if tid.startswith("webtab_") and tid.count("_") >= 2:
+                                    active_tab_ids.add(tid.split("_", 2)[2])
                             else:
-                                if mtime_age < 180.0:
+                                if mtime_age < 300.0:
                                     has_recently_starting_project = True
                             for reg_v in (st.get("agent_chat_registry") or {}).values():
                                 if isinstance(reg_v, dict) and reg_v.get("thread_id"):
-                                    active_threads.add(str(reg_v["thread_id"]).strip())
+                                    rtid = str(reg_v["thread_id"]).strip()
+                                    active_threads.add(rtid)
+                                    if rtid.startswith("webtab_") and rtid.count("_") >= 2:
+                                        active_tab_ids.add(rtid.split("_", 2)[2])
                     except Exception:
                         pass
         except Exception:
@@ -510,25 +531,29 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
             uncontrolled_tabs = []
             home_tabs = []
             for t in page_tabs:
+                t_id = str(t.get("id") or "").strip()
                 u = str(t.get("url") or "").strip()
                 u_clean = u.rstrip("/")
                 m = re.search(r"/c/([0-9a-fA-F\-]{16,})", u)
                 cid = m.group(1) if m else ""
                 is_auth_page = any(k in u.lower() for k in ("auth.openai.com", "login", "auth0", "accounts.google.com"))
                 is_home_page = u_clean in ("https://chatgpt.com", "https://chatgpt.com/?model=auto")
-                if (cid and cid in active_threads) or is_auth_page or (is_home_page and has_recently_starting_project):
+                if (
+                    (cid and cid in active_threads)
+                    or (t_id and t_id in active_tab_ids)
+                    or is_auth_page
+                    or (is_home_page and has_recently_starting_project)
+                ):
                     controlled_tabs.append(t)
                 elif is_home_page:
                     home_tabs.append(t)
                 else:
                     uncontrolled_tabs.append(t)
 
-            # Luôn giữ lại tối đa 1 tab trang chủ https://chatgpt.com để sẵn sàng nhận lệnh mới tức thì
-            if home_tabs and not controlled_tabs:
+            # Luôn giữ lại tối thiểu 1 tab trang chủ https://chatgpt.com để sẵn sàng nhận lệnh mới tức thì
+            if home_tabs:
                 controlled_tabs.append(home_tabs[0])
                 uncontrolled_tabs.extend(home_tabs[1:])
-            else:
-                uncontrolled_tabs.extend(home_tabs)
 
             if len(controlled_tabs) >= 1:
                 for t in uncontrolled_tabs:
@@ -1203,11 +1228,36 @@ class ChatGPTWebMultiTabClient:
         host_id: str = "",
     ) -> None:
         """
-        Đóng ngay Tab đang mở `thread_id` khi kịch bản chuyển sang Skill/Agent khác để giải phóng RAM tức thì,
-        chỉ giữ lại các Tab đang thực sự được điều khiển!
+        Giải phóng Tab đang mở `thread_id` của Bàn trước và đánh dấu Tab đó là Tab ưu tiên tái sử dụng
+        (`_reusable_project_tab[project_id]`) cho Bàn tiếp theo của chính `project_id` này!
+        Không gọi `sweep_completed_and_idle_tabs_across_all_accounts` giữa chừng khi đang chuyển Bàn
+        để tránh đóng nhầm Tab trang chủ của các luồng khác!
         """
         try:
-            self.close_tab_for_completed_project(project_id="", thread_id=thread_id, host_id=host_id)
+            acc_cfg = self._resolve_acc_cfg(thread_id=thread_id, host_id=host_id, project_id=project_id)
+            aid = acc_cfg["acc_id"]
+            port = acc_cfg["port"]
+            with WEB_TAB_LOCK:
+                acc_tab_map = self._thread_to_tab.setdefault(aid, {})
+                acc_reserved = self._reserved_tab_ids.setdefault(aid, set())
+                acc_busy = self._active_busy_tabs.setdefault(aid, set())
+                mapped_tid = acc_tab_map.pop(thread_id, None) if thread_id else None
+                if not mapped_tid and thread_id and str(thread_id).startswith("webtab_") and str(thread_id).count("_") >= 2:
+                    mapped_tid = str(thread_id).split("_", 2)[2]
+                if not mapped_tid and thread_id and is_cdp_browser_running(port=port):
+                    try:
+                        tabs = _cdp_http_json("/json/list", timeout=2.0, port=port)
+                        for t in tabs:
+                            if t.get("type") == "page" and f"/c/{thread_id}" in str(t.get("url") or ""):
+                                mapped_tid = t.get("id")
+                                break
+                    except Exception:
+                        pass
+                if mapped_tid:
+                    acc_reserved.discard(mapped_tid)
+                    acc_busy.discard(mapped_tid)
+                    if project_id:
+                        self._reusable_project_tab[project_id] = mapped_tid
         except Exception:
             pass
 
@@ -1257,6 +1307,8 @@ class ChatGPTWebMultiTabClient:
             acc_reserved = self._reserved_tab_ids.setdefault(aid, set())
             acc_busy = self._active_busy_tabs.setdefault(aid, set())
             mapped_tid = acc_tab_map.pop(thread_id, None) if thread_id else None
+            if not mapped_tid and thread_id and str(thread_id).startswith("webtab_") and str(thread_id).count("_") >= 2:
+                mapped_tid = str(thread_id).split("_", 2)[2]
             if mapped_tid:
                 acc_reserved.discard(mapped_tid)
                 acc_busy.discard(mapped_tid)
@@ -1270,7 +1322,7 @@ class ChatGPTWebMultiTabClient:
                     tabs = _cdp_http_json("/json/list", timeout=2.5, port=port)
                     page_tabs = [t for t in tabs if t.get("type") == "page"]
                     target_t = None
-                    if thread_id:
+                    if thread_id and _is_valid_chatgpt_uuid(thread_id):
                         for t in page_tabs:
                             if f"/c/{thread_id}" in str(t.get("url") or ""):
                                 target_t = t
@@ -1327,7 +1379,8 @@ class ChatGPTWebMultiTabClient:
         """
         Trả về `(tab_id, ws_url)` của Tab Chrome trên đúng Tài khoản `acc_id` (`Port 9222 / 9223 / 9224`) dành riêng cho `thread_id`.
         KHÓA CỨNG GIỚI HẠN TỐI ĐA 5 TAB MỞ TRÊN MỖI TÀI KHOẢN (`MAX_OPEN_TABS_PER_ACCOUNT = 5`):
-        - Nếu `thread_id` đã có Tab đang mở tại `/c/{thread_id}`, tái sử dụng ngay lập tức (KHÔNG tải lại trang!).
+        - Nếu `thread_id` là mã tạm `webtab_<aid>_<tab_id>`, trả về trực tiếp đúng `tab_id` đó (TUYỆT ĐỐI KHÔNG điều hướng tới `/c/webtab_...`!).
+        - Nếu `thread_id` là UUID thật và đã có Tab đang mở tại `/c/{thread_id}`, tái sử dụng ngay lập tức (KHÔNG tải lại trang!).
         - Nếu cần mở đoạn chat mới hoặc quay lại 1 `thread_id` đã lưu của Agent trước đó mà tài khoản đã mở đủ 5 Tab:
           Tự động chọn Tab nhàn rỗi (không nằm trong `_active_busy_tabs` đang streaming) và điều hướng Tab đó tới
           `/c/{thread_id}` (hoặc `https://chatgpt.com/` cho chat mới), TUYỆT ĐỐI KHÔNG mở Tab thứ 6!
@@ -1384,7 +1437,33 @@ class ChatGPTWebMultiTabClient:
                     if k_tab == target_tab_id and k_tid != keep_thread_id:
                         acc_tab_map.pop(k_tid, None)
 
-            if thread_id and not force_new_chat:
+            # XỬ LÝ ĐẶC BIỆT CHO MÃ TẠM `webtab_<aid>_<tab_id>`:
+            # TUYỆT ĐỐI KHÔNG BAO GIỜ điều hướng tới `https://chatgpt.com/c/webtab_...` vì sẽ gây lỗi "Could not load this ChatGPT conversation"!
+            if thread_id and str(thread_id).startswith("webtab_") and not force_new_chat:
+                mapped_tab_id = acc_tab_map.get(thread_id)
+                if not mapped_tab_id and str(thread_id).count("_") >= 2:
+                    mapped_tab_id = str(thread_id).split("_", 2)[2]
+                if mapped_tab_id:
+                    for t in page_tabs:
+                        if t.get("id") == mapped_tab_id and t.get("webSocketDebuggerUrl"):
+                            u_cur = str(t.get("url") or "")
+                            if "/c/webtab_" in u_cur:
+                                # Nếu trước đó tab bị điều hướng nhầm vào /c/webtab_..., đưa ngay về trang chủ sạch
+                                _eval_js_in_tab(
+                                    t["webSocketDebuggerUrl"],
+                                    "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                                    await_promise=False,
+                                )
+                                time.sleep(4.0)
+                            acc_tab_map[thread_id] = t["id"]
+                            self._thread_to_acc[thread_id] = aid
+                            self._tab_last_used_ts[t["id"]] = time.time()
+                            return t["id"], t["webSocketDebuggerUrl"]
+                # Nếu tab gốc của webtab_... không còn tồn tại, chuyển sang mở hội thoại mới trên trang chủ https://chatgpt.com/
+                force_new_chat = True
+                thread_id = ""
+
+            if thread_id and _is_valid_chatgpt_uuid(thread_id) and not force_new_chat:
                 # 1. Tìm tab đang mở sẵn đúng URL /c/{thread_id}
                 for t in page_tabs:
                     u = str(t.get("url", ""))
@@ -1394,19 +1473,21 @@ class ChatGPTWebMultiTabClient:
                         self._tab_last_used_ts[t["id"]] = time.time()
                         return t["id"], t["webSocketDebuggerUrl"]
 
-                # 2. Nếu có tab đã gán cho thread_id này (và không bị luồng khác chiếm), điều hướng tới /c/{thread_id}
+                # 2. Nếu có tab đã gán cho thread_id này, kiểm tra và điều hướng tới /c/{thread_id}
                 mapped_tab_id = acc_tab_map.get(thread_id)
-                if mapped_tab_id and mapped_tab_id not in acc_busy:
+                if mapped_tab_id:
                     for t in page_tabs:
                         if t.get("id") == mapped_tab_id and t.get("webSocketDebuggerUrl"):
-                            target_url = f"https://chatgpt.com/c/{thread_id}"
-                            _eval_js_in_tab(
-                                t["webSocketDebuggerUrl"],
-                                f"window.location.href = {json.dumps(target_url)}; true;",
-                                await_promise=False,
-                            )
+                            u_cur = str(t.get("url", ""))
+                            if f"/c/{thread_id}" not in u_cur:
+                                target_url = f"https://chatgpt.com/c/{thread_id}"
+                                _eval_js_in_tab(
+                                    t["webSocketDebuggerUrl"],
+                                    f"window.onbeforeunload = null; window.location.href = {json.dumps(target_url)}; true;",
+                                    await_promise=False,
+                                )
+                                time.sleep(4.5)
                             self._tab_last_used_ts[t["id"]] = time.time()
-                            time.sleep(4.5)
                             return t["id"], t["webSocketDebuggerUrl"]
 
                 # 3. Nếu có tab đang ở trang chủ https://chatgpt.com/ chưa gắn với hội thoại nào và chưa bận
@@ -1423,7 +1504,7 @@ class ChatGPTWebMultiTabClient:
                         _unbind_old_threads_from_tab(t["id"], keep_thread_id=thread_id)
                         _eval_js_in_tab(
                             t["webSocketDebuggerUrl"],
-                            f"window.location.href = {json.dumps(target_url)}; true;",
+                            f"window.onbeforeunload = null; window.location.href = {json.dumps(target_url)}; true;",
                             await_promise=False,
                         )
                         acc_tab_map[thread_id] = t["id"]
@@ -1442,7 +1523,7 @@ class ChatGPTWebMultiTabClient:
                         acc_reserved.add(r_id)
                         _eval_js_in_tab(
                             reused_t["webSocketDebuggerUrl"],
-                            f"window.location.href = {json.dumps(target_url)}; true;",
+                            f"window.onbeforeunload = null; window.location.href = {json.dumps(target_url)}; true;",
                             await_promise=False,
                         )
                         acc_tab_map[thread_id] = r_id
@@ -1462,6 +1543,30 @@ class ChatGPTWebMultiTabClient:
                 return new_t["id"], new_t["webSocketDebuggerUrl"]
 
             # Trường hợp tạo đoạn chat mới cho Skill/Agent tách riêng (force_new_chat=True hoặc chưa có thread_id):
+            # Ưu tiên 0: Nếu có Tab vừa được giải phóng của chính project_id này, điều hướng ngay về https://chatgpt.com/
+            if project_id and project_id in self._reusable_project_tab:
+                pref_tid = self._reusable_project_tab.get(project_id)
+                if pref_tid and pref_tid not in acc_busy:
+                    for t in page_tabs:
+                        if t.get("id") == pref_tid and t.get("webSocketDebuggerUrl"):
+                            self._reusable_project_tab.pop(project_id, None)
+                            _unbind_old_threads_from_tab(pref_tid)
+                            acc_reserved.add(pref_tid)
+                            u_p = str(t.get("url", "")).rstrip("/")
+                            is_clean_home = (
+                                u_p in ("https://chatgpt.com", "https://chatgpt.com/?model=auto")
+                                and "/c/" not in u_p
+                            )
+                            if not is_clean_home:
+                                _eval_js_in_tab(
+                                    t["webSocketDebuggerUrl"],
+                                    "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                                    await_promise=False,
+                                )
+                                time.sleep(4.2)
+                            self._tab_last_used_ts[pref_tid] = time.time()
+                            return pref_tid, t["webSocketDebuggerUrl"]
+
             used_tab_ids = set(acc_tab_map.values()) | acc_reserved | acc_busy
             for t in page_tabs:
                 u = str(t.get("url", "")).rstrip("/")
@@ -1493,8 +1598,8 @@ class ChatGPTWebMultiTabClient:
                     time.sleep(4.2)
                     return t["id"], t["webSocketDebuggerUrl"]
 
-            # Nếu đã đạt giới hạn 5 Tab trên tài khoản (hoặc có Tab của Desk trước vừa giải phóng), tái sử dụng ngay Tab đó thay vì mở Tab mới!
-            if len(page_tabs) >= MAX_OPEN_TABS_PER_ACCOUNT or (project_id and project_id in self._reusable_project_tab):
+            # Nếu đã đạt giới hạn 5 Tab trên tài khoản (hoặc có Tab nhàn rỗi), tái sử dụng ngay Tab đó thay vì mở Tab mới!
+            if len(page_tabs) >= MAX_OPEN_TABS_PER_ACCOUNT:
                 reused_t = _pick_reusable_idle_tab()
                 if reused_t:
                     r_id = reused_t["id"]
@@ -1526,6 +1631,24 @@ class ChatGPTWebMultiTabClient:
         js_send = f"""
         (async () => {{
             const promptText = {json.dumps(prompt)};
+            function hasConversationLoadError() {{
+                const pathNow = (window.location.pathname || '').toLowerCase();
+                if (pathNow.includes('/c/webtab_')) return true;
+                const bodyTxt = ((document.body && document.body.innerText) || '').toLowerCase();
+                if (
+                    bodyTxt.includes('could not load this chatgpt conversation') ||
+                    bodyTxt.includes('unable to load conversation') ||
+                    bodyTxt.includes('conversation not found')
+                ) {{
+                    return true;
+                }}
+                return false;
+            }}
+            if (hasConversationLoadError()) {{
+                window.onbeforeunload = null;
+                window.location.href = 'https://chatgpt.com/';
+                return JSON.stringify({{ error: 'CONVERSATION_LOAD_ERROR_REDIRECTED_HOME' }});
+            }}
             function findComposerBox() {{
                 return document.querySelector('#prompt-textarea')
                     || document.querySelector('.ProseMirror[contenteditable="true"]')
@@ -1546,6 +1669,11 @@ class ChatGPTWebMultiTabClient:
             // Đợi ô nhập liệu xuất hiện (tối đa 18s)
             let el = null;
             for (let i = 0; i < 36; i++) {{
+                if (hasConversationLoadError()) {{
+                    window.onbeforeunload = null;
+                    window.location.href = 'https://chatgpt.com/';
+                    return JSON.stringify({{ error: 'CONVERSATION_LOAD_ERROR_REDIRECTED_HOME' }});
+                }}
                 el = findComposerBox();
                 if (el) break;
                 await new Promise(r => setTimeout(r, 500));
@@ -1691,8 +1819,13 @@ class ChatGPTWebMultiTabClient:
             // Chờ nút Send kích hoạt và bấm lặp lại cho tới khi ô nhập thực sự gửi đi (ô trống & hết chip đính kèm hoặc hiện nút Stop SAU KHI đã bấm Send)
             let sentConfirmed = false;
             let clickedSendOnce = false;
-            for (let s = 0; s < 28; s++) {{
+            for (let s = 0; s < 32; s++) {{
                 await new Promise(r => setTimeout(r, 350));
+                if (hasConversationLoadError()) {{
+                    window.onbeforeunload = null;
+                    window.location.href = 'https://chatgpt.com/';
+                    return JSON.stringify({{ error: 'CONVERSATION_LOAD_ERROR_REDIRECTED_HOME' }});
+                }}
                 const stopNow = findStopButton();
                 const curBox = findComposerBox();
                 const curTextLen = curBox ? (curBox.innerText || '').trim().length : 0;
@@ -1723,14 +1856,19 @@ class ChatGPTWebMultiTabClient:
                 }}
             }}
             if (!sentConfirmed) {{
-                return JSON.stringify({{ error: 'Nút Send chưa gửi được tin nhắn đi sau 28 lần thử, sẽ tự động thử lại!' }});
+                return JSON.stringify({{ error: 'Nút Send chưa gửi được tin nhắn đi sau 32 lần thử, sẽ tự động thử lại!' }});
             }}
 
-            // Chờ URL cập nhật sang /c/<uuid> (nếu là đoạn chat mới)
+            // Chờ URL cập nhật sang /c/<uuid> (nếu là đoạn chat mới, tối đa 22s)
             let convId = '';
-            for (let w = 0; w < 30; w++) {{
+            for (let w = 0; w < 44; w++) {{
+                if (hasConversationLoadError()) {{
+                    window.onbeforeunload = null;
+                    window.location.href = 'https://chatgpt.com/';
+                    return JSON.stringify({{ error: 'CONVERSATION_LOAD_ERROR_REDIRECTED_HOME' }});
+                }}
                 const m = window.location.pathname.match(/\\/c\\/([0-9a-fA-F\\-]{{20,}})/);
-                if (m) {{
+                if (m && !m[1].toLowerCase().startsWith('webtab_')) {{
                     convId = m[1];
                     break;
                 }}
@@ -1744,7 +1882,7 @@ class ChatGPTWebMultiTabClient:
         }})()
         """
         try:
-            raw = _eval_js_in_tab(ws_url, js_send, await_promise=True, timeout=60.0)
+            raw = _eval_js_in_tab(ws_url, js_send, await_promise=True, timeout=75.0)
         except Exception as e:
             return {"error": f"WebSocket eval error: {e}"}
         if not raw:
@@ -1789,7 +1927,7 @@ class ChatGPTWebMultiTabClient:
                 return tid, f"chatgpt_web:{aid}"
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
-            time.sleep(3.5)
+            time.sleep(4.2)
         raise RuntimeError(
             f"Không thể gửi lệnh trên Tab ChatGPT Web [{acc_cfg['label']} - Port {acc_cfg['port']}] "
             f"(hãy kiểm tra đã đăng nhập {acc_cfg['label']} tại https://chatgpt.com chưa): {res}"
@@ -1808,7 +1946,13 @@ class ChatGPTWebMultiTabClient:
             if attempt > 0:
                 with WEB_TAB_LOCK:
                     self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
-                tab_id, ws_url = self._get_or_create_tab_ws(thread_id=thread_id, force_new_chat=False, acc_id=aid, project_id=project_id)
+                force_clean = "CONVERSATION_LOAD_ERROR" in str(res.get("error", ""))
+                tab_id, ws_url = self._get_or_create_tab_ws(
+                    thread_id="" if force_clean else thread_id,
+                    force_new_chat=force_clean,
+                    acc_id=aid,
+                    project_id=project_id,
+                )
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).add(tab_id)
                 self._tab_last_used_ts[tab_id] = time.time()
@@ -1819,6 +1963,7 @@ class ChatGPTWebMultiTabClient:
                     self._thread_to_tab.setdefault(aid, {})[real_tid] = tab_id
                     self._thread_to_acc[real_tid] = aid
                     self._tab_last_used_ts[tab_id] = time.time()
+                self._last_sent_prompt[real_tid] = prompt
                 return {"result": {"success": True, "threadId": real_tid, "accountId": aid}}
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
@@ -1845,7 +1990,8 @@ class ChatGPTWebMultiTabClient:
         (async () => {{
             const targetConvId = {json.dumps(thread_id)};
             const mUrl = window.location.pathname.match(/\\/c\\/([0-9a-fA-F\\-]{{20,}})/);
-            const convId = (mUrl && mUrl[1]) ? mUrl[1] : (targetConvId.startsWith('webtab_') ? '' : targetConvId);
+            const urlConvId = (mUrl && mUrl[1] && !mUrl[1].toLowerCase().startsWith('webtab_')) ? mUrl[1] : '';
+            const convId = urlConvId || (targetConvId.startsWith('webtab_') ? '' : targetConvId);
 
             const turnStates = Array.from(document.querySelectorAll('[data-talvt-turn-state]')).map(e => e.getAttribute('data-talvt-turn-state'));
             const hasIncompleteTurn = turnStates.some(s => s && s !== 'complete');
@@ -1997,13 +2143,16 @@ class ChatGPTWebMultiTabClient:
         try:
             raw = _eval_js_in_tab(ws_url, js_harvest, await_promise=True, timeout=25.0)
             parsed = json.loads(raw) if isinstance(raw, str) and raw.strip().startswith("{") else {"turns": []}
+            real_conv_id = parsed.get("conv_id") or thread_id
             out = {
                 "_verified_live": True,
-                "thread": {"id": parsed.get("conv_id") or thread_id, "kind": "chatgpt_web", "account_id": aid},
+                "thread": {"id": real_conv_id, "kind": "chatgpt_web", "account_id": aid},
                 "turns": parsed.get("turns") or [],
             }
             if out["turns"]:
                 self._last_known_turns[thread_id] = out
+                if real_conv_id and real_conv_id != thread_id:
+                    self._last_known_turns[real_conv_id] = out
             return out
         except Exception:
             return self._last_known_turns.get(thread_id, {"turns": []})
@@ -2020,6 +2169,8 @@ class ChatGPTWebMultiTabClient:
         """
         Theo dõi trực tiếp trên Tab trình duyệt Web của đúng Tài khoản (`Acc #1`, `Acc #2`, `Acc #3`):
         - Cứ mỗi 3.5 giây kiểm tra DOM của Tab xem nút `stop-button` đã tắt chưa và độ dài chữ đang gõ là bao nhiêu.
+        - Tự động phát hiện và chữa lành tức thì (Auto-Heal) nếu gặp thông báo `"Could not load this ChatGPT conversation"`
+          hoặc đứng im `0 ký tự` quá 28 giây: tự động mở đoạn chat sạch mới tại `https://chatgpt.com/` và gửi lại Prompt!
         - Ngay khi `stop-button` biến mất và văn bản ổn định, thu hoạch 100% văn bản Markdown gốc!
         """
         main_mod = sys.modules.get("__main__")
@@ -2038,24 +2189,35 @@ class ChatGPTWebMultiTabClient:
         if not os.path.exists(proj_dir):
             alt_h = os.path.join(STUDIO_WEB_ROOT, "PROJECTS_HOMELESS", project_id)
             alt_m = os.path.join(STUDIO_WEB_ROOT, "PROJECTS", project_id)
+            alt_x = os.path.join(STUDIO_WEB_ROOT, "PROJECTS_MEXICO", project_id)
             if os.path.exists(alt_h):
                 proj_dir = alt_h
             elif os.path.exists(alt_m):
                 proj_dir = alt_m
+            elif os.path.exists(alt_x):
+                proj_dir = alt_x
 
         st_path = os.path.join(proj_dir, "STATE.json")
+        orig_thread_id = thread_id
         start_t = time.time()
+        zero_char_since = start_t
+        auto_heal_count = 0
         last_log_t = 0.0
         last_state_t = 0.0
         stable_hits = 0
         last_char_len = 0
 
-        def _update_live_note(note_txt: str, elapsed_s: float):
+        def _update_live_note(note_txt: str, elapsed_s: float, updated_tid: str = ""):
             if os.path.exists(st_path):
                 try:
                     st_obj = json.load(open(st_path, encoding="utf-8"))
                     st_obj["account_id"] = aid
                     st_obj["account_label"] = acc_label
+                    if updated_tid:
+                        st_obj["thread_id"] = updated_tid
+                        active_d = st_obj.get("active_agent_desk")
+                        if active_d and isinstance(st_obj.get("agent_chat_registry"), dict) and active_d in st_obj["agent_chat_registry"]:
+                            st_obj["agent_chat_registry"][active_d]["thread_id"] = updated_tid
                     st_obj["live_note"] = note_txt
                     st_obj["elapsed_sec"] = elapsed_s
                     st_obj["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2082,6 +2244,16 @@ class ChatGPTWebMultiTabClient:
                         if (scroller) scroller.scrollTop = scroller.scrollHeight;
                         window.scrollTo(0, document.body.scrollHeight);
                     } catch (e) {}
+                    const pathNow = (window.location.pathname || '');
+                    const mUrl = pathNow.match(/\\/c\\/([0-9a-fA-F\\-]{20,})/);
+                    const convId = (mUrl && mUrl[1] && !mUrl[1].toLowerCase().startsWith('webtab_')) ? mUrl[1] : '';
+                    const bodyLow = ((document.body && document.body.innerText) || '').toLowerCase();
+                    const loadError = Boolean(
+                        pathNow.toLowerCase().includes('/c/webtab_') ||
+                        bodyLow.includes('could not load this chatgpt conversation') ||
+                        bodyLow.includes('unable to load conversation') ||
+                        bodyLow.includes('conversation not found')
+                    );
                     const turnStates = Array.from(document.querySelectorAll('[data-talvt-turn-state]')).map(e => e.getAttribute('data-talvt-turn-state'));
                     const hasIncompleteTurn = turnStates.some(s => s && s !== 'complete');
                     const stopBtn = Boolean(
@@ -2090,6 +2262,13 @@ class ChatGPTWebMultiTabClient:
                         document.querySelector('button[aria-label*="Stop streaming"]') ||
                         document.querySelector('.result-streaming') ||
                         hasIncompleteTurn
+                    );
+                    const streamError = Boolean(
+                        !stopBtn && (
+                            bodyLow.includes('error in message stream') ||
+                            bodyLow.includes('something went wrong while generating') ||
+                            document.querySelector('button[data-testid="regenerate-thread-error-button"]')
+                        )
                     );
                     const turnNodes = Array.from(document.querySelectorAll('[data-turn-key]'));
                     if (turnNodes.length > 0) {
@@ -2106,6 +2285,9 @@ class ChatGPTWebMultiTabClient:
                         }
                         const asstCount = charLen > 15 ? turnNodes.length : Math.max(0, turnNodes.length - 1);
                         return JSON.stringify({
+                            conv_id: convId,
+                            load_error: loadError,
+                            stream_error: streamError,
                             streaming: stopBtn,
                             asst_count: asstCount,
                             user_count: turnNodes.length,
@@ -2117,6 +2299,9 @@ class ChatGPTWebMultiTabClient:
                     const lastAsst = asstEls.length > 0 ? asstEls[asstEls.length - 1] : null;
                     const charLen = lastAsst ? (lastAsst.innerText || lastAsst.textContent || '').trim().length : 0;
                     return JSON.stringify({
+                        conv_id: convId,
+                        load_error: loadError,
+                        stream_error: streamError,
                         streaming: stopBtn,
                         asst_count: asstEls.length,
                         user_count: userEls.length,
@@ -2130,10 +2315,99 @@ class ChatGPTWebMultiTabClient:
                 except Exception:
                     dom_st = {}
 
+                # Nếu trước đó thread_id là mã tạm `webtab_...` và nay URL đã cập nhật sang UUID thật `/c/<uuid>`, nâng cấp ngay lập tức!
+                detected_cid = str(dom_st.get("conv_id") or "").strip()
+                if detected_cid and _is_valid_chatgpt_uuid(detected_cid) and str(thread_id).startswith("webtab_"):
+                    old_webtab = thread_id
+                    thread_id = detected_cid
+                    with WEB_TAB_LOCK:
+                        self._thread_to_tab.setdefault(aid, {})[thread_id] = tab_id
+                        self._thread_to_acc[thread_id] = aid
+                    if old_webtab in self._last_sent_prompt and thread_id not in self._last_sent_prompt:
+                        self._last_sent_prompt[thread_id] = self._last_sent_prompt[old_webtab]
+                    _update_live_note(
+                        f"🔗 [{acc_label}] Đã đồng bộ mã hội thoại chuẩn threadId={thread_id} tại [{step_label}]",
+                        elapsed,
+                        updated_tid=thread_id,
+                    )
+
                 is_streaming = bool(dom_st.get("streaming"))
                 cur_chars = int(dom_st.get("char_len") or 0)
+                has_load_err = bool(dom_st.get("load_error"))
+                has_stream_err = bool(dom_st.get("stream_error"))
+                if cur_chars > 0 or is_streaming:
+                    zero_char_since = time.time()
+
                 with WEB_TAB_LOCK:
                     self._tab_last_used_ts[tab_id] = time.time()
+
+                # CƠ CHẾ TỰ CHỮA LÀNH TỨC THÌ (AUTO-HEAL):
+                # Nếu gặp lỗi "Could not load this ChatGPT conversation" / "/c/webtab_..." HOẶC đứng im 0 ký tự quá 28s mà không streaming:
+                zero_stuck_secs = time.time() - zero_char_since
+                if (has_load_err or has_stream_err or (not is_streaming and cur_chars == 0 and zero_stuck_secs >= 28.0)) and auto_heal_count < 3:
+                    auto_heal_count += 1
+                    recovery_prompt = (
+                        self._last_sent_prompt.get(thread_id)
+                        or self._last_sent_prompt.get(orig_thread_id)
+                        or ""
+                    )
+                    reason_str = (
+                        "Could not load this ChatGPT conversation"
+                        if has_load_err
+                        else ("Stream Error" if has_stream_err else f"0 ký tự sau {int(zero_stuck_secs)}s")
+                    )
+                    log_msg(
+                        project_id,
+                        f"♻️ [AUTO-HEAL CHATGPT WEB #{auto_heal_count}/3] Phát hiện [{reason_str}] tại [{step_label}]. Đang tự động chuyển Tab về trang chủ ChatGPT sạch & gửi lại lệnh ngay lập tức!",
+                    )
+                    _update_live_note(
+                        f"♻️ [{acc_label} - Auto-Heal #{auto_heal_count}] Tự động làm sạch lỗi [{reason_str}] & gửi lại [{step_label}]...",
+                        elapsed,
+                    )
+                    try:
+                        _eval_js_in_tab(
+                            ws_url,
+                            "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                            await_promise=False,
+                        )
+                    except Exception:
+                        pass
+                    time.sleep(4.5)
+                    with WEB_TAB_LOCK:
+                        self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
+                    tab_id, ws_url = self._get_or_create_tab_ws(
+                        thread_id="",
+                        force_new_chat=True,
+                        acc_id=aid,
+                        project_id=project_id,
+                    )
+                    with WEB_TAB_LOCK:
+                        self._active_busy_tabs.setdefault(aid, set()).add(tab_id)
+                        self._tab_last_used_ts[tab_id] = time.time()
+                    if recovery_prompt:
+                        re_res = self._inject_and_send_prompt_on_ws(ws_url, recovery_prompt)
+                        if "error" not in re_res and re_res.get("ok"):
+                            new_tid = re_res.get("thread_id") or f"webtab_{aid}_{tab_id}"
+                            thread_id = new_tid
+                            expected_min_turns = 1
+                            with WEB_TAB_LOCK:
+                                self._thread_to_tab.setdefault(aid, {})[thread_id] = tab_id
+                                self._thread_to_acc[thread_id] = aid
+                            self._last_sent_prompt[thread_id] = recovery_prompt
+                            _update_live_note(
+                                f"✅ [{acc_label} - Auto-Heal #{auto_heal_count}] Đã gửi lại [{step_label}] trên hội thoại sạch threadId={thread_id}!",
+                                elapsed,
+                                updated_tid=thread_id,
+                            )
+                            log_msg(
+                                project_id,
+                                f"✅ [AUTO-HEAL THÀNH CÔNG] Đã khởi tạo đoạn chat sạch mới threadId={thread_id} cho [{step_label}] và tiếp tục chạy!",
+                            )
+                    zero_char_since = time.time()
+                    stable_hits = 0
+                    last_char_len = 0
+                    time.sleep(3.5)
+                    continue
 
                 if time.time() - last_state_t >= 4.0:
                     last_state_t = time.time()
@@ -2169,7 +2443,7 @@ class ChatGPTWebMultiTabClient:
                                 full_text = "\n\n".join(texts).strip()
                                 if len(full_text) > 40:
                                     done_note = f"✅ [{acc_label} - Tab Web] Hoàn tất [{step_label}] sau {elapsed}s (Nhận {len(full_text):,} ký tự | Turn #{len(turns)})"
-                                    _update_live_note(done_note, elapsed)
+                                    _update_live_note(done_note, elapsed, updated_tid=thread_id)
                                     log_msg(
                                         project_id,
                                         f"✅ [{acc_label} - {step_label}] Hoàn tất sau {elapsed}s (Độ dài phản hồi: {len(full_text):,} ký tự | Tổng số Turn: {len(turns)})",

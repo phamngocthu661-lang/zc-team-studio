@@ -1,8 +1,8 @@
 {
   "version": "V1.0.0",
-  "build_number": 112,
-  "released_at": "2026-11-04 06:16:00",
+  "build_number": 113,
+  "released_at": "2026-11-04 11:15:00",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
-  "changelog": "Phiên bản V1.0.0 (Build #112): Sửa triệt để lỗi bấm nút chạy (Viết Kịch Bản ➔ Làm Video Luôn, Lưu & Chạy Ngay, Chạy Tiếp Hàng Đợi, Chạy từng dòng) không hoạt động và không hiện Log trên máy khách hàng; đính kèm trọn bộ python_runtime (kèm đầy đủ _socket.pyd, _ssl.pyd, DLLs/) trực tiếp trong gói cập nhật OTA; hiển thị khung Nhật Ký Tiến Trình Trực Tiếp (Live Console Log) ngay dưới nút chạy; tự động chuyển trạng thái kịch bản từ CHỜ CHẠY sang ĐANG CHẠY và tự mở Chrome cổng 9222 khi cần đăng nhập ChatGPT."
+  "changelog": "Phiên bản V1.0.0 (Build #113): Sửa triệt để lỗi 'Could not load this ChatGPT conversation' và treo (0 ký tự) khi chuyển Bàn/Vòng kiểm định & sửa bài (Bước 4A/4B). Chặn tuyệt đối điều hướng vào URL tạm /c/webtab_...; tách đoạn chat độc lập gọn nhẹ cho từng vòng sửa (REPAIR_DESK_4B_R1..R5 & CALIB_DESK_4) để hội thoại không bị phình 700KB; tích hợp cơ chế Auto-Heal tự động mở đoạn chat sạch mới tại https://chatgpt.com/ và gửi lại lệnh ngay lập tức nếu phát hiện lỗi tải hội thoại hoặc đứng 0 ký tự quá 28 giây."
 }

@@ -3491,15 +3491,19 @@ def _run_single_project_pipeline_inner(
         agent_id, skill_name = _resolve_agent_skill_meta(desk_role)
         reg = state.setdefault("agent_chat_registry", {})
         prev_entry = reg.get(desk_role) or {}
-        final_tid = tid or prev_entry.get("thread_id") or ""
+        if status == "STARTING_NEW_CHAT":
+            final_tid = ""
+        else:
+            final_tid = tid or prev_entry.get("thread_id") or ""
         final_turns = turns_cnt or prev_entry.get("turns_count") or 0
+        is_real_uuid = bool(final_tid and not str(final_tid).lower().startswith("webtab_"))
         entry = {
             "desk_role": desk_role,
             "agent_id": agent_id,
             "agent_label": reason_desc or prev_entry.get("agent_label") or desk_role,
             "skill_name": skill_name,
             "thread_id": final_tid,
-            "chat_url": f"https://chatgpt.com/c/{final_tid}" if final_tid else "",
+            "chat_url": f"https://chatgpt.com/c/{final_tid}" if is_real_uuid else ("https://chatgpt.com/" if final_tid else ""),
             "acc_id": state.get("account_id", "acc_1"),
             "account_label": state.get("account_label", "Acc #1"),
             "host_id": state.get("host_id", ""),
@@ -3558,6 +3562,8 @@ def _run_single_project_pipeline_inner(
 
         saved_entry = reg.get(desk_role) or {}
         saved_tid = str(saved_entry.get("thread_id") or "").strip()
+        if saved_tid.lower().startswith("webtab_"):
+            saved_tid = ""
         saved_acc = str(saved_entry.get("acc_id") or "").strip()
         cur_acc = str(state.get("account_id") or "acc_1").strip()
 
@@ -3583,10 +3589,13 @@ def _run_single_project_pipeline_inner(
         Nếu lượt gần nhất trên thread đã được gửi lệnh của bước này (ví dụ khi resume sau khi khởi động lại),
         thu hoạch trực tiếp kết quả của lượt đó mà không gửi trùng lại lần 2.
         Nếu người dùng vừa đổi sang tài khoản ChatGPT mới (khiến thread_id cũ không truy cập được),
+        hoặc thread_id cũ là mã tạm `webtab_...` / bị lỗi tải hội thoại,
         tự động khởi tạo thread mới kèm toàn bộ Checkpoint đã lưu để chạy tiếp mượt mà!
         """
         active_desk = state.get("active_agent_desk") or "DESK_ACTIVE"
         active_lbl = state.get("active_agent_label") or step_label
+        if str(state.get("thread_id") or "").strip().lower().startswith("webtab_"):
+            state["thread_id"] = ""
         if state.get("thread_id"):
             tid = state["thread_id"]
             record_agent_chat_state(active_desk, active_lbl, tid, status="RUNNING")
@@ -3633,7 +3642,9 @@ def _run_single_project_pipeline_inner(
                         expected_min_turns=len(turns),
                         timeout_sec=timeout_sec,
                     )
-                    record_agent_chat_state(active_desk, active_lbl, tid, status="RUNNING", turns_cnt=len(d_out.get("turns", [])))
+                    actual_tid = str((d_out or {}).get("thread", {}).get("id") or tid).strip()
+                    state["thread_id"] = actual_tid
+                    record_agent_chat_state(active_desk, active_lbl, actual_tid, status="RUNNING", turns_cnt=len(d_out.get("turns", [])))
                     return resp_out, d_out
                 # Nếu là các bước khởi tạo cố định (Bước 1, Bước 2, Bước 3 Draft Stage A/B/C, Bước 5) và lượt đó đã hoàn tất ở turns[1..12], thu hoạch ngay!
                 # TUYỆT ĐỐI KHÔNG thu hoạch lại lịch sử cũ cho các vòng lặp Bước 4 (AUDIT ROUND, SỬA RIÊNG PART, REWRITE, CALIB, CONTINUE, RECOVERY)
@@ -3671,16 +3682,21 @@ def _run_single_project_pipeline_inner(
             log_msg(project_id, f"📨 Đang gửi lệnh [{step_label}] vào đoạn chat Agent [{active_desk}] threadId={tid} (Turn #{prev_turns + 1})...")
             send_res = client.send_message(tid, state["host_id"], prompt, thinking=thinking, project_id=project_id)
             if "error" in send_res:
-                for same_tid_retry in range(3):
+                for same_tid_retry in range(2):
                     log_msg(
                         project_id,
-                        f"⏳ Đoạn chat hiện tại ({tid}) đang chờ mở khóa Rate-Limit, tự động giữ nguyên tab này và đợi 28s rồi gửi lại (lần {same_tid_retry + 1}/3)...",
+                        f"⏳ Đoạn chat hiện tại ({tid}) đang bận hoặc chờ mở khóa, tự động đợi 18s rồi gửi lại (lần {same_tid_retry + 1}/2)...",
                     )
-                    time.sleep(28.0)
+                    time.sleep(18.0)
                     send_res = client.send_message(tid, state["host_id"], prompt, thinking=thinking, project_id=project_id)
                     if "error" not in send_res:
                         break
             if "error" not in send_res:
+                sent_tid = str((send_res.get("result") or {}).get("threadId") or tid).strip()
+                if sent_tid and sent_tid != tid:
+                    tid = sent_tid
+                    state["thread_id"] = tid
+                    prev_turns = 0
                 resp_out, d_out = client.wait_for_turn_completion(
                     project_id,
                     tid,
@@ -3689,25 +3705,15 @@ def _run_single_project_pipeline_inner(
                     expected_min_turns=prev_turns + 1,
                     timeout_sec=timeout_sec,
                 )
-                record_agent_chat_state(active_desk, active_lbl, tid, status="RUNNING", turns_cnt=len(d_out.get("turns", [])))
+                actual_tid = str((d_out or {}).get("thread", {}).get("id") or tid).strip()
+                state["thread_id"] = actual_tid
+                record_agent_chat_state(active_desk, active_lbl, actual_tid, status="RUNNING", turns_cnt=len(d_out.get("turns", [])))
                 return resp_out, d_out
-            # Tuyệt đối KHÔNG chuyển sang đoạn chat mới khi gặp Rate-Limit trên tab hiện tại (vì chuyển tab sẽ ép windowId=1 bắn thêm GET /conversations/{new_id} gây lỗi "Could not load this ChatGPT conversation" dây chuyền).
             log_msg(
                 project_id,
-                f"⏳ [AI-ERROR-HANDLER] Tab hiện tại ({tid}) cần nghỉ sâu 45s để làm sạch hoàn toàn hàng đợi lịch sử OpenAI trước khi gửi tiếp...",
+                f"♻️ [AUTO-RECOVER THREAD] Đoạn chat cũ ({tid}) không thể tải trên ChatGPT Web. Đang tự động mở đoạn chat sạch mới cho [{step_label}]...",
             )
-            time.sleep(45.0)
-            send_res = client.send_message(tid, state["host_id"], prompt, thinking=thinking, project_id=project_id)
-            resp_out, d_out = client.wait_for_turn_completion(
-                project_id,
-                tid,
-                state["host_id"],
-                step_label,
-                expected_min_turns=prev_turns + 1,
-                timeout_sec=timeout_sec,
-            )
-            record_agent_chat_state(active_desk, active_lbl, tid, status="RUNNING", turns_cnt=len(d_out.get("turns", [])))
-            return resp_out, d_out
+            state["thread_id"] = ""
 
         full_prompt = _build_checkpoint_context_preamble() + prompt
         resume_prefix = "Mexico Ba Co" if ACTIVE_NICHE == "mexico" else ("Homeless V12" if ACTIVE_NICHE == "homeless" else "Mafia Story")
@@ -3730,7 +3736,9 @@ def _run_single_project_pipeline_inner(
             expected_min_turns=1,
             timeout_sec=timeout_sec,
         )
-        record_agent_chat_state(active_desk, active_lbl, tid, status="RUNNING", turns_cnt=len(d_out.get("turns", [])) or 1)
+        actual_tid = str((d_out or {}).get("thread", {}).get("id") or tid).strip()
+        state["thread_id"] = actual_tid
+        record_agent_chat_state(active_desk, active_lbl, actual_tid, status="RUNNING", turns_cnt=len(d_out.get("turns", [])) or 1)
         return resp_out, d_out
 
     # ==========================================================================
@@ -5064,8 +5072,8 @@ QUAN TRỌNG:
             ):
                 calib_attempt += 1
                 switch_to_isolated_desk_thread(
-                    "REPAIR_DESK_4B" if "REPAIR_DESK_4B" in state.get("agent_chat_registry", {}) else "DESK_3_WRITER",
-                    f"Bàn #4B — Quay lại Đoạn chat Sửa bài Cân chỉnh độ dài Vòng #{audit_round}",
+                    f"CALIB_DESK_4_R{audit_round}_{calib_attempt}",
+                    f"Bàn #4B — Đoạn chat Cân chỉnh độ dài độc lập Vòng #{audit_round}.{calib_attempt}",
                 )
                 words_to_cut = max(450, int((cur_metrics["word_count"] - 7250) * 1.35))
                 chars_to_cut = max(2500, int((cur_metrics["char_count"] - 46500) * 1.35))
@@ -5083,6 +5091,10 @@ QUAN TRỌNG:
   + **Tổng số ký tự hiển thị:** `{cur_metrics['char_count']:,}` ký tự (Khung bắt buộc: `40.000 – 55.000` ký tự; Vùng chuẩn: `44.000 – 48.000` ký tự)
   + **Tổng số từ:** `{cur_metrics['word_count']:,}` từ (KHÓA CỨNG P0: Bắt buộc **< 8.000 từ**; Vùng chuẩn: `7.300 – 7.650` từ)
   + **Chi tiết độ dài từng Part:** `{cur_metrics['per_part_summary']}`
+
+=== VĂN BẢN KỊCH BẢN HIỆN TẠI CẦN CÂN CHỈNH ĐỘ DÀI (`CURRENT WORKING SCRIPT`) ===
+{current_script}
+=== KẾT THÚC VĂN BẢN KỊCH BẢN HIỆN TẠI ===
 
 Vì số từ hiện tại là `{cur_metrics['word_count']:,}` từ (hoặc số ký tự `{cur_metrics['char_count']:,}`), nếu chấm điểm ngay sẽ bị phạt lỗi P0 Hard Word/Char Lock (trần 59/100).
 YÊU CẦU THỰC HIỆN NGAY:
@@ -5385,9 +5397,9 @@ YÊU CẦU THỰC HIỆN NGAY Ở CHẾ ĐỘ `MODE A — EXHAUSTIVE REVIEW` TR�
                 f"🛠️ [BƯỚC 4B - Vòng Sửa Kịch Bản #{audit_round}/{max_rewrite_rounds}] Điểm hiện tại = {score}/100. Chuyển sang/Quay lại Đoạn chat Agent Sửa bài (`REPAIR_DESK_4B`) & kích hoạt MODE B kèm Điểm Neo Biên (Boundary Anchors 5 câu đầu/cuối)...",
             )
 
-            # Tách đoạn chat riêng cho Bàn #4B (Sửa kịch bản) và tự động quay lại đoạn chat sửa bài đã lưu ở các vòng tiếp theo
+            # Mở đoạn chat riêng gọn nhẹ cho từng Vòng sửa Bàn #4B (REPAIR_DESK_4B_R{audit_round}) để hội thoại không bao giờ phình lên 600KB-700KB gây lỗi "Could not load this ChatGPT conversation"
             switch_to_isolated_desk_thread(
-                "REPAIR_DESK_4B",
+                f"REPAIR_DESK_4B_R{audit_round}",
                 f"Bàn #4B — Phẫu Thuật & Sửa Kịch Bản theo Patch Ledger (Vòng #{audit_round})",
             )
 
@@ -5629,11 +5641,18 @@ Hãy kích hoạt ngay **`MODE B — CONTROLLED REWRITE`** theo đúng quy tắc
             save_state(f"STEP_4_REWRITTEN_ROUND_{audit_round}")
             save_conversation_transcript(project_dir, state["thread_id"], thread_data)
             record_agent_chat_state(
+                f"REPAIR_DESK_4B_R{audit_round}",
+                f"Bàn #4B — Phẫu Thuật & Sửa Kịch Bản (Hoàn tất Vòng #{audit_round})",
+                state.get("thread_id", ""),
+                status="COMPLETED",
+                turns_cnt=len((thread_data or {}).get("turns", [])) or 1,
+            )
+            record_agent_chat_state(
                 "REPAIR_DESK_4B",
                 f"Bàn #4B — Phẫu Thuật & Sửa Kịch Bản (Đã xong Vòng #{audit_round}, chờ Kiểm định)",
                 state.get("thread_id", ""),
                 status="SAVED_READY_TO_RESUME",
-                turns_cnt=len((thread_data or {}).get("turns", [])) or audit_round,
+                turns_cnt=audit_round,
             )
 
             # Nếu vừa hoàn tất vòng sửa thứ 5 (kịch bản sửa vòng 5), quay lại MODE A chấm điểm thực tế lần cuối cho bản sửa số 5 rồi chốt!
