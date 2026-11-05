@@ -1512,9 +1512,26 @@ class BatchService {
 
   async prepareMissingVoices({ jobs, config = {}, folders = {}, callbacks = {}, signal }) {
     const voiceMode = String(config.voiceSourceMode || 'EXISTING_AUDIO').toUpperCase();
-    const hasValidVoiceFile = (p) => {
+    const { voiceStudio, voiceValidator, voiceProfileManager } = this._ensureVoiceServices();
+    const hasValidVoiceFile = (job) => {
       try {
-        return Boolean(p && fs.existsSync(p) && fs.statSync(p).size > 44);
+        const p = job?.voicePath;
+        if (!p || !fs.existsSync(p) || fs.statSync(p).size <= 44) return false;
+        if (job?.scriptPath && fs.existsSync(job.scriptPath)) {
+          const scriptText = fs.readFileSync(job.scriptPath, 'utf8');
+          const consistency = voiceValidator.verifyScriptAudioConsistency({ scriptText, audioPath: p });
+          if (!consistency.valid) {
+            callbacks.onLog?.(
+              `⚠️ [KIỂM ĐỊNH KỊCH BẢN ↔ VOICE] File voice hiện có (${path.basename(p)}: ${consistency.actualDurationMin} phút) bị hụt thời lượng so với kịch bản (${path.basename(job.scriptPath)}: ${consistency.cleanChars.toLocaleString()} ký tự, yêu cầu >= ${consistency.minExpectedMin} phút). Tự động xóa file voice lỗi để tạo lại đầy đủ!`
+            );
+            try { fs.unlinkSync(p); } catch {}
+            const srtSibling = p.replace(/\.[^.]+$/, '.srt');
+            try { if (fs.existsSync(srtSibling)) fs.unlinkSync(srtSibling); } catch {}
+            job.needsVoiceGeneration = true;
+            return false;
+          }
+        }
+        return true;
       } catch {
         return false;
       }
@@ -1523,7 +1540,7 @@ class BatchService {
     const candidates = (jobs || []).filter((job) => {
       if (!job.scriptPath || !fs.existsSync(job.scriptPath)) return false;
       if (config.forceScriptRegenerate === true) return true;
-      if (job.needsVoiceGeneration || !hasValidVoiceFile(job.voicePath)) return true;
+      if (job.needsVoiceGeneration || !hasValidVoiceFile(job)) return true;
       return false;
     });
 
@@ -1542,7 +1559,6 @@ class BatchService {
       return { generated: 0, skippedExisting: readyCount };
     }
 
-    const { voiceStudio, voiceValidator, voiceProfileManager } = this._ensureVoiceServices();
     const selectedProfileId = config.voiceProfileId || 'omnivoice';
     const profile = voiceProfileManager.getProfile(selectedProfileId);
 
@@ -1867,6 +1883,28 @@ class BatchService {
           jobs[index].voiceEstimated = true;
         } else {
           metadata = await this.ffmpeg.probe(jobs[index].voicePath);
+          if (jobs[index].scriptPath && fs.existsSync(jobs[index].scriptPath)) {
+            const text = fs.readFileSync(jobs[index].scriptPath, 'utf8');
+            const { VoiceValidatorService } = require('./voice/voice-validator-service');
+            const validator = new VoiceValidatorService();
+            const consistency = validator.verifyScriptAudioConsistency({
+              scriptText: text,
+              audioPath: jobs[index].voicePath,
+              durationMs: Number(metadata?.durationMs || 0)
+            });
+            if (!consistency.valid) {
+              callbacks.onLog?.(
+                `⚠️ [QUÉT ĐẦU VÀO] File voice ${path.basename(jobs[index].voicePath)} (${consistency.actualDurationMin} phút) bị hụt thời lượng so với kịch bản ${path.basename(jobs[index].scriptPath)} (${consistency.cleanChars.toLocaleString()} ký tự, yêu cầu >= ${consistency.minExpectedMin} phút). Đã xóa file lỗi & đánh dấu tạo lại voice!`
+              );
+              try { fs.unlinkSync(jobs[index].voicePath); } catch {}
+              const srtSibling = jobs[index].voicePath.replace(/\.[^.]+$/, '.srt');
+              try { if (fs.existsSync(srtSibling)) fs.unlinkSync(srtSibling); } catch {}
+              jobs[index].needsVoiceGeneration = true;
+              const estimatedMs = Math.max(3000, Math.round((consistency.totalWords / 2.5) * 1000));
+              metadata = { durationMs: estimatedMs };
+              jobs[index].voiceEstimated = true;
+            }
+          }
         }
         jobs[index].voiceDurationMs = metadata.durationMs;
         voiceDurationMs += metadata.durationMs;

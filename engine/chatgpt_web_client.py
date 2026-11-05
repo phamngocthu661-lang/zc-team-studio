@@ -2203,8 +2203,13 @@ class ChatGPTWebMultiTabClient:
                                     const t = turnsChrono[i];
                                     const items = [];
                                     if (t.user_text) items.push({{ type: 'userMessage', text: t.user_text }});
-                                    const joinedA = t.agent_texts.join('\\n\\n').trim();
-                                    if (joinedA) items.push({{ type: 'agentMessage', text: joinedA }});
+                                    let joinedA = t.agent_texts.join('\\n\\n').trim();
+                                    if (joinedA) {{
+                                        joinedA = joinedA.replace(/Pasted\\s+text\\s*\\([^)\\n]{{1,40}}\\)(?:\\.(?:txt|md|json|doc|docx|pdf|csv))?\\s*(?:Document|Tài liệu|Archivo|Documento)?/gi, '\\n\\n');
+                                        joinedA = joinedA.replace(/(\\[\\s*(?:PART|PARTE)\\s+\\d+\\s*\\])(?=[A-ZÁÉÍÓÚÑÜ"“‘¡¿])/gi, '$1\\n\\n');
+                                        joinedA = joinedA.replace(/\\n{{3,}}/g, '\\n\\n').trim();
+                                        items.push({{ type: 'agentMessage', text: joinedA }});
+                                    }}
                                     synth.push({{
                                         id: t.id,
                                         status: (i === turnsChrono.length - 1 && isStopBtnVisible) ? 'running' : t.status,

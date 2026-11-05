@@ -5,8 +5,9 @@
   "description": "",
   "speed": 0.96,
   "model": "omnivoice",
-  "sampleFile": "sample.mp3",
+  "sampleFile": "sample.wav",
   "vsProfileId": "7d2dda84",
   "createdAt": "2026-10-14T05:42:47.269Z",
-  "updatedAt": "2026-10-30T06:21:28.892Z"
+  "updatedAt": "2026-10-30T06:21:28.892Z",
+  "refText": "Richard Holden held the black card between two fingers, as if it were evidence from a crime scene. Across the conference table,"
 }

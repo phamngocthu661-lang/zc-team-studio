@@ -674,12 +674,38 @@ def run_tts_director_step_6(
             raw_seo = f.read()
 
     niche_norm = (niche or "").strip().lower()
-    is_mexico = ("mexico" in niche_norm) or ("bà cô" in niche_norm) or ("ba co" in niche_norm)
+    is_mexico = ("mexico" in niche_norm) or ("bà cô" in niche_norm) or ("ba co" in niche_norm) or ("03_" in niche_norm) or ("04_" in niche_norm) or ("07_" in niche_norm) or ("08_" in niche_norm) or ("09_" in niche_norm)
+    is_mafia = ("mafia" in niche_norm) or ("nguoi_hau" in niche_norm)
 
     if is_mexico:
         clean_tts_script, stats = sanitize_and_normalize_mexico_spanish_tts(raw_script)
     else:
         clean_tts_script, stats = sanitize_and_normalize_tts_script(raw_script)
+
+    # Cổng khóa độ dài hậu kỳ (70.000 - 79.500 ký tự) sau khi bung số/viết tắt cho Homeless & Mexico 7 Phần
+    if not is_mafia and len(clean_tts_script) > 79200:
+        try:
+            from engine.mafia_chatgpt_pipeline import condense_homeless_stage_text
+            before_cond_len = len(clean_tts_script)
+            clean_tts_script = condense_homeless_stage_text(
+                clean_tts_script,
+                expected_parts=[1, 2, 3, 4, 5, 6, 7],
+                target_chars=76500,
+                hard_max_chars=78800,
+            )
+            words_after = re.findall(r"\b[\wÁÉÍÓÚÑáéíóúñü']+\b", clean_tts_script)
+            paras_after = [p.strip() for p in re.split(r"\n\s*\n", clean_tts_script) if p.strip()]
+            stats["final_char_count"] = len(clean_tts_script)
+            stats["final_word_count"] = len(words_after)
+            stats["final_paragraph_count"] = len(paras_after)
+            stats["estimated_tts_minutes"] = round(len(words_after) / (145.0 if is_mexico else 150.0), 1)
+            stats["char_range_ok"] = 70000 <= len(clean_tts_script) <= 80000
+            stats["examples"].insert(
+                0,
+                f"[Length Calibration Lock] Đã cân chỉnh hậu kỳ từ `{before_cond_len:,}` -> `{len(clean_tts_script):,}` ký tự (chuẩn 70k–80k ký tự)",
+            )
+        except Exception:
+            pass
 
     if clean_tts_script:
         with open(full_script_path, "w", encoding="utf-8") as f:

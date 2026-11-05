@@ -39,10 +39,13 @@ class VoiceValidatorService {
   splitScriptIntoChunks(scriptText) {
     if (!scriptText || typeof scriptText !== 'string') return [];
 
-    // 1. Chuẩn hóa xuống dòng và khoảng trắng thừa
+    // 1. Chuẩn hóa xuống dòng, dọn sạch tàn dư Pasted text(...) / nhãn [PART N] / tiêu đề Markdown và khoảng trắng thừa
     const cleaned = scriptText
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
+      .replace(/Pasted\s+text\s*\([^)]*\)\s*(?:\.[a-z0-9]+)?\s*(?:Document)?\s*/gi, '')
+      .replace(/^\s*(?:#{1,6}\s*)?\[\s*(?:PART|PARTE)\s+\d+(?:\s*[:—\-–][^\]]*)?\]\s*$/gim, '')
+      .replace(/^\s*#{1,6}\s+(?:PART|PARTE)\s+\d+.*$/gim, '')
       .trim();
 
     if (!cleaned) return [];
@@ -150,18 +153,42 @@ class VoiceValidatorService {
 
   /**
    * Đọc cực nhanh thời lượng file WAV trực tiếp từ RIFF header trên RAM (0.05ms, không cần gọi ffprobe)
+   * Hỗ trợ cả WAV chuẩn 44-byte lẫn WAV xuất qua FFmpeg có chèn chunk LIST/INFO.
    */
   _tryFastWavDurationMs(filePath) {
     try {
+      const stat = fs.statSync(filePath);
+      if (!stat || stat.size <= 44) return 0;
+      const readLen = Math.min(stat.size, 4096);
       const fd = fs.openSync(filePath, 'r');
-      const header = Buffer.alloc(44);
-      const bytesRead = fs.readSync(fd, header, 0, 44, 0);
+      const header = Buffer.alloc(readLen);
+      const bytesRead = fs.readSync(fd, header, 0, readLen, 0);
       fs.closeSync(fd);
       if (bytesRead >= 44 && header.toString('ascii', 0, 4) === 'RIFF' && header.toString('ascii', 8, 12) === 'WAVE') {
-        const byteRate = header.readUInt32LE(28);
-        const stat = fs.statSync(filePath);
-        if (byteRate > 0 && stat.size > 44) {
-          return Math.round(((stat.size - 44) / byteRate) * 1000);
+        let byteRate = 0;
+        let dataBytes = 0;
+        let pos = 12;
+        while (pos + 8 <= bytesRead) {
+          const chunkId = header.toString('ascii', pos, pos + 4);
+          const chunkSize = header.readUInt32LE(pos + 4);
+          if (chunkId === 'fmt ' && pos + 20 <= bytesRead) {
+            byteRate = header.readUInt32LE(pos + 16);
+          } else if (chunkId === 'data') {
+            const payloadRemaining = Math.max(0, stat.size - (pos + 8));
+            dataBytes = (chunkSize > 0 && chunkSize <= payloadRemaining) ? chunkSize : payloadRemaining;
+            break;
+          }
+          if (chunkSize < 0 || chunkSize > stat.size) break;
+          pos += 8 + chunkSize + (chunkSize % 2);
+        }
+        if (byteRate <= 0) {
+          byteRate = header.readUInt32LE(28);
+        }
+        if (dataBytes <= 0) {
+          dataBytes = Math.max(0, stat.size - 44);
+        }
+        if (byteRate > 0 && dataBytes > 0) {
+          return Math.round((dataBytes / byteRate) * 1000);
         }
       }
     } catch {}
@@ -216,16 +243,16 @@ class VoiceValidatorService {
     // Nếu đo được thời lượng, kiểm tra tỷ lệ từ/thời lượng để bắt lỗi nuốt chữ hoặc lặp âm
     if (durationMs > 0) {
       const durationSec = durationMs / 1000;
-      // Giới hạn dưới: tốc độ siêu nhanh 300 từ/phút -> tối thiểu 0.2s/từ
-      const minDurationSec = Math.max(0.5, (wordCount * 0.18));
-      // Giới hạn trên: tốc độ siêu chậm 40 từ/phút -> tối đa 1.5s/từ
+      // Giới hạn dưới: tốc độ đọc nhanh tối đa ~270 từ/phút -> tối thiểu 0.21s/từ (chặn lỗi đọc 2x/nuốt chữ)
+      const minDurationSec = Math.max(0.5, (wordCount * 0.21));
+      // Giới hạn trên: tốc độ siêu chậm 40 từ/phút -> tối đa 1.8s/từ
       const maxDurationSec = Math.max(3.5, (wordCount * 1.8));
 
       if (durationSec < minDurationSec) {
         return {
           valid: false,
           durationMs,
-          reason: `Thời lượng quá ngắn (${durationSec.toFixed(2)}s cho ${wordCount} từ) -> Nghi vấn AI bị nuốt chữ / cắt cụt câu.`
+          reason: `Thời lượng quá ngắn (${durationSec.toFixed(2)}s cho ${wordCount} từ, tối thiểu ${minDurationSec.toFixed(2)}s) -> Nghi vấn AI bị nuốt chữ / tua nhanh / cắt cụt câu.`
         };
       }
 
@@ -265,6 +292,7 @@ class VoiceValidatorService {
     };
 
     let lastError = null;
+    const targetFormat = path.extname(chunkAudioPath || '').toLowerCase() === '.wav' ? 'wav' : 'mp3';
 
     for (let attempt = 1; attempt <= this.maxRetriesPerChunk; attempt++) {
       try {
@@ -279,7 +307,7 @@ class VoiceValidatorService {
           refAudio,
           model,
           language,
-          responseFormat: 'mp3',
+          responseFormat: targetFormat,
           speed: Number(speed) || 1.0,
           outputPath: chunkAudioPath,
           skipPrecheck,
@@ -588,14 +616,29 @@ class VoiceValidatorService {
         } catch {}
       }
 
+      // 5.5. CỔNG KIỂM ĐỊNH ĐỘ DÀI VOICE SO VỚI KỊCH BẢN (HARD FULL-SCRIPT DURATION GATE)
+      // Chặn tuyệt đối lỗi kịch bản 75.000-100.000 ký tự nhưng chỉ tạo ra ~30 phút voice mà vẫn báo thành công!
+      const consistency = this.verifyScriptAudioConsistency({
+        scriptText,
+        audioPath: targetOut,
+        durationMs: actualDurationMs
+      });
+      if (!consistency.valid) {
+        log(`❌ [CHẶN LỖI VOICE HỤT THỜI LƯỢNG] ${consistency.reason}`);
+        try {
+          if (fs.existsSync(targetOut)) fs.unlinkSync(targetOut);
+        } catch {}
+        throw new Error(consistency.reason);
+      }
+
       updateProgress({
         percent: 100,
         currentChunk: chunks.length,
         totalChunks: chunks.length,
-        status: `Hoàn tất tạo voice kịch bản & đã dọn sạch bộ nhớ đệm!`
+        status: `Hoàn tất tạo voice kịch bản (${consistency.actualDurationMin} phút / ${consistency.cleanChars.toLocaleString()} ký tự) & đã dọn sạch bộ nhớ đệm!`
       });
 
-      log(`🎉 [HOÀN TẤT] Đã lưu duy nhất 1 file voice: ${path.basename(targetOut)} (~${(actualDurationMs / 1000).toFixed(1)}s, ${(actualSizeBytes / 1024).toFixed(1)} KB) & giải phóng toàn bộ file tạm.`);
+      log(`🎉 [HOÀN TẤT & ĐÃ KIỂM ĐỊNH KHỚP KỊCH BẢN] Đã lưu file voice: ${path.basename(targetOut)} (~${consistency.actualDurationMin} phút [${(actualDurationMs / 1000).toFixed(1)}s], ngưỡng tối thiểu ${consistency.minExpectedMin} phút cho ${consistency.cleanChars.toLocaleString()} ký tự / ${consistency.totalWords.toLocaleString()} từ, ${(actualSizeBytes / 1024).toFixed(1)} KB).`);
 
       return {
         success: true,
@@ -603,7 +646,9 @@ class VoiceValidatorService {
         finalOutputPath: targetOut,
         durationMs: actualDurationMs,
         sizeBytes: actualSizeBytes,
-        chunkCount: chunks.length
+        chunkCount: chunks.length,
+        cleanChars: consistency.cleanChars,
+        totalWords: consistency.totalWords
       };
     } finally {
       // 6. LUÔN LUÔN dọn dẹp sạch sẽ 100% các file chunk tạm và bộ nhớ cache của VoiceStudio (kể cả khi thành công hay lỗi)
@@ -629,6 +674,58 @@ class VoiceValidatorService {
         } catch {}
       }
     }
+  }
+
+  /**
+   * Kiểm định chéo thời lượng file audio hoàn chỉnh (.wav/.mp3) so với độ dài kịch bản (.txt)
+   * Ngăn chặn tuyệt đối lỗi kịch bản dài (vd 75.000-100.000 ký tự) nhưng chỉ tạo ra ~30 phút voice mà vẫn báo thành công.
+   */
+  verifyScriptAudioConsistency({ scriptText = '', audioPath = '', durationMs = 0 } = {}) {
+    const cleaned = String(scriptText || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/Pasted\s+text\s*\([^)]*\)\s*(?:\.[a-z0-9]+)?\s*(?:Document)?\s*/gi, '')
+      .replace(/^\s*(?:#{1,6}\s*)?\[\s*(?:PART|PARTE)\s+\d+(?:\s*[:—\-–][^\]]*)?\]\s*$/gim, '')
+      .replace(/^\s*#{1,6}\s+(?:PART|PARTE)\s+\d+.*$/gim, '')
+      .trim();
+
+    const cleanChars = cleaned.length;
+    const totalWords = this.estimateWordCount(cleaned);
+    let actualDurationMs = Number(durationMs || 0);
+    if (actualDurationMs <= 0 && audioPath && fs.existsSync(audioPath)) {
+      actualDurationMs = this._tryFastWavDurationMs(audioPath);
+    }
+
+    const actualDurationSec = actualDurationMs / 1000;
+    const minExpectedSec = totalWords >= 350
+      ? Math.max(totalWords * 0.26, cleanChars / 23.0)
+      : Math.max(0.5, totalWords * 0.18);
+
+    const actualDurationMin = Number((actualDurationSec / 60).toFixed(1));
+    const minExpectedMin = Number((minExpectedSec / 60).toFixed(1));
+
+    // Chỉ siết cổng kiểm định cứng khi kịch bản dài (>= 350 từ) và đo được durationMs > 0
+    if (totalWords >= 350 && actualDurationMs > 0 && actualDurationSec < minExpectedSec) {
+      return {
+        valid: false,
+        actualDurationMs,
+        actualDurationMin,
+        minExpectedMin,
+        cleanChars,
+        totalWords,
+        reason: `ERR_VOICE_DURATION_MISMATCH: Thời lượng voice tạo ra quá ngắn (${actualDurationMin} phút / ${Math.round(actualDurationSec)}s) so với độ dài kịch bản (${cleanChars.toLocaleString()} ký tự / ${totalWords.toLocaleString()} từ — yêu cầu tối thiểu ${minExpectedMin} phút). Đã chặn báo thành công giả để bảo vệ chất lượng video!`
+      };
+    }
+
+    return {
+      valid: true,
+      actualDurationMs,
+      actualDurationMin,
+      minExpectedMin,
+      cleanChars,
+      totalWords,
+      reason: 'OK'
+    };
   }
 
   /**

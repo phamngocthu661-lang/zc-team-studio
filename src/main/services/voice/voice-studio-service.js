@@ -442,6 +442,45 @@ class VoiceStudioService {
    * Đăng ký file âm thanh mẫu (refAudio) vào SQLite của VoiceStudio qua POST /profiles
    * để POST /v1/audio/speech nhận diện được voice profile_id và dùng đúng giọng clone.
    */
+  _resolveOrEstimateRefText(sampleFile, rawRefText = '', language = 'en') {
+    const clean = String(rawRefText || '').trim();
+    if (clean.length >= 12) return clean;
+    try {
+      const sidecarTxt = path.join(path.dirname(sampleFile), 'sample.txt');
+      if (fs.existsSync(sidecarTxt)) {
+        const sTxt = fs.readFileSync(sidecarTxt, 'utf8').trim();
+        if (sTxt.length >= 12) return sTxt;
+      }
+    } catch {}
+    // Nếu profile tùy chỉnh chưa có refText, tự động ước lượng câu tham chiếu chuẩn tỷ lệ 16 ký tự/giây
+    // để ngăn OmniVoice rơi vào nhánh fallback 25 tokens (0.5s) làm tốc độ đọc nhanh gấp đôi (bị hụt 50% thời lượng)!
+    let durSec = 10.0;
+    try {
+      const st = fs.statSync(sampleFile);
+      const ext = path.extname(sampleFile).toLowerCase();
+      if (ext === '.wav' && st.size > 44) {
+        const fd = fs.openSync(sampleFile, 'r');
+        const hdr = Buffer.alloc(44);
+        fs.readSync(fd, hdr, 0, 44, 0);
+        fs.closeSync(fd);
+        const br = hdr.readUInt32LE(28);
+        if (br > 0) durSec = Math.max(3.0, Math.min(20.0, (st.size - 44) / br));
+      } else if (st.size > 1000) {
+        durSec = Math.max(4.0, Math.min(20.0, st.size / 24000));
+      }
+    } catch {}
+    const langLow = String(language || 'en').toLowerCase();
+    const baseSentence = langLow.startsWith('es')
+      ? 'Esta es una grabación de referencia clara y natural para mantener el ritmo pausado y la entonación exacta durante toda la narración de la historia familiar.'
+      : 'This is a clear and steady reference voice recording designed to maintain a natural storytelling pace and accurate spoken duration across every paragraph.';
+    const targetChars = Math.max(40, Math.round(durSec * 15.5));
+    let out = baseSentence;
+    while (out.length < targetChars) {
+      out += ' ' + baseSentence;
+    }
+    return out.slice(0, targetChars).trim();
+  }
+
   async _ensureVoiceStudioCloneProfile({ profile = null, refAudio, name, language, existingVsProfileId = null }) {
     const sampleFile = refAudio || profile?.samplePath;
     if (!sampleFile || !fs.existsSync(sampleFile)) return null;
@@ -453,7 +492,12 @@ class VoiceStudioService {
       return null;
     }
 
-    const cacheKey = `${path.resolve(sampleFile)}:${stat.size}:${Math.floor(stat.mtimeMs)}`;
+    const effectiveRefText = this._resolveOrEstimateRefText(
+      sampleFile,
+      profile?.refText || '',
+      language || profile?.language || 'en'
+    );
+    const cacheKey = `${path.resolve(sampleFile)}:${stat.size}:${Math.floor(stat.mtimeMs)}:${effectiveRefText.length}`;
     if (this._refAudioToVsIdCache.has(cacheKey)) {
       return this._refAudioToVsIdCache.get(cacheKey);
     }
@@ -462,7 +506,7 @@ class VoiceStudioService {
     if (prevId) {
       try {
         const existing = await this._httpGetJson(`${this.rootUrl}/profiles/${encodeURIComponent(prevId)}`, 2500);
-        if (existing && existing.id) {
+        if (existing && existing.id && String(existing.ref_text || '').trim().length >= 12) {
           this._refAudioToVsIdCache.set(cacheKey, existing.id);
           return existing.id;
         }
@@ -472,18 +516,18 @@ class VoiceStudioService {
     try {
       const uploaded = await this._uploadCloneProfileToVoiceStudio({
         refAudioPath: sampleFile,
-        name: name || profile?.name || path.basename(sampleFile, path.extname(sampleFile)) || 'VBS_Voice',
+        name: `${name || profile?.name || path.basename(sampleFile, path.extname(sampleFile)) || 'VBS_Voice'}_${Date.now().toString(36).slice(-4)}`,
         language: language || profile?.language || 'Auto',
-        refText: profile?.refText || '',
+        refText: effectiveRefText,
         personality: profile?.personality || profile?.description || ''
       });
       const vsId = typeof uploaded === 'string' ? uploaded : uploaded?.id;
       if (vsId) {
         this._refAudioToVsIdCache.set(cacheKey, vsId);
-        if (profile && profile.vsProfileId !== vsId) {
+        if (profile && (profile.vsProfileId !== vsId || !profile.refText)) {
           try {
             const manager = this._getProfileManager();
-            manager?.saveProfile({ ...profile, vsProfileId: vsId });
+            manager?.saveProfile({ ...profile, refText: effectiveRefText, vsProfileId: vsId });
           } catch {}
         }
         return vsId;
@@ -749,18 +793,36 @@ class VoiceStudioService {
   }
 
   /**
+   * Tìm đường dẫn thực thi FFmpeg để chuẩn hóa định dạng WAV chuẩn PCM
+   */
+  _resolveFfmpegBinary() {
+    const candidates = [
+      process.env.FFMPEG_PATH,
+      path.resolve(__dirname, '../../../../resources/ffmpeg/win-x64/ffmpeg.exe'),
+      path.resolve(__dirname, '../../../../resources/ffmpeg/win32-x64/ffmpeg.exe'),
+      path.resolve(process.cwd(), 'resources', 'ffmpeg', 'win-x64', 'ffmpeg.exe'),
+      path.resolve(process.cwd(), 'resources', 'ffmpeg', 'win32-x64', 'ffmpeg.exe'),
+      'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\resources\\ffmpeg\\win-x64\\ffmpeg.exe',
+      'ffmpeg'
+    ].filter(Boolean);
+    return candidates.find(c => c === 'ffmpeg' || fs.existsSync(c)) || 'ffmpeg';
+  }
+
+  /**
    * Gọi API chuẩn OpenAI format của VoiceStudio (POST /v1/audio/speech)
    * Có cơ chế tự động chờ và thử lại khi GPU Pool báo bận (HTTP 429 / 503 Retry-After)
    */
   async _callVoiceStudioApi({ text, voice, refAudio, model, speed, language, responseFormat, outputPath }) {
     const speechUrl = `${this.baseUrl}/audio/speech`;
+    const isWavOut = path.extname(String(outputPath || '')).toLowerCase() === '.wav';
+    const effectiveFormat = isWavOut ? 'wav' : (responseFormat || 'mp3');
 
     const requestBody = {
       model: model || 'omnivoice',
       input: text,
       voice: voice || 'default',
       speed: Number(speed) || 1.0,
-      response_format: responseFormat || 'mp3'
+      response_format: effectiveFormat
     };
 
     if (language && String(language).toLowerCase() !== 'auto') {
@@ -774,7 +836,7 @@ class VoiceStudioService {
     const payload = JSON.stringify(requestBody);
     const urlObj = new URL(speechUrl);
 
-    for (let attempt = 1; attempt <= 4; attempt++) {
+    for (let attempt = 1; attempt <= 6; attempt++) {
       try {
         const res = await new Promise((resolve, reject) => {
           const client = urlObj.protocol === 'https:' ? https : http;
@@ -793,10 +855,10 @@ class VoiceStudioService {
               let errBody = '';
               response.on('data', chunk => { errBody += chunk; });
               response.on('end', () => {
-                const retryHeader = Number(response.headers?.['retry-after']) || 2;
+                const retryHeader = Number(response.headers?.['retry-after']) || 3;
                 const busyErr = new Error(`GPU Pool bận (${response.statusCode}): ${errBody.slice(0, 180)}`);
                 busyErr.retryable = true;
-                busyErr.retryDelayMs = Math.min(6000, Math.max(800, retryHeader * 400));
+                busyErr.retryDelayMs = Math.min(8000, Math.max(1200, retryHeader * 500));
                 reject(busyErr);
               });
               return;
@@ -837,8 +899,8 @@ class VoiceStudioService {
         });
         return res;
       } catch (err) {
-        if (err && err.retryable && attempt < 4) {
-          await new Promise(r => setTimeout(r, err.retryDelayMs || 1200));
+        if (err && err.retryable && attempt < 6) {
+          await new Promise(r => setTimeout(r, err.retryDelayMs || 1500));
           continue;
         }
         throw err;
@@ -851,17 +913,26 @@ class VoiceStudioService {
    */
   async _generateViaFallbackTts({ text, voice, language, speed, outputPath }) {
     const { IsomorphicCommunicate } = require('edge-tts-universal');
+    const isWavOut = path.extname(String(outputPath || '')).toLowerCase() === '.wav';
 
-    let edgeVoice = 'vi-VN-HoaiMyNeural';
+    let edgeVoice = 'en-US-JennyNeural';
     const vLower = `${voice || ''} ${language || ''}`.toLowerCase();
     if (vLower.includes('ja') || vLower.includes('jp')) {
       edgeVoice = 'ja-JP-NanamiNeural';
+    } else if (vLower.includes('es') || vLower.includes('mx') || vLower.includes('mexico') || vLower.includes('dona') || vLower.includes('elena')) {
+      edgeVoice = (vLower.includes('padre') || vLower.includes('ong_gia') || vLower.includes('campo'))
+        ? 'es-MX-JorgeNeural'
+        : 'es-MX-DaliaNeural';
     } else if (vLower.includes('zh') || vLower.includes('cn')) {
       edgeVoice = 'zh-CN-XiaoxiaoNeural';
-    } else if (vLower.includes('en') || vLower.includes('eng')) {
-      edgeVoice = 'en-US-JennyNeural';
-    } else if (vLower.includes('nam') || vLower.includes('minh') || vLower.includes('male') || vLower.includes('đức') || vLower.includes('tuấn')) {
-      edgeVoice = 'vi-VN-NamMinhNeural';
+    } else if (vLower.includes('vi') || vLower.includes('hoaimy') || vLower.includes('namminh')) {
+      edgeVoice = (vLower.includes('nam') || vLower.includes('minh') || vLower.includes('male'))
+        ? 'vi-VN-NamMinhNeural'
+        : 'vi-VN-HoaiMyNeural';
+    } else if (vLower.includes('en') || vLower.includes('eng') || vLower.includes('us') || vLower.includes('homeless') || vLower.includes('daden')) {
+      edgeVoice = (vLower.includes('gus') || vLower.includes('ong_gia') || vLower.includes('dad') || vLower.includes('romance') || vLower.includes('midnight') || vLower.includes('daden'))
+        ? 'en-US-ChristopherNeural'
+        : 'en-US-JennyNeural';
     }
 
     const ratePct = Math.round(((Number(speed) || 1.0) - 1.0) * 100);
@@ -883,13 +954,31 @@ class VoiceStudioService {
         }
         const buffer = Buffer.concat(chunks);
         if (buffer.length > 512) {
-          fs.writeFileSync(outputPath, buffer);
-          return {
-            success: true,
-            outputPath,
-            sizeBytes: buffer.length,
-            engine: 'Fallback-Universal'
-          };
+          if (isWavOut) {
+            const tmpMp3 = `${outputPath}.tmp_${Date.now()}.mp3`;
+            fs.writeFileSync(tmpMp3, buffer);
+            try {
+              const ffmpegBin = this._resolveFfmpegBinary();
+              execFileSync(ffmpegBin, [
+                '-y', '-hide_banner', '-loglevel', 'error',
+                '-i', tmpMp3,
+                '-ar', '24000', '-ac', '1', '-c:a', 'pcm_s16le',
+                outputPath
+              ], { timeout: 30000, windowsHide: true });
+            } finally {
+              try { if (fs.existsSync(tmpMp3)) fs.unlinkSync(tmpMp3); } catch {}
+            }
+          } else {
+            fs.writeFileSync(outputPath, buffer);
+          }
+          if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 512) {
+            return {
+              success: true,
+              outputPath,
+              sizeBytes: fs.statSync(outputPath).size,
+              engine: 'Fallback-Universal'
+            };
+          }
         }
       } catch (err) {
         lastErr = err;

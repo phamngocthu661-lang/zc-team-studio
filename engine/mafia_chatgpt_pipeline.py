@@ -2707,49 +2707,64 @@ def condense_homeless_stage_text(
     if expected_parts is None:
         expected_parts = allowed_parts if allowed_parts is not None else [1, 2, 3, 4, 5, 6, 7]
     if hard_max_chars is None:
-        hard_max_chars = max_chars if max_chars is not None else 79800
-    sliced = slice_script_to_allowed_parts(stage_text, expected_parts)
-    m = analyze_script_metrics(sliced, start_part=min(expected_parts) if expected_parts else 1)
-    # Bảo vệ 100% mạch nhân quả (Causality): Khi kịch bản 7 Phần đã nằm trong ngưỡng <= 80.000 ký tự
-    # (hoặc nhóm Part nằm trong ngưỡng hợp lệ), giữ nguyên 100% từng câu chữ của ChatGPT, tuyệt đối không cắt câu giữa đoạn!
-    effective_ceiling = max(hard_max_chars, 79800 if len(expected_parts) == 7 else hard_max_chars + 1500)
-    if m["char_count"] <= effective_ceiling:
+        hard_max_chars = max_chars if max_chars is not None else (78800 if len(expected_parts) == 7 else int(target_chars * 1.04))
+
+    # Hỗ trợ cả kịch bản có nhãn [PART N] lẫn kịch bản thuần văn bản (_KB.txt đã xóa nhãn [PART N])
+    has_part_headers = bool(re.search(r"(?m)^\s*(?:#{1,6}\s*)?\[?\s*(?:PART|PARTE)\s+\d+", stage_text or "", flags=re.IGNORECASE))
+    if has_part_headers:
+        sliced = slice_script_to_allowed_parts(stage_text, expected_parts)
+        m = analyze_script_metrics(sliced, start_part=min(expected_parts) if expected_parts else 1)
+        char_len = m["char_count"]
+    else:
+        sliced = (stage_text or "").strip()
+        char_len = len(sliced)
+
+    effective_ceiling = hard_max_chars
+    if char_len <= effective_ceiling:
         return sliced
 
-    # Tách văn bản theo từng Part
+    # Tách văn bản theo từng Part (hoặc chia thành num_p phân đoạn ảo nếu đã xóa nhãn [PART N])
     part_blocks = {}
-    cur_p = None
-    cur_lines = []
-    for ln in sliced.splitlines():
-        m_h = STANDALONE_PART_HEADING_RE.match(ln.strip())
-        if m_h and int(m_h.group(1)) in expected_parts:
-            if cur_p is not None:
-                part_blocks[cur_p] = "\n".join(cur_lines).strip()
-            cur_p = int(m_h.group(1))
-            cur_lines = []
-        else:
-            if cur_p is not None:
-                cur_lines.append(ln)
-    if cur_p is not None:
-        part_blocks[cur_p] = "\n".join(cur_lines).strip()
+    if has_part_headers:
+        cur_p = None
+        cur_lines = []
+        for ln in sliced.splitlines():
+            m_h = STANDALONE_PART_HEADING_RE.match(ln.strip())
+            if m_h and int(m_h.group(1)) in expected_parts:
+                if cur_p is not None:
+                    part_blocks[cur_p] = "\n".join(cur_lines).strip()
+                cur_p = int(m_h.group(1))
+                cur_lines = []
+            else:
+                if cur_p is not None:
+                    cur_lines.append(ln)
+        if cur_p is not None:
+            part_blocks[cur_p] = "\n".join(cur_lines).strip()
+    else:
+        all_paras = [p.strip() for p in re.split(r"\n\s*\n", sliced) if p.strip()]
+        num_v = max(1, len(expected_parts))
+        chunk_sz = max(1, (len(all_paras) + num_v - 1) // num_v)
+        for idx_v, p_num in enumerate(expected_parts):
+            sub_p = all_paras[idx_v * chunk_sz : (idx_v + 1) * chunk_sz]
+            if sub_p:
+                part_blocks[p_num] = "\n\n".join(sub_p)
 
     num_p = max(1, len(expected_parts))
     per_part_target = int(target_chars / num_p)
 
     def _condense_single_part(p_text: str, p_budget: int) -> str:
-        if len(p_text) <= p_budget + 250:
+        if len(p_text) <= p_budget + 120:
             return p_text
         raw_paras = [p.strip() for p in re.split(r"\n\s*\n", p_text) if p.strip()]
         if len(raw_paras) <= 5:
             return p_text
 
-        # Bước 0: Nếu ChatGPT viết theo kiểu tách từng câu đơn lẻ thành 1 đoạn văn (ví dụ >60 đoạn ngắn/Part),
-        # gộp các câu trần thuật liên tiếp không có thoại thành đoạn văn tự nhiên (2–4 câu) để giữ mạch chuyển ý
+        # Bước 0: Gộp các câu trần thuật ngắn đơn lẻ thành đoạn văn tự nhiên (2–4 câu)
         paras = []
         buf = []
         buf_len = 0
         for rp in raw_paras:
-            has_q = ('"' in rp) or ("\u201c" in rp) or ("\u201d" in rp)
+            has_q = ('"' in rp) or ("\u201c" in rp) or ("\u201d" in rp) or ("«" in rp) or ("—" in rp and len(rp) < 260)
             if has_q or len(rp) > 220 or len(buf) >= 3 or (buf_len + len(rp) > 420):
                 if buf:
                     paras.append(" ".join(buf))
@@ -2769,7 +2784,7 @@ def condense_homeless_stage_text(
         if len(paras) <= 5:
             return "\n\n".join(paras)
 
-        # Nhận diện lần xuất hiện đầu tiên của mọi tên riêng nhân vật/địa danh viết hoa trong Part để BẢO VỆ 100%
+        # Nhận diện lần xuất hiện đầu tiên của tên riêng đầy đủ (2 từ viết hoa) để bảo vệ
         seen_names = set()
         first_name_para_indices = set()
         common_starters = {
@@ -2785,67 +2800,135 @@ def condense_homeless_stage_text(
             "January", "February", "March", "April", "May", "June", "July", "August", "September",
             "October", "November", "December", "Morning", "Afternoon", "Evening", "Night", "Back",
             "Down", "Up", "Near", "Far", "Here", "Where", "What", "Why", "How", "Who", "If", "As",
-            "But", "And", "Or", "So", "Yet", "For", "Nor",
+            "But", "And", "Or", "So", "Yet", "For", "Nor", "Doña", "Señora", "Señor", "Don",
         }
         for idx, para in enumerate(paras):
-            # Ưu tiên bắt tên đầy đủ 2 từ viết hoa (ví dụ Evelyn Mercer, Thomas Bell, Clara Nguyen)
-            for m_full in re.finditer(r"\b([A-Z][a-z]{2,15}\s+[A-Z][a-z]{2,15})\b", para):
+            for m_full in re.finditer(r"\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,15}\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,15})\b", para):
                 w_full = m_full.group(1)
                 first_w = w_full.split()[0]
-                if first_w not in common_starters and w_full not in seen_names and len(first_name_para_indices) < 14:
+                if first_w not in common_starters and w_full not in seen_names and len(first_name_para_indices) < 10:
                     seen_names.add(w_full)
-                    seen_names.add(first_w)
-                    first_name_para_indices.add(idx)
-            # Bắt tên riêng xuất hiện giữa câu (đứng sau chữ thường, không phải từ đầu câu)
-            for m_nm in re.finditer(r"(?<=[a-z,;:])\s+([A-Z][a-z]{2,15})\b", para):
-                w_nm = m_nm.group(1)
-                if w_nm not in common_starters and w_nm not in seen_names and len(first_name_para_indices) < 14:
-                    seen_names.add(w_nm)
                     first_name_para_indices.add(idx)
 
-        # Bước 1: Rút gọn nhẹ ở cấp độ câu phụ bên trong các đoạn văn dài >= 3 câu:
-        # - LUÔN GIỮ câu mở đầu sents[0] VÀ câu kết thúc sents[-1] (để không bao giờ đứt mạch chuyển đoạn).
-        # - LUÔN GIỮ mọi câu có dấu hỏi chấm (?), lời thoại ("..."), số liệu/tiền tệ (kể cả số viết bằng chữ tiếng Anh như eighteen dollars, six screws),
-        #   và câu giới thiệu tên riêng nhân vật.
+        # Chỉ bảo vệ các token pháp lý/chứng cứ cốt lõi, số, tiền tệ và dấu hỏi
         protected_token_re = re.compile(
-            r"\?|\d+|\$|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|dollar|dollars|cent|cents|screw|screws|inch|inches|foot|feet|panel|pipe|vent|window|porch|roof|stairs|notebook|envelope|inventory|ledger|deed|valve|shim|key|latch|hinge|C0\d|C1\d|W0\d|R\d|E\d\d)\b",
+            r"\?|\d+|\$|\b(?:deed|ledger|clause|notary|escritura|testamento|parcel|audit|trust|contract|warrant|affidavit|C0\d|C1\d|W0\d|R\d|E\d\d)\b",
             flags=re.IGNORECASE,
         )
-        cur_s1_len = sum(len(p) for p in paras) + 2 * (len(paras) - 1)
-        trimmed_paras = []
+
+        # PASS 1: Rút gọn câu phụ ở giữa các đoạn văn >= 3 câu (luôn giữ câu đầu & câu cuối của đoạn)
+        cur_len = sum(len(p) for p in paras) + 2 * (len(paras) - 1)
+        pass1_paras = []
         for idx, para in enumerate(paras):
-            if cur_s1_len <= p_budget + 120 or idx < 2 or idx >= len(paras) - 2 or idx in first_name_para_indices:
-                trimmed_paras.append(para)
+            if cur_len <= p_budget + 80 or idx < 2 or idx >= len(paras) - 2 or idx in first_name_para_indices:
+                pass1_paras.append(para)
                 continue
-            has_quote = ('"' in para) or ("\u201c" in para) or ("\u201d" in para)
+            has_quote = ('"' in para) or ("\u201c" in para) or ("\u201d" in para) or ("«" in para)
             sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", para) if s.strip()]
             new_p = para
-            if not has_quote and len(sents) >= 3 and len(para) > 260:
+            if not has_quote and len(sents) >= 3 and len(para) > 210:
                 kept_s = [sents[0]]
                 for s_mid in sents[1:-1]:
-                    if protected_token_re.search(s_mid) and len(" ".join(kept_s)) < 380:
+                    if protected_token_re.search(s_mid) and len(" ".join(kept_s)) < 290:
                         kept_s.append(s_mid)
                 kept_s.append(sents[-1])
                 new_p = " ".join(kept_s)
-            elif has_quote and len(sents) >= 4 and len(para) > 420:
+            elif has_quote and len(sents) >= 3 and len(para) > 320:
                 kept_s = [sents[0]]
                 for s_mid in sents[1:-1]:
-                    if ('"' in s_mid or "\u201c" in s_mid or "\u201d" in s_mid or protected_token_re.search(s_mid)):
+                    if ('"' in s_mid or "\u201c" in s_mid or "\u201d" in s_mid or "«" in s_mid or protected_token_re.search(s_mid)):
                         kept_s.append(s_mid)
-                kept_s.append(sents[-1])
+                if sents[-1] not in kept_s:
+                    kept_s.append(sents[-1])
                 new_p = " ".join(kept_s)
-            cur_s1_len -= (len(para) - len(new_p))
-            trimmed_paras.append(new_p)
+            cur_len -= (len(para) - len(new_p))
+            pass1_paras.append(new_p)
 
-        # TUYỆT ĐỐI KHÔNG xóa nguyên đoạn văn ở giữa câu chuyện để bảo vệ 100% chuỗi hành động nhân quả!
-        return "\n\n".join(trimmed_paras)
+        # PASS 2: Nếu vẫn vượt ngân sách, lược bớt câu cảm nghĩ/miêu tả phụ ở cuối các đoạn trần thuật >= 2 câu không chứa thoại
+        pass2_paras = list(pass1_paras)
+        if cur_len > p_budget + 80:
+            for idx in range(2, len(pass2_paras) - 2):
+                if cur_len <= p_budget + 80:
+                    break
+                if idx in first_name_para_indices:
+                    continue
+                para = pass2_paras[idx]
+                has_quote = ('"' in para) or ("\u201c" in para) or ("\u201d" in para) or ("«" in para)
+                if has_quote:
+                    continue
+                sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", para) if s.strip()]
+                if len(sents) >= 2 and len(sents[0]) >= 55 and not protected_token_re.search(sents[-1]):
+                    new_p = " ".join(sents[:-1])
+                    cur_len -= (len(para) - len(new_p))
+                    pass2_paras[idx] = new_p
 
-    # Phân bổ động ngân sách (dynamic_p_budget): các Part đã ngắn hơn per_part_target được giữ nguyên 100%,
-    # phần ngân sách còn lại (target_chars - short_parts_sum) được chia tỷ lệ cho các Part dài hơn để tổng 7 Phần luôn đạt ~76.000 ký tự!
+        # PASS 3: Nếu vẫn vượt ngân sách, chỉ giữ câu mở đầu + các câu có lời thoại trực tiếp trong các đoạn thoại dài
+        if cur_len > p_budget + 80:
+            for idx in range(2, len(pass2_paras) - 2):
+                if cur_len <= p_budget + 80:
+                    break
+                para = pass2_paras[idx]
+                has_quote = ('"' in para) or ("\u201c" in para) or ("\u201d" in para) or ("«" in para)
+                if not has_quote:
+                    continue
+                sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", para) if s.strip()]
+                if len(sents) >= 2:
+                    quote_sents = [s for s in sents if ('"' in s or "\u201c" in s or "\u201d" in s or "«" in s or protected_token_re.search(s))]
+                    if quote_sents:
+                        if sents[0] not in quote_sents and len(quote_sents) < len(sents):
+                            kept = [sents[0]] + quote_sents
+                        else:
+                            kept = quote_sents
+                        new_p = " ".join(kept)
+                        if len(new_p) < len(para):
+                            cur_len -= (len(para) - len(new_p))
+                            pass2_paras[idx] = new_p
+
+        # PASS 4: Nếu một Part vẫn vượt ngân sách (ví dụ AI viết 15.000-18.000 ký tự/Part),
+        # lược bỏ giãn cách đều các đoạn miêu tả tĩnh ở giữa (ưu tiên đoạn không có thoại và không có số/tên mới)
+        final_paras = list(pass2_paras)
+        if cur_len > p_budget + 120 and len(final_paras) > 9:
+            tier1 = []
+            tier2 = []
+            tier3 = []
+            for idx in range(2, len(final_paras) - 2):
+                if idx in first_name_para_indices:
+                    continue
+                p_txt = final_paras[idx]
+                has_q = ('"' in p_txt) or ("\u201c" in p_txt) or ("\u201d" in p_txt) or ("«" in p_txt)
+                has_prot = bool(protected_token_re.search(p_txt))
+                if not has_q and not has_prot:
+                    tier1.append(idx)
+                elif not has_q:
+                    tier2.append(idx)
+                elif not has_prot:
+                    tier3.append(idx)
+
+            def _spread_order(indices_list: list[int]) -> list[int]:
+                if len(indices_list) <= 2:
+                    return indices_list
+                # Lấy xen kẽ từ giữa ra để không xóa 2 đoạn liên tiếp
+                evens = indices_list[1::2]
+                odds = indices_list[0::2]
+                return evens + odds
+
+            drop_candidates = _spread_order(tier1) + _spread_order(tier2) + _spread_order(tier3)
+            dropped_set = set()
+            for c_idx in drop_candidates:
+                if cur_len <= p_budget + 80 or (len(final_paras) - len(dropped_set)) <= 8:
+                    break
+                dropped_set.add(c_idx)
+                cur_len -= (len(final_paras[c_idx]) + 2)
+            if dropped_set:
+                final_paras = [p for i, p in enumerate(final_paras) if i not in dropped_set]
+
+        return "\n\n".join(final_paras)
+
+    # Phân bổ động ngân sách (dynamic_p_budget)
     short_parts_sum = sum(len(part_blocks.get(p, "")) for p in expected_parts if len(part_blocks.get(p, "")) <= per_part_target)
     long_parts = [p for p in expected_parts if len(part_blocks.get(p, "")) > per_part_target]
     long_parts_raw_sum = max(1, sum(len(part_blocks.get(p, "")) for p in long_parts))
-    remaining_budget = max(per_part_target * len(long_parts), target_chars - short_parts_sum)
+    remaining_budget = max(int(per_part_target * 0.92) * len(long_parts), target_chars - short_parts_sum)
 
     rebuilt_chunks = []
     for p_num in expected_parts:
@@ -2854,11 +2937,14 @@ def condense_homeless_stage_text(
             continue
         if p_num in long_parts and len(long_parts) > 0:
             dyn_budget = int(remaining_budget * (len(p_raw) / long_parts_raw_sum))
-            dyn_budget = max(per_part_target, min(len(p_raw), dyn_budget))
+            dyn_budget = max(int(per_part_target * 0.90), min(len(p_raw), dyn_budget))
         else:
             dyn_budget = per_part_target
         p_cond = _condense_single_part(p_raw, dyn_budget)
-        rebuilt_chunks.append(f"[PART {p_num}]\n\n{p_cond.strip()}")
+        if has_part_headers:
+            rebuilt_chunks.append(f"[PART {p_num}]\n\n{p_cond.strip()}")
+        else:
+            rebuilt_chunks.append(p_cond.strip())
 
     return "\n\n".join(rebuilt_chunks).strip()
 
@@ -4521,13 +4607,13 @@ Hãy thiết kế và xuất trọn vẹn **FULL STORY OUTLINE** cho `CURRENT FI
         beat_range_str = f"E{beat_start:02d}..E{beat_end:02d}"
 
         ends_cleanly = bool(re.search(r'[.!?""\u201d\']\s*$', body_clean))
-        if len(body_clean) >= 7500 and ends_cleanly:
-            if len(body_clean) > 11600:
+        if len(body_clean) >= 9600 and ends_cleanly:
+            if len(body_clean) > 11300:
                 cond_full = condense_homeless_stage_text(
                     f"[PART {part_num}]\n\n{body_clean}",
                     allowed_parts=[part_num],
                     target_chars=10850,
-                    max_chars=11400,
+                    max_chars=11200,
                 )
                 pm = split_script_into_part_dict(cond_full, max_p=7)
                 body_clean = pm.get(part_num, body_clean)
@@ -4652,12 +4738,12 @@ QUAN TRỌNG:
             if s_body and len(s_body) > len(body_clean) and not is_refusal_or_meta_response(s_body, min_chars=2800):
                 body_clean = s_body
 
-        if len(body_clean) > 11600:
+        if len(body_clean) > 11300:
             cond_full = condense_homeless_stage_text(
                 f"[PART {part_num}]\n\n{body_clean}",
                 allowed_parts=[part_num],
                 target_chars=10850,
-                max_chars=11400,
+                max_chars=11200,
             )
             pm = split_script_into_part_dict(cond_full, max_p=7)
             body_clean = pm.get(part_num, body_clean)
