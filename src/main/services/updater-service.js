@@ -409,20 +409,48 @@ class UpdaterService {
 
       emitProgress(70, 'Đang nâng cấp giao diện Electron, Engine 9 Bàn Agent, 12 Key Skills & Kho_Voice...');
 
+      // Tạm dừng server Python 8098 trước khi chép file để không bị khóa file (EBUSY) trên Windows
+      if (this.scriptBridgeService && typeof this.scriptBridgeService.killScriptServerAndRelatedProcesses === 'function') {
+        try {
+          this.scriptBridgeService.killScriptServerAndRelatedProcesses({
+            killVoiceStudio: false,
+            killChrome: false,
+            killFfmpeg: false
+          });
+        } catch {}
+      }
+
       let updatedFilesCount = 0;
+      let skippedLockedFilesCount = 0;
       const copyRecursiveCount = (src, dst) => {
         if (!fs.existsSync(src)) return;
-        const stat = fs.statSync(src);
+        let stat = null;
+        try {
+          stat = fs.statSync(src);
+        } catch {
+          return;
+        }
         if (stat.isDirectory()) {
-          fs.mkdirSync(dst, { recursive: true });
-          for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+          try { fs.mkdirSync(dst, { recursive: true }); } catch {}
+          let entries = [];
+          try {
+            entries = fs.readdirSync(src, { withFileTypes: true });
+          } catch {
+            return;
+          }
+          for (const entry of entries) {
             if (entry.name === '__pycache__' || entry.name.endsWith('.pyc') || entry.name === '.git') continue;
             copyRecursiveCount(path.join(src, entry.name), path.join(dst, entry.name));
           }
         } else {
-          fs.mkdirSync(path.dirname(dst), { recursive: true });
-          fs.copyFileSync(src, dst);
-          updatedFilesCount += 1;
+          try {
+            fs.mkdirSync(path.dirname(dst), { recursive: true });
+            fs.copyFileSync(src, dst);
+            updatedFilesCount += 1;
+          } catch {
+            // Bỏ qua các file nhị phân đang mở (như python.exe / .dll) để không bao giờ bị treo hay đứt quãng ở 70%
+            skippedLockedFilesCount += 1;
+          }
         }
       };
 

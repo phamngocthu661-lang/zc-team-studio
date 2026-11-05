@@ -4132,6 +4132,7 @@ setupStitchUiEnhancements();
 let _lastOtaStatus = null;
 let _postponedOtaBuild = null;
 let _otaControlsBound = false;
+let _otaIsApplying = false;
 
 function formatVersionLabel(v) {
   const s = String(v || 'V1.0.0').trim();
@@ -4139,7 +4140,7 @@ function formatVersionLabel(v) {
 }
 
 function renderOtaStatusToUi(st, { openModalIfNew = false, forceOpenModal = false } = {}) {
-  if (!st) return;
+  if (!st || _otaIsApplying) return;
   _lastOtaStatus = st;
 
   const curVer = formatVersionLabel(st.currentVersion || 'V1.0.0');
@@ -4321,6 +4322,7 @@ function initOtaUpdaterControls() {
     $('btnApplyOtaUpdateNow').onclick = async () => {
       const btn = $('btnApplyOtaUpdateNow');
       const postponeBtn = $('btnPostponeOtaUpdate');
+      _otaIsApplying = true;
       btn.disabled = true;
       if (postponeBtn) postponeBtn.disabled = true;
       btn.textContent = '⏳ Đang tải & cài đặt bản cập nhật...';
@@ -4355,13 +4357,33 @@ function initOtaUpdaterControls() {
             }
           }, 800);
         } else {
-          toast('❌ ' + (res?.message || 'Cập nhật thất bại.'), true);
+          _otaIsApplying = false;
+          const errMsg = res?.message || res?.error || 'Cập nhật thất bại.';
+          toast('❌ ' + errMsg, true);
+          if ($('otaProgressMessage')) $('otaProgressMessage').textContent = '❌ Lỗi: ' + errMsg;
+          const banner = $('otaStatusBanner');
+          if (banner) {
+            banner.style.background = 'rgba(239,68,68,0.16)';
+            banner.style.borderColor = '#ef4444';
+            banner.style.color = '#fecaca';
+            banner.innerHTML = `❌ <strong>Lỗi trong quá trình cập nhật:</strong> ${htmlEscape(errMsg)}`;
+          }
           btn.disabled = false;
           if (postponeBtn) postponeBtn.disabled = false;
           btn.textContent = '🚀 Thử Cập Nhật Lại';
         }
       } catch (err) {
-        toast('❌ Lỗi cập nhật: ' + err.message, true);
+        _otaIsApplying = false;
+        const errMsg = err?.message || String(err);
+        toast('❌ Lỗi cập nhật: ' + errMsg, true);
+        if ($('otaProgressMessage')) $('otaProgressMessage').textContent = '❌ Lỗi: ' + errMsg;
+        const banner = $('otaStatusBanner');
+        if (banner) {
+          banner.style.background = 'rgba(239,68,68,0.16)';
+          banner.style.borderColor = '#ef4444';
+          banner.style.color = '#fecaca';
+          banner.innerHTML = `❌ <strong>Lỗi trong quá trình cập nhật:</strong> ${htmlEscape(errMsg)}`;
+        }
         btn.disabled = false;
         if (postponeBtn) postponeBtn.disabled = false;
         btn.textContent = '🚀 Thử Cập Nhật Lại';

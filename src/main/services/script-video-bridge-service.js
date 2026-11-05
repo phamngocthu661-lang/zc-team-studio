@@ -499,13 +499,41 @@ class ScriptVideoBridgeService {
   }
 
   async restartScriptServer() {
-    this.killScriptServerAndRelatedProcesses({
-      killVoiceStudio: false,
-      killChrome: false,
-      killFfmpeg: false
-    });
+    try {
+      // Đảm bảo mọi hàm mới trên prototype đều được gắn vào instance (khi nâng cấp OTA từ V1.0.6)
+      for (const fnName of Object.getOwnPropertyNames(ScriptVideoBridgeService.prototype)) {
+        if (fnName !== 'constructor' && typeof ScriptVideoBridgeService.prototype[fnName] === 'function' && typeof this[fnName] !== 'function') {
+          this[fnName] = ScriptVideoBridgeService.prototype[fnName].bind(this);
+        }
+      }
+      if (typeof this.killScriptServerAndRelatedProcesses === 'function') {
+        this.killScriptServerAndRelatedProcesses({
+          killVoiceStudio: false,
+          killChrome: false,
+          killFfmpeg: false
+        });
+      }
+    } catch {}
     await new Promise((r) => setTimeout(r, 600));
-    return this.ensureScriptServerRunning();
+    const res = await this.ensureScriptServerRunning();
+    // Nếu hàm này được gọi từ cuối quá trình applyUpdate() của bản cũ (V1.0.0..V1.0.6), tự động relaunch toàn bộ ứng dụng sau 1.8s
+    try {
+      const stack = String(new Error().stack || '');
+      if (stack.includes('applyUpdate') && !this._otaRelaunchTriggered) {
+        this._otaRelaunchTriggered = true;
+        setTimeout(() => {
+          try {
+            const { app } = require('electron');
+            if (app && typeof app.relaunch === 'function') {
+              const cleanArgs = process.argv.slice(1).filter((arg) => arg !== '--relaunch-after-update');
+              app.relaunch({ args: [...cleanArgs, '--relaunch-after-update'] });
+              app.exit(0);
+            }
+          } catch {}
+        }, 1800);
+      }
+    } catch {}
+    return res;
   }
 
   saveSettings(partial = {}) {

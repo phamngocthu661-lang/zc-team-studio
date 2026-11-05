@@ -1,10 +1,11 @@
 {
-  "version": "V1.0.10",
-  "build_number": 124,
-  "released_at": "2026-11-05 13:15:05",
+  "version": "V1.0.11",
+  "build_number": 125,
+  "released_at": "2026-11-05 14:17:59",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.11 (Build #125) - 2026-11-05 14:17:59] Khắc phục triệt để lỗi đứng ở 70% khi cập nhật OTA từ các phiên bản cũ (V1.0.6..V1.0.10): Gỡ python_runtime khỏi gói ZIP OTA để tránh lỗi Windows khóa file EBUSY trên python.exe đang chạy ngầm, bọc an toàn try/catch cho từng file khi giải nén và tự động khởi động lại ứng dụng sau khi cập nhật xong.",
     "[V1.0.10 (Build #124) - 2026-11-05 13:15:05] Nâng cấp V1.1.0 (Build #124): Kiểm định độc lập & Pass 100% toàn bộ 15 Kênh/Key (75/75 cụm Skill), chuẩn hóa 58/58 kịch bản Homeless & Mafia đạt 99/100 (bung 100% số tiền $, danh xưng viết tắt Mr./Mrs./Ms./Dr., gộp đoạn ngắn tự nhiên, khử đoạn lặp), sửa lỗi VIDEO_EXTENSIONS.has trong resolveProjectImageLayers và vượt qua 189/189 bài Unit/Integration Tests.",
     "[V1.0.9 (Build #123) - 2026-11-05 12:48:44] Ban cap nhat V1.0.9 (Build #123): Fix triet de loi Voice Homeless 30 phut (bo sung refText chuan cho Kho_Voice/homeless & daden), them cong kiem dinh cung Kich ban <-> Voice <-> Video (verifyScriptAudioConsistency) chan bao thanh cong gia, va dong bo do dai kich ban Homeless 74.5k-78.5k ky tu",
     "[V1.0.8 (Build #122) - 2026-11-05 09:48:08] Dọn sạch file rác máy code trong thư mục khách hàng (chỉ giữ code trong resources/app), tự động làm sạch thư mục ngoài cùng khi khách cập nhật OTA, và gom gọn toàn bộ các file/folder lặp vào PROJECTS/, data/, skills/, docs/",
@@ -18,5 +19,5 @@
     "[V1.0.1 (Build #115) - 2026-11-04 11:59:44] Sửa triệt để lỗi 'The messages you submitted were too long' và 'Could not load this ChatGPT conversation' trên ChatGPT Web; cân bằng ngân sách Prompt <= 82k-84k ký tự bảo toàn 100% kịch bản truyện; tích hợp Auto-Heal tự động mở hội thoại sạch & gửi lại lệnh tức thì.",
     "Phiên bản V1.0.0 (Build #114): Sửa triệt để 100% lỗi 'The messages you submitted were too long, please edit them and resubmit.' trên ChatGPT Web: (1) Loại bỏ đính kèm trùng lặp 02_STORY_OUTLINE.md trong _build_checkpoint_context_preamble khi Prompt đã có sẵn Giàn ý/Kịch bản; (2) Khóa cứng ngân sách ký tự <= 82.000–84.000 ký tự/tin nhắn ở Bước 2, Bước 3, Bước 4A (Vòng 1..6), Bước 4B và Bước 5 cho cả 15 Key mà vẫn BẢO TOÀN 100% văn bản kịch bản truyện (CURRENT REVISION BASELINE / CURRENT WORKING SCRIPT); (3) Xóa sạch triệt để ô .ProseMirror và bỏ dán trùng headLine trước khi dán Prompt để không bao giờ nhân đôi văn bản khi cửa sổ Chrome chạy ngầm; (4) Tích hợp Auto-Heal tự động phát hiện 'The messages you submitted were too long', tự động nén gọn khối Reference phụ trợ và gửi lại ngay lập tức trên hội thoại sạch."
   ],
-  "release_date": "2026-11-05 13:15:05"
+  "release_date": "2026-11-05 14:17:59"
 }
