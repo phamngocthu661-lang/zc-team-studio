@@ -74,58 +74,10 @@ ENGINE_DIR = (
     else os.path.join(STUDIO_ROOT, "engine")
 )
 ENGINE_SCRIPT = os.path.join(ENGINE_DIR, "mafia_chatgpt_pipeline.py")
-PROJECTS_ROOT = os.path.join(STUDIO_ROOT, "PROJECTS")
-BACKLOG_PATH = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG.json")
-LIVE_LOG_PATH = os.path.join(STUDIO_ROOT, "LIVE_STUDIO_LOG.txt")
+PROJECTS_ROOT = os.path.join(STUDIO_ROOT, "PROJECTS", "PROJECTS_MAFIA")
+BACKLOG_PATH = os.path.join(STUDIO_ROOT, "data", "queues", "QUEUE_BACKLOG.json")
+LIVE_LOG_PATH = os.path.join(STUDIO_ROOT, "data", "logs", "LIVE_STUDIO_LOG.txt")
 PORT = 8098
-
-
-def _migrate_backlog_and_projects_if_split():
-    """Nếu trước đó server từng chạy trong resources/app (_CODE_ROOT) khác với STUDIO_ROOT (exeDir), gộp toàn bộ QUEUE_BACKLOG*.json và PROJECTS* về STUDIO_ROOT."""
-    if os.path.normcase(os.path.abspath(_CODE_ROOT)) == os.path.normcase(os.path.abspath(STUDIO_ROOT)):
-        return
-    try:
-        for entry in os.listdir(_CODE_ROOT):
-            if entry.startswith("QUEUE_BACKLOG") and entry.endswith(".json"):
-                src_b = os.path.join(_CODE_ROOT, entry)
-                dst_b = os.path.join(STUDIO_ROOT, entry)
-                try:
-                    src_data = json.load(open(src_b, encoding="utf-8"))
-                    src_items = src_data.get("items") or []
-                    if not src_items:
-                        continue
-                    dst_data = {"max_parallel_threads": 3, "thinking_effort": "medium", "items": []}
-                    if os.path.exists(dst_b):
-                        try:
-                            dst_data = json.load(open(dst_b, encoding="utf-8"))
-                        except Exception:
-                            pass
-                    existing_pids = {x.get("project_id") for x in (dst_data.get("items") or [])}
-                    changed = False
-                    for it in src_items:
-                        pid = it.get("project_id")
-                        if pid and pid not in existing_pids:
-                            old_pdir = it.get("project_dir") or ""
-                            if old_pdir and os.path.normcase(_CODE_ROOT) in os.path.normcase(old_pdir):
-                                rel_pdir = os.path.relpath(old_pdir, _CODE_ROOT)
-                                new_pdir = os.path.join(STUDIO_ROOT, rel_pdir)
-                                if os.path.exists(old_pdir) and not os.path.exists(new_pdir):
-                                    os.makedirs(os.path.dirname(new_pdir), exist_ok=True)
-                                    shutil.copytree(old_pdir, new_pdir, dirs_exist_ok=True)
-                                it["project_dir"] = new_pdir
-                            dst_data.setdefault("items", []).append(it)
-                            existing_pids.add(pid)
-                            changed = True
-                    if changed:
-                        with open(dst_b, "w", encoding="utf-8") as f:
-                            json.dump(dst_data, f, ensure_ascii=False, indent=2)
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-
-_migrate_backlog_and_projects_if_split()
 
 for _p in (ENGINE_DIR, _CODE_ROOT, STUDIO_ROOT):
     if _p and _p not in sys.path:
@@ -4351,14 +4303,23 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                 m_stt = _re.match(r"^(\d+)", pid)
                 if m_stt:
                     export_prefixes.add(m_stt.group(1))
+                candidate_pdirs.add(os.path.abspath(os.path.join(cfg["PROJECTS_ROOT"], pid)))
                 for root_dir in candidate_roots:
-                    pdir_cand = os.path.join(root_dir, projects_dirname, pid)
-                    candidate_pdirs.add(os.path.abspath(pdir_cand))
+                    candidate_pdirs.add(os.path.abspath(os.path.join(root_dir, "PROJECTS", projects_dirname, pid)))
+                    candidate_pdirs.add(os.path.abspath(os.path.join(root_dir, projects_dirname, pid)))
 
             # 1. Xóa khỏi QUEUE_BACKLOG*.json trên tất cả các root liên quan & thu thập thêm project_dir/custom_name
             removed_backlog_count = 0
+            candidate_bpaths = [cfg["BACKLOG_PATH"]]
             for root_dir in candidate_roots:
-                bpath = os.path.join(root_dir, backlog_filename)
+                for cand_b in (
+                    os.path.join(root_dir, "data", "queues", backlog_filename),
+                    os.path.join(root_dir, backlog_filename),
+                ):
+                    if all(os.path.normcase(os.path.abspath(cand_b)) != os.path.normcase(os.path.abspath(x)) for x in candidate_bpaths):
+                        candidate_bpaths.append(cand_b)
+
+            for bpath in candidate_bpaths:
                 if os.path.exists(bpath):
                     try:
                         with open(bpath, "r", encoding="utf-8") as f:
@@ -4368,7 +4329,7 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
                         for it in old_items:
                             it_pid = str(it.get("project_id", "")).strip()
                             if it_pid in seen_ids:
-                                if os.path.normcase(os.path.abspath(root_dir)) == os.path.normcase(os.path.abspath(STUDIO_ROOT)):
+                                if os.path.normcase(os.path.abspath(bpath)) == os.path.normcase(os.path.abspath(cfg["BACKLOG_PATH"])):
                                     removed_backlog_count += 1
                                 it_pdir = str(it.get("project_dir", "")).strip()
                                 if it_pdir:
@@ -4433,6 +4394,7 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             deleted_tong_hop_files = 0
             candidate_th_dirs = {os.path.abspath(cfg["TONG_HOP_ROOT"])}
             for root_dir in candidate_roots:
+                candidate_th_dirs.add(os.path.abspath(os.path.join(root_dir, "PROJECTS", projects_dirname, "TONG HOP")))
                 candidate_th_dirs.add(os.path.abspath(os.path.join(root_dir, projects_dirname, "TONG HOP")))
             for th_dir in candidate_th_dirs:
                 if os.path.isdir(th_dir):

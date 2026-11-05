@@ -426,82 +426,184 @@ class UpdaterService {
         }
       };
 
-      // 1. Cập nhật các thư mục code & tài nguyên chuẩn vào studioRoot
-      const codeFolders = [
-        'src',
-        'assets',
-        'engine',
-        'python_runtime',
-        'skills_12_keys',
-        'skills_mexico',
-        'skills_homeless',
-        'DOCSMOI',
-        '.agents',
-        'Kho_Voice',
-        'scripts',
-        'tests',
-        'docs'
-      ];
-      for (const folder of codeFolders) {
-        const sDir = path.join(srcRoot, folder);
-        if (fs.existsSync(sDir)) {
-          copyRecursiveCount(sDir, path.join(this.studioRoot, folder));
+      const isDevWorkspace = path.resolve(this.studioRoot).toLowerCase() === path.resolve('D:\\ZC_TEAM\\TOOL_ZC_TEAM').toLowerCase();
+
+      // 1. Nếu đang chạy trên máy Dev (D:\ZC_TEAM\TOOL_ZC_TEAM), cập nhật đầy đủ vào studioRoot
+      if (isDevWorkspace) {
+        const devCodeFolders = [
+          'src',
+          'assets',
+          'engine',
+          'python_runtime',
+          'skills',
+          'Kho_Voice',
+          'scripts',
+          'tests',
+          'docs'
+        ];
+        for (const folder of devCodeFolders) {
+          const sDir = path.join(srcRoot, folder);
+          if (fs.existsSync(sDir)) {
+            copyRecursiveCount(sDir, path.join(this.studioRoot, folder));
+          }
+        }
+        for (const f of ['package.json', 'version.json', 'mafia_dashboard_server.py']) {
+          const sf = path.join(srcRoot, f);
+          if (fs.existsSync(sf)) {
+            try {
+              fs.copyFileSync(sf, path.join(this.studioRoot, f));
+              updatedFilesCount += 1;
+            } catch {}
+          }
         }
       }
 
-      // 2. Cập nhật các file lẻ ở thư mục gốc (trừ các file dữ liệu/key bảo vệ của khách)
-      for (const entry of fs.readdirSync(srcRoot, { withFileTypes: true })) {
-        if (!entry.isFile()) continue;
-        if (this._isProtectedItem(entry.name)) continue;
-        try {
-          fs.copyFileSync(path.join(srcRoot, entry.name), path.join(this.studioRoot, entry.name));
-          updatedFilesCount += 1;
-        } catch {}
-      }
-
-      // 3. Đồng bộ sang bản chạy EXE (Ban-Giao-Khach-Hang-EXE/VideoBatchStudio/resources/app & Kho_Voice)
+      // 2. Đồng bộ code & skills vào resources/app của bản đóng gói (KHÔNG BAO GIỜ đổ code ra thư mục ngoài của khách)
       const packagedResAppDirs = [
         this.appDir,
         path.join(this.exeDir, 'resources', 'app'),
+        path.join(this.studioRoot, 'resources', 'app'),
         path.join(this.studioRoot, 'Ban-Giao-Khach-Hang-EXE', 'VideoBatchStudio', 'resources', 'app')
       ];
       const visitedAppDirs = new Set();
       for (const targetAppDir of packagedResAppDirs) {
+        if (!targetAppDir) continue;
         const resolved = path.resolve(targetAppDir);
-        if (visitedAppDirs.has(resolved) || !fs.existsSync(resolved)) continue;
+        const isResourcesApp = path.basename(resolved).toLowerCase() === 'app'
+          && path.basename(path.dirname(resolved)).toLowerCase() === 'resources';
+        if (!isResourcesApp || visitedAppDirs.has(resolved) || !fs.existsSync(resolved)) continue;
         visitedAppDirs.add(resolved);
-        for (const sub of ['src', 'assets', 'engine', 'skills_12_keys', 'skills_mexico', 'skills_homeless', 'DOCSMOI', '.agents']) {
+
+        for (const sub of ['src', 'assets', 'engine', 'skills']) {
           if (fs.existsSync(path.join(srcRoot, sub))) {
             copyRecursiveCount(path.join(srcRoot, sub), path.join(resolved, sub));
           }
         }
-        for (const f of ['package.json', 'version.json', 'mafia_dashboard_server.py', 'organize_12_keys_skills.py']) {
+        // Tương thích ngược nếu gói tải về còn chứa các folder skill rời ở gốc thì gom vào resources/app/skills/
+        for (const legacySkill of ['skills_12_keys', 'skills_mexico', 'skills_homeless', 'DOCSMOI', '.agents']) {
+          if (fs.existsSync(path.join(srcRoot, legacySkill))) {
+            copyRecursiveCount(path.join(srcRoot, legacySkill), path.join(resolved, 'skills', legacySkill));
+          }
+          const oldInApp = path.join(resolved, legacySkill);
+          if (fs.existsSync(oldInApp)) {
+            try { fs.rmSync(oldInApp, { recursive: true, force: true }); } catch {}
+          }
+        }
+        for (const f of ['package.json', 'version.json', 'mafia_dashboard_server.py']) {
           if (fs.existsSync(path.join(srcRoot, f))) {
-            try { fs.copyFileSync(path.join(srcRoot, f), path.join(resolved, f)); } catch {}
+            try {
+              fs.copyFileSync(path.join(srcRoot, f), path.join(resolved, f));
+              updatedFilesCount += 1;
+            } catch {}
           }
         }
       }
 
-      // Đồng bộ Kho_Voice, python_runtime, engine, skills & version.json vào exeDir (cho máy khách chạy trực tiếp từ thư mục giải nén ZIP)
-      if (this.exeDir && path.resolve(this.exeDir) !== path.resolve(this.studioRoot) && fs.existsSync(this.exeDir)) {
-        for (const sub of ['Kho_Voice', 'python_runtime', 'engine', 'skills_12_keys', 'skills_mexico', 'skills_homeless', 'DOCSMOI', '.agents']) {
+      // 3. Ở thư mục ngoài chứa EXE của khách (VideoBatchStudio), CHỈ đồng bộ Kho_Voice, python_runtime & version.json
+      //    và TỰ ĐỘNG DỌN SẠCH mọi file/folder máy code bị lẫn vào từ các bản cũ
+      const customerExeDirs = [
+        this.exeDir,
+        this.studioRoot,
+        path.join(this.studioRoot, 'Ban-Giao-Khach-Hang-EXE', 'VideoBatchStudio')
+      ];
+      const visitedExeDirs = new Set();
+      for (const targetExeDir of customerExeDirs) {
+        if (!targetExeDir) continue;
+        const resolvedExe = path.resolve(targetExeDir);
+        if (visitedExeDirs.has(resolvedExe) || !fs.existsSync(resolvedExe)) continue;
+        if (resolvedExe.toLowerCase() === path.resolve('D:\\ZC_TEAM\\TOOL_ZC_TEAM').toLowerCase()) continue;
+        if (!fs.existsSync(path.join(resolvedExe, 'resources', 'app'))) continue;
+        visitedExeDirs.add(resolvedExe);
+
+        for (const sub of ['Kho_Voice', 'python_runtime']) {
           if (fs.existsSync(path.join(srcRoot, sub))) {
-            copyRecursiveCount(path.join(srcRoot, sub), path.join(this.exeDir, sub));
+            copyRecursiveCount(path.join(srcRoot, sub), path.join(resolvedExe, sub));
           }
         }
-        for (const f of ['version.json', 'mafia_dashboard_server.py', 'organize_12_keys_skills.py']) {
-          if (fs.existsSync(path.join(srcRoot, f))) {
-            try { fs.copyFileSync(path.join(srcRoot, f), path.join(this.exeDir, f)); } catch {}
-          }
+        if (fs.existsSync(path.join(srcRoot, 'version.json'))) {
+          try {
+            fs.copyFileSync(path.join(srcRoot, 'version.json'), path.join(resolvedExe, 'version.json'));
+            updatedFilesCount += 1;
+          } catch {}
         }
-      }
 
-      // 4. Nếu có script đồng bộ 12 Key Skills vào ~/.gemini/config/skills thì chạy ngầm
-      const orgScript = path.join(this.studioRoot, 'organize_12_keys_skills.py');
-      if (fs.existsSync(orgScript)) {
-        try {
-          execFileSync(pyExe, [orgScript], { cwd: this.studioRoot, timeout: 25000, windowsHide: true });
-        } catch {}
+        // Gom dữ liệu khách hàng vào data/ và PROJECTS/ trước khi dọn file rác máy code
+        const queuesDir = path.join(resolvedExe, 'data', 'queues');
+        const memoryDir = path.join(resolvedExe, 'data', 'memory');
+        const progressDir = path.join(resolvedExe, 'data', 'progress');
+        const logsDir = path.join(resolvedExe, 'data', 'logs');
+        const configDir = path.join(resolvedExe, 'data', 'config');
+        const profilesDir = path.join(resolvedExe, 'data', 'browser_profiles');
+        const projectsBase = path.join(resolvedExe, 'PROJECTS');
+        for (const d of [queuesDir, memoryDir, progressDir, logsDir, configDir, profilesDir, projectsBase]) {
+          try { fs.mkdirSync(d, { recursive: true }); } catch {}
+        }
+
+        for (const entry of fs.readdirSync(resolvedExe, { withFileTypes: true })) {
+          const name = entry.name;
+          const full = path.join(resolvedExe, name);
+          if (entry.isFile()) {
+            if (name.startsWith('QUEUE_BACKLOG') && name.endsWith('.json')) {
+              const dst = path.join(queuesDir, name);
+              if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+              try { fs.unlinkSync(full); } catch {}
+            } else if (name.startsWith('CHANNEL_MEMORY') && name.endsWith('.json')) {
+              const dst = path.join(memoryDir, name);
+              if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+              try { fs.unlinkSync(full); } catch {}
+            } else if (name.startsWith('TIEN_DO_') && name.endsWith('.md')) {
+              const dst = path.join(progressDir, name);
+              if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+              try { fs.unlinkSync(full); } catch {}
+            } else if (name === 'LIVE_STUDIO_LOG.txt') {
+              const dst = path.join(logsDir, name);
+              if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+              try { fs.unlinkSync(full); } catch {}
+            } else if (name === 'CUSTOM_LINKED_FOLDERS.json' || name === 'CHAT_CONVERSATION_POOL.json') {
+              const dst = path.join(configDir, name);
+              if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+              try { fs.unlinkSync(full); } catch {}
+            }
+          } else if (entry.isDirectory()) {
+            if (name === 'BROWSER_PROFILE' || name === 'BROWSER_PROFILE_2' || name === 'BROWSER_PROFILE_3') {
+              const dst = path.join(profilesDir, name);
+              if (!fs.existsSync(dst)) {
+                try { fs.renameSync(full, dst); } catch {}
+              }
+            } else if (name.startsWith('PROJECTS_')) {
+              const dst = path.join(projectsBase, name);
+              if (!fs.existsSync(dst)) {
+                try { fs.renameSync(full, dst); } catch {}
+              }
+            }
+          }
+        }
+
+        // Xóa sạch các thư mục và file máy code bị lẫn ở thư mục gốc của khách
+        for (const dName of [
+          'src', 'engine', 'assets', 'skills', 'skills_12_keys', 'skills_homeless', 'skills_mexico',
+          'DOCSMOI', '.agents', 'docs', 'tests', 'scripts', 'sample-data', 'stitch_redesign_screens', 'VBS-License-Admin'
+        ]) {
+          const p = path.join(resolvedExe, dName);
+          if (fs.existsSync(p)) {
+            try { fs.rmSync(p, { recursive: true, force: true }); } catch {}
+          }
+        }
+        for (const fName of [
+          '.gitignore', 'AGENTS.md', 'CHANGELOG.md', 'CODE_VA_CACH_HOAT_DONG_LIEN_KET_CHATGPT_TOAN_TAP.txt',
+          'GHI_CHU_CAP_NHAT_MEXICO_BA_CO.md', 'MANIFEST.txt', 'OWNER_NOTICE.txt', 'Program.md', 'README.md',
+          'SO_DO_KIEN_TRUC_VA_GIAO_DIEN_UNG_DUNG.md', 'START_HERE.txt', 'TONG_KET_QUY_TRINH_AGENT_CHATGPT_WEB_TOAN_TAP.txt',
+          'LICENSE.txt', 'mafia_dashboard_server.py', 'organize_12_keys_skills.py', 'push_update_github.py',
+          'package.json', 'package-lock.json', 'Chay-Ung-Dung.bat', 'KHOI_DONG_STUDIO_WEB.bat',
+          'MO_VIDEO_BATCH_STUDIO.bat', 'Mo-Ung-Dung-Quan-Ly-Key-Admin.bat',
+          'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC1.bat', 'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC2.bat',
+          'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC3.bat', 'Test_Sub_CapCut_1Phut.mp4'
+        ]) {
+          const p = path.join(resolvedExe, fName);
+          if (fs.existsSync(p)) {
+            try { fs.unlinkSync(p); } catch {}
+          }
+        }
       }
 
       emitProgress(92, 'Đang chuẩn bị đóng toàn bộ tiến trình cũ và khởi động lại ứng dụng...');

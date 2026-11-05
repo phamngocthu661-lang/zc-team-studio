@@ -1,9 +1,0 @@
-[2026-11-04 06:15:00] [SYSTEM] 🚀 Hệ thống ZC Team Studio V1.0.0 (Build #112) đã sẵn sàng. Hãy chọn Chế độ Tiêu đề và bấm [🎬 Viết Kịch Bản ➔ Làm Video Luôn] hoặc [▶️ Chạy Tiếp Hàng Đợi] để bắt đầu!
-[2026-11-04 06:28:52] [WEB-CONTROL] 🧹 [AUTO-CLOSE TAB] Đã tự động đóng 1 Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM (Acc #2:closed:BB113C)!
-[2026-11-04 07:40:52] [WEB-CONTROL] 🧹 [AUTO-CLOSE TAB] Đã tự động đóng 1 Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM (Acc #2:closed:0EDC23)!
-[2026-11-04 07:45:22] [WEB-CONTROL] 🧹 [AUTO-CLOSE TAB] Đã tự động đóng 1 Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM (Acc #2:closed:AB9AE3)!
-[2026-11-04 07:51:02] [WEB-CONTROL] 🧹 [AUTO-CLOSE TAB] Đã tự động đóng 1 Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM (Acc #2:closed:3B40AB)!
-[2026-11-04 09:07:35] [WEB-CONTROL] 🧹 [AUTO-CLOSE TAB] Đã tự động đóng 1 Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM (Acc #2:closed:9AB2C0)!
-[2026-11-04 09:49:48] [WEB-CONTROL] 🧹 [AUTO-CLOSE TAB] Đã tự động đóng 1 Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM (Acc #3:closed:EA4C0C)!
-[2026-11-04 15:13:38] [WEB-CONTROL] 🧹 [AUTO-CLOSE TAB] Đã tự động đóng 1 Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM (Acc #1:closed:7B036C)!
-[2026-11-04 15:22:57] [WEB-CONTROL] 🧹 [AUTO-CLOSE TAB] Đã tự động đóng 1 Tab trình duyệt của kịch bản đã viết xong để giải phóng RAM (Acc #1:closed:45FCE9)!

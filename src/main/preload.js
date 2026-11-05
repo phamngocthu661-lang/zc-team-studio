@@ -151,14 +151,33 @@ function flattenPortablePythonDlls(pyRuntimeDir) {
   } catch {}
 }
 
-function mergeBacklogFilesBetweenDirs(srcDir, dstDir) {
+function isPackagedResourcesApp(appDir) {
+  if (!appDir) return false;
+  const norm = path.resolve(appDir);
+  return path.basename(norm).toLowerCase() === 'app'
+    && path.basename(path.dirname(norm)).toLowerCase() === 'resources';
+}
+
+function resolveUnifiedStudioRoot(appDir, exeDir) {
+  if (isPackagedResourcesApp(appDir)) {
+    const outer = path.resolve(appDir, '..', '..');
+    if (fs.existsSync(outer)) return outer;
+  }
+  if (exeDir && fs.existsSync(path.join(exeDir, 'Video Batch Studio.exe'))) {
+    return exeDir;
+  }
+  return appDir || exeDir;
+}
+
+function mergeBacklogFilesBetweenDirs(srcQueuesDir, dstQueuesDir, srcRootDir, dstRootDir) {
   try {
-    if (!srcDir || !dstDir || !fs.existsSync(srcDir) || !fs.existsSync(dstDir)) return;
-    if (path.resolve(srcDir).toLowerCase() === path.resolve(dstDir).toLowerCase()) return;
-    for (const entry of fs.readdirSync(srcDir)) {
+    if (!srcQueuesDir || !dstQueuesDir || !fs.existsSync(srcQueuesDir)) return;
+    if (path.resolve(srcQueuesDir).toLowerCase() === path.resolve(dstQueuesDir).toLowerCase()) return;
+    fs.mkdirSync(dstQueuesDir, { recursive: true });
+    for (const entry of fs.readdirSync(srcQueuesDir)) {
       if (entry.startsWith('QUEUE_BACKLOG') && entry.endsWith('.json')) {
-        const srcB = path.join(srcDir, entry);
-        const dstB = path.join(dstDir, entry);
+        const srcB = path.join(srcQueuesDir, entry);
+        const dstB = path.join(dstQueuesDir, entry);
         try {
           const srcData = JSON.parse(fs.readFileSync(srcB, 'utf8') || '{}');
           const srcItems = Array.isArray(srcData.items) ? srcData.items : [];
@@ -175,9 +194,9 @@ function mergeBacklogFilesBetweenDirs(srcDir, dstDir) {
           for (const it of srcItems) {
             if (it && it.project_id && !existingIds.has(it.project_id)) {
               const oldPdir = String(it.project_dir || '');
-              if (oldPdir && oldPdir.toLowerCase().startsWith(path.resolve(srcDir).toLowerCase())) {
-                const rel = path.relative(srcDir, oldPdir);
-                const newPdir = path.join(dstDir, rel);
+              if (srcRootDir && dstRootDir && oldPdir && oldPdir.toLowerCase().startsWith(path.resolve(srcRootDir).toLowerCase())) {
+                const rel = path.relative(srcRootDir, oldPdir);
+                const newPdir = path.join(dstRootDir, rel);
                 if (fs.existsSync(oldPdir) && !fs.existsSync(newPdir)) {
                   syncDirRecursiveSafe(oldPdir, newPdir);
                 }
@@ -208,6 +227,188 @@ function readBuildNumberSafe(dir) {
   return 0;
 }
 
+function migrateRootStateToOrganizedSubfolders(rootDir) {
+  try {
+    if (!rootDir || !fs.existsSync(rootDir)) return;
+    const queuesDir = path.join(rootDir, 'data', 'queues');
+    const memoryDir = path.join(rootDir, 'data', 'memory');
+    const progressDir = path.join(rootDir, 'data', 'progress');
+    const logsDir = path.join(rootDir, 'data', 'logs');
+    const configDir = path.join(rootDir, 'data', 'config');
+    const profilesDir = path.join(rootDir, 'data', 'browser_profiles');
+    const projectsBase = path.join(rootDir, 'PROJECTS');
+    for (const d of [queuesDir, memoryDir, progressDir, logsDir, configDir, profilesDir, projectsBase]) {
+      try { fs.mkdirSync(d, { recursive: true }); } catch {}
+    }
+
+    for (const entry of fs.readdirSync(rootDir, { withFileTypes: true })) {
+      const name = entry.name;
+      const fullPath = path.join(rootDir, name);
+      if (entry.isFile()) {
+        if (name.startsWith('QUEUE_BACKLOG') && name.endsWith('.json')) {
+          mergeBacklogFilesBetweenDirs(rootDir, queuesDir, rootDir, rootDir);
+          const dst = path.join(queuesDir, name);
+          if (!fs.existsSync(dst)) {
+            try { fs.copyFileSync(fullPath, dst); } catch {}
+          }
+          try { fs.unlinkSync(fullPath); } catch {}
+        } else if (name.startsWith('CHANNEL_MEMORY') && name.endsWith('.json')) {
+          const dst = path.join(memoryDir, name);
+          if (!fs.existsSync(dst)) {
+            try { fs.copyFileSync(fullPath, dst); } catch {}
+          }
+          try { fs.unlinkSync(fullPath); } catch {}
+        } else if (name.startsWith('TIEN_DO_') && name.endsWith('.md')) {
+          const dst = path.join(progressDir, name);
+          if (!fs.existsSync(dst)) {
+            try { fs.copyFileSync(fullPath, dst); } catch {}
+          }
+          try { fs.unlinkSync(fullPath); } catch {}
+        } else if (name === 'LIVE_STUDIO_LOG.txt') {
+          const dst = path.join(logsDir, name);
+          if (!fs.existsSync(dst)) {
+            try { fs.copyFileSync(fullPath, dst); } catch {}
+          }
+          try { fs.unlinkSync(fullPath); } catch {}
+        } else if (name === 'CUSTOM_LINKED_FOLDERS.json' || name === 'CHAT_CONVERSATION_POOL.json') {
+          const dst = path.join(configDir, name);
+          if (!fs.existsSync(dst)) {
+            try { fs.copyFileSync(fullPath, dst); } catch {}
+          }
+          try { fs.unlinkSync(fullPath); } catch {}
+        }
+      } else if (entry.isDirectory()) {
+        if (name === 'BROWSER_PROFILE' || name === 'BROWSER_PROFILE_2' || name === 'BROWSER_PROFILE_3') {
+          const dst = path.join(profilesDir, name);
+          if (!fs.existsSync(dst)) {
+            try {
+              fs.renameSync(fullPath, dst);
+            } catch {
+              syncDirRecursiveSafe(fullPath, dst);
+              try { fs.rmSync(fullPath, { recursive: true, force: true }); } catch {}
+            }
+          }
+        } else if (name.startsWith('PROJECTS_')) {
+          const dst = path.join(projectsBase, name);
+          if (!fs.existsSync(dst)) {
+            try {
+              fs.renameSync(fullPath, dst);
+            } catch {
+              syncDirRecursiveSafe(fullPath, dst);
+              try { fs.rmSync(fullPath, { recursive: true, force: true }); } catch {}
+            }
+          } else {
+            syncDirRecursiveSafe(fullPath, dst);
+            try { fs.rmSync(fullPath, { recursive: true, force: true }); } catch {}
+          }
+        }
+      }
+    }
+  } catch {}
+}
+
+function cleanLeakedDevFilesFromCustomerRoot(exeDir, appDir) {
+  try {
+    if (!isPackagedResourcesApp(appDir) || !exeDir || !fs.existsSync(exeDir)) return;
+    if (path.resolve(exeDir).toLowerCase() === path.resolve('D:\\ZC_TEAM\\TOOL_ZC_TEAM').toLowerCase()) return;
+
+    // Nếu thư mục ngoài của khách đang có bản build mới hơn từ OTA cũ thì đồng bộ vào resources/app trước khi dọn
+    const appBuild = readBuildNumberSafe(appDir);
+    const exeBuild = readBuildNumberSafe(exeDir);
+    if (exeBuild > appBuild && fs.existsSync(path.join(exeDir, 'mafia_dashboard_server.py'))) {
+      for (const f of ['mafia_dashboard_server.py', 'version.json', 'package.json']) {
+        const sf = path.join(exeDir, f);
+        if (fs.existsSync(sf)) {
+          try { fs.copyFileSync(sf, path.join(appDir, f)); } catch {}
+        }
+      }
+      for (const d of ['src', 'engine', 'assets', 'skills']) {
+        const sd = path.join(exeDir, d);
+        if (fs.existsSync(sd)) {
+          syncDirRecursiveSafe(sd, path.join(appDir, d));
+        }
+      }
+    }
+
+    // Gom các folder skill rời rạc vào resources/app/skills
+    const appSkillsRoot = path.join(appDir, 'skills');
+    try { fs.mkdirSync(appSkillsRoot, { recursive: true }); } catch {}
+    for (const skillFolder of ['skills_12_keys', 'skills_homeless', 'skills_mexico', 'DOCSMOI', '.agents']) {
+      for (const base of [appDir, exeDir]) {
+        const sDir = path.join(base, skillFolder);
+        const dDir = path.join(appSkillsRoot, skillFolder);
+        if (fs.existsSync(sDir)) {
+          if (!fs.existsSync(dDir)) {
+            syncDirRecursiveSafe(sDir, dDir);
+          }
+          try { fs.rmSync(sDir, { recursive: true, force: true }); } catch {}
+        }
+      }
+    }
+
+    // Dọn sạch các thư mục code/dev bị lẫn ở thư mục gốc của khách (chỉ để trong resources/app)
+    const devDirsInOuterRoot = [
+      'src',
+      'engine',
+      'assets',
+      'skills',
+      'skills_12_keys',
+      'skills_homeless',
+      'skills_mexico',
+      'DOCSMOI',
+      '.agents',
+      'docs',
+      'tests',
+      'scripts',
+      'sample-data',
+      'stitch_redesign_screens',
+      'VBS-License-Admin'
+    ];
+    for (const dName of devDirsInOuterRoot) {
+      const targetDir = path.join(exeDir, dName);
+      if (fs.existsSync(targetDir)) {
+        try { fs.rmSync(targetDir, { recursive: true, force: true }); } catch {}
+      }
+    }
+
+    // Dọn sạch các file máy code bị lẫn ở thư mục gốc của khách
+    const devFilesInOuterRoot = [
+      '.gitignore',
+      'AGENTS.md',
+      'CHANGELOG.md',
+      'CODE_VA_CACH_HOAT_DONG_LIEN_KET_CHATGPT_TOAN_TAP.txt',
+      'GHI_CHU_CAP_NHAT_MEXICO_BA_CO.md',
+      'MANIFEST.txt',
+      'OWNER_NOTICE.txt',
+      'Program.md',
+      'README.md',
+      'SO_DO_KIEN_TRUC_VA_GIAO_DIEN_UNG_DUNG.md',
+      'START_HERE.txt',
+      'TONG_KET_QUY_TRINH_AGENT_CHATGPT_WEB_TOAN_TAP.txt',
+      'LICENSE.txt',
+      'mafia_dashboard_server.py',
+      'organize_12_keys_skills.py',
+      'push_update_github.py',
+      'package.json',
+      'package-lock.json',
+      'Chay-Ung-Dung.bat',
+      'KHOI_DONG_STUDIO_WEB.bat',
+      'MO_VIDEO_BATCH_STUDIO.bat',
+      'Mo-Ung-Dung-Quan-Ly-Key-Admin.bat',
+      'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC1.bat',
+      'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC2.bat',
+      'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC3.bat',
+      'Test_Sub_CapCut_1Phut.mp4'
+    ];
+    for (const fName of devFilesInOuterRoot) {
+      const targetFile = path.join(exeDir, fName);
+      if (fs.existsSync(targetFile)) {
+        try { fs.unlinkSync(targetFile); } catch {}
+      }
+    }
+  } catch {}
+}
+
 function ensureCustomerFilesSynced(appDir, exeDir) {
   try {
     for (const base of [exeDir, appDir]) {
@@ -216,6 +417,18 @@ function ensureCustomerFilesSynced(appDir, exeDir) {
         flattenPortablePythonDlls(path.join(base, 'engine', 'python_runtime'));
       }
     }
+    const studioRoot = resolveUnifiedStudioRoot(appDir, exeDir);
+    migrateRootStateToOrganizedSubfolders(studioRoot);
+    if (appDir && path.resolve(appDir) !== path.resolve(studioRoot)) {
+      migrateRootStateToOrganizedSubfolders(appDir);
+      mergeBacklogFilesBetweenDirs(
+        path.join(appDir, 'data', 'queues'),
+        path.join(studioRoot, 'data', 'queues'),
+        appDir,
+        studioRoot
+      );
+    }
+
     if (!appDir || !exeDir || path.resolve(appDir) === path.resolve(exeDir)) return;
     // Đồng bộ DLLs của python_runtime giữa appDir và exeDir nếu 1 trong 2 bên có đủ DLLs
     const appPyDlls = path.join(appDir, 'python_runtime', 'DLLs');
@@ -228,67 +441,8 @@ function ensureCustomerFilesSynced(appDir, exeDir) {
       flattenPortablePythonDlls(path.join(appDir, 'python_runtime'));
     }
 
-    // Đồng bộ QUEUE_BACKLOG*.json hai chiều để không bao giờ mất hàng đợi
-    mergeBacklogFilesBetweenDirs(appDir, exeDir);
-    mergeBacklogFilesBetweenDirs(exeDir, appDir);
-
-    const appBuild = readBuildNumberSafe(appDir);
-    const exeBuild = readBuildNumberSafe(exeDir);
-    const srcBase = (exeBuild > appBuild && fs.existsSync(path.join(exeDir, 'mafia_dashboard_server.py')))
-      ? exeDir
-      : (fs.existsSync(path.join(appDir, 'mafia_dashboard_server.py')) ? appDir : exeDir);
-    const dstBase = srcBase === appDir ? exeDir : appDir;
-    if (!fs.existsSync(dstBase)) return;
-
-    for (const f of ['mafia_dashboard_server.py', 'organize_12_keys_skills.py', 'version.json']) {
-      const sf = path.join(srcBase, f);
-      const df = path.join(dstBase, f);
-      if (fs.existsSync(sf)) {
-        try { fs.copyFileSync(sf, df); } catch {}
-      }
-    }
-    for (const ef of [
-      'chatgpt_web_client.py',
-      'mafia_chatgpt_pipeline.py',
-      'license_manager.py',
-      'channel_memory_guard.py',
-      'tts_post_director.py',
-      'auto_tab_sweeper_daemon.py'
-    ]) {
-      const sf = path.join(srcBase, 'engine', ef);
-      const df = path.join(dstBase, 'engine', ef);
-      if (fs.existsSync(sf)) {
-        try {
-          fs.mkdirSync(path.dirname(df), { recursive: true });
-          fs.copyFileSync(sf, df);
-        } catch {}
-      }
-    }
-    for (const af of ['script_studio_dashboard.html', 'script_studio_fallback_status.json']) {
-      const sf = path.join(srcBase, 'assets', af);
-      const df = path.join(dstBase, 'assets', af);
-      if (fs.existsSync(sf)) {
-        try {
-          fs.mkdirSync(path.dirname(df), { recursive: true });
-          fs.copyFileSync(sf, df);
-        } catch {}
-      }
-    }
-    for (const dirRel of [
-      path.join('engine', 'websocket'),
-      path.join('engine', 'skills_bundle'),
-      'skills_12_keys',
-      'skills_mexico',
-      'skills_homeless',
-      'DOCSMOI',
-      '.agents'
-    ]) {
-      const sDir = path.join(srcBase, dirRel);
-      const dDir = path.join(dstBase, dirRel);
-      if (fs.existsSync(sDir) && !fs.existsSync(dDir)) {
-        syncDirRecursiveSafe(sDir, dDir);
-      }
-    }
+    // Dọn sạch các file máy code bị lẫn ở thư mục gốc của khách hàng (chỉ giữ code trong resources/app)
+    cleanLeakedDevFilesFromCustomerRoot(exeDir, appDir);
   } catch {}
 }
 
@@ -414,10 +568,10 @@ function ensurePortablePythonReady(appDir, exeDir) {
 
 function resolveBestServerScript(appDir, exeDir) {
   const candidates = [
-    fs.existsSync(path.join(exeDir, 'engine', 'websocket')) ? path.join(exeDir, 'mafia_dashboard_server.py') : null,
     fs.existsSync(path.join(appDir, 'engine', 'websocket')) ? path.join(appDir, 'mafia_dashboard_server.py') : null,
-    path.join(exeDir, 'mafia_dashboard_server.py'),
+    fs.existsSync(path.join(exeDir, 'engine', 'websocket')) ? path.join(exeDir, 'mafia_dashboard_server.py') : null,
     path.join(appDir, 'mafia_dashboard_server.py'),
+    path.join(exeDir, 'mafia_dashboard_server.py'),
     'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\mafia_dashboard_server.py'
   ].filter(Boolean);
   for (const c of candidates) {
@@ -432,7 +586,7 @@ function launchChromeWebLoginNode(rootDir, slotId = 1) {
   const slot = Math.max(1, Math.min(3, Number(slotId) || 1));
   const debugPort = 9221 + slot;
   const profileDirName = slot === 1 ? 'BROWSER_PROFILE' : `BROWSER_PROFILE_${slot}`;
-  const profileDir = path.join(rootDir, profileDirName);
+  const profileDir = path.join(rootDir, 'data', 'browser_profiles', profileDirName);
   try { fs.mkdirSync(profileDir, { recursive: true }); } catch {}
 
   const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
@@ -536,27 +690,31 @@ function parseTitlesPayloadNode(body = {}) {
 function resolveBacklogAndProjectsDirsNode(rootDir, niche) {
   const n = String(niche || 'mafia').trim();
   const low = n.toLowerCase();
+  const queuesDir = path.join(rootDir, 'data', 'queues');
+  const projectsBase = path.join(rootDir, 'PROJECTS');
+  try { fs.mkdirSync(queuesDir, { recursive: true }); } catch {}
+  try { fs.mkdirSync(projectsBase, { recursive: true }); } catch {}
   if (low === 'mafia') {
     return {
-      backlogPath: path.join(rootDir, 'QUEUE_BACKLOG.json'),
-      projectsRoot: path.join(rootDir, 'PROJECTS')
+      backlogPath: path.join(queuesDir, 'QUEUE_BACKLOG.json'),
+      projectsRoot: path.join(projectsBase, 'PROJECTS_MAFIA')
     };
   }
   if (low === 'homeless') {
     return {
-      backlogPath: path.join(rootDir, 'QUEUE_BACKLOG_HOMELESS.json'),
-      projectsRoot: path.join(rootDir, 'PROJECTS_HOMELESS')
+      backlogPath: path.join(queuesDir, 'QUEUE_BACKLOG_HOMELESS.json'),
+      projectsRoot: path.join(projectsBase, 'PROJECTS_HOMELESS')
     };
   }
   if (low === 'mexico') {
     return {
-      backlogPath: path.join(rootDir, 'QUEUE_BACKLOG_MEXICO.json'),
-      projectsRoot: path.join(rootDir, 'PROJECTS_MEXICO')
+      backlogPath: path.join(queuesDir, 'QUEUE_BACKLOG_MEXICO.json'),
+      projectsRoot: path.join(projectsBase, 'PROJECTS_MEXICO')
     };
   }
   return {
-    backlogPath: path.join(rootDir, `QUEUE_BACKLOG_${n}.json`),
-    projectsRoot: path.join(rootDir, `PROJECTS_${n}`)
+    backlogPath: path.join(queuesDir, `QUEUE_BACKLOG_${n}.json`),
+    projectsRoot: path.join(projectsBase, `PROJECTS_${n}`)
   };
 }
 
@@ -639,7 +797,9 @@ function persistTitlesToDiskNode(rootDir, niche, parsedItems, skipTitleRewrite =
 function appendStudioLogNode(rootDir, tag, message) {
   try {
     const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    const logPath = path.join(rootDir, 'LIVE_STUDIO_LOG.txt');
+    const logsDir = path.join(rootDir, 'data', 'logs');
+    try { fs.mkdirSync(logsDir, { recursive: true }); } catch {}
+    const logPath = path.join(logsDir, 'LIVE_STUDIO_LOG.txt');
     fs.appendFileSync(logPath, `[${nowStr}] [${tag}] ${message}\n`, 'utf8');
   } catch {}
 }
@@ -708,14 +868,17 @@ function triggerPipelineWorkerNode(appDir, exeDir, rootDir, niche, maxWorkers = 
   }).catch(() => {});
 
   ensurePortablePythonReady(appDir, exeDir).then((pyExe) => {
-    const pipelineScript = path.join(rootDir, 'engine', 'mafia_chatgpt_pipeline.py');
+    const codeDir = fs.existsSync(path.join(appDir, 'engine', 'mafia_chatgpt_pipeline.py')) ? appDir : rootDir;
+    const pipelineScript = path.join(codeDir, 'engine', 'mafia_chatgpt_pipeline.py');
     if (!fs.existsSync(pipelineScript)) {
       appendStudioLogNode(rootDir, 'ERROR', `❌ Không tìm thấy file ${pipelineScript}`);
       return;
     }
     let logFd = null;
     try {
-      const liveLogPath = path.join(rootDir, 'LIVE_STUDIO_LOG.txt');
+      const logsDir = path.join(rootDir, 'data', 'logs');
+      try { fs.mkdirSync(logsDir, { recursive: true }); } catch {}
+      const liveLogPath = path.join(logsDir, 'LIVE_STUDIO_LOG.txt');
       logFd = fs.openSync(liveLogPath, 'a');
     } catch {}
     try {
@@ -814,7 +977,7 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
       }
       const htmlBuf = fs.readFileSync(htmlFile);
       const statusMap = JSON.parse(fs.readFileSync(statusFile, 'utf8'));
-      const rootDir = fs.existsSync(path.join(exeDir, 'mafia_dashboard_server.py')) ? exeDir : appDir;
+      const rootDir = resolveUnifiedStudioRoot(appDir, exeDir);
 
       const srv = http.createServer((req, res) => {
         try {
@@ -876,7 +1039,7 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
                   };
                 });
               }
-              const liveLogPath = path.join(rootDir, 'LIVE_STUDIO_LOG.txt');
+              const liveLogPath = path.join(rootDir, 'data', 'logs', 'LIVE_STUDIO_LOG.txt');
               if (fs.existsSync(liveLogPath)) {
                 const logLines = fs.readFileSync(liveLogPath, 'utf8').split(/\r?\n/);
                 baseSt.recent_logs = logLines.slice(-120).join('\n');
@@ -1213,7 +1376,7 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
 
       const serverScript = resolveBestServerScript(appDir, exeDir);
       if (serverScript) {
-        const rootDir = path.dirname(serverScript);
+        const studioRoot = resolveUnifiedStudioRoot(appDir, exeDir);
         const pyExe = await ensurePortablePythonReady(appDir, exeDir);
 
         if (_nodeFallbackServer) {
@@ -1244,11 +1407,13 @@ async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
 
         let srvLogFd = null;
         try {
-          srvLogFd = fs.openSync(path.join(rootDir, 'LIVE_STUDIO_LOG.txt'), 'a');
+          const logsDir = path.join(studioRoot, 'data', 'logs');
+          try { fs.mkdirSync(logsDir, { recursive: true }); } catch {}
+          srvLogFd = fs.openSync(path.join(logsDir, 'LIVE_STUDIO_LOG.txt'), 'a');
         } catch {}
         try {
           const child = spawn(pyExe, ['-u', serverScript, '--no-browser', '--port', String(targetPort)], {
-            cwd: rootDir,
+            cwd: studioRoot,
             windowsHide: true,
             stdio: srvLogFd !== null ? ['ignore', srvLogFd, srvLogFd] : 'ignore',
             detached: false,
@@ -1311,17 +1476,22 @@ setTimeout(() => {
 function getStudioBaseDirs() {
   const appDir = path.resolve(__dirname, '..', '..');
   const exeDir = path.dirname(process.execPath);
-  const primaryRoot = fs.existsSync(path.join(exeDir, 'mafia_dashboard_server.py')) ? exeDir : appDir;
+  const primaryRoot = resolveUnifiedStudioRoot(appDir, exeDir);
   return { appDir, exeDir, primaryRoot };
 }
 
 function readCustomLinkedFolders() {
   try {
-    const { appDir, exeDir } = getStudioBaseDirs();
-    for (const dir of [exeDir, appDir]) {
-      const f = path.join(dir, 'CUSTOM_LINKED_FOLDERS.json');
-      if (fs.existsSync(f)) {
-        return JSON.parse(fs.readFileSync(f, 'utf8') || '{}') || {};
+    const { appDir, exeDir, primaryRoot } = getStudioBaseDirs();
+    for (const dir of [primaryRoot, exeDir, appDir]) {
+      if (!dir) continue;
+      for (const f of [
+        path.join(dir, 'data', 'config', 'CUSTOM_LINKED_FOLDERS.json'),
+        path.join(dir, 'CUSTOM_LINKED_FOLDERS.json')
+      ]) {
+        if (fs.existsSync(f)) {
+          return JSON.parse(fs.readFileSync(f, 'utf8') || '{}') || {};
+        }
       }
     }
   } catch {}
@@ -1339,13 +1509,13 @@ function writeCustomLinkedFolders(partial = {}) {
     }
   };
   try {
-    const { appDir, exeDir } = getStudioBaseDirs();
-    for (const dir of [exeDir, appDir]) {
-      if (dir && fs.existsSync(dir)) {
-        try {
-          fs.writeFileSync(path.join(dir, 'CUSTOM_LINKED_FOLDERS.json'), JSON.stringify(merged, null, 2), 'utf8');
-        } catch {}
-      }
+    const { primaryRoot } = getStudioBaseDirs();
+    if (primaryRoot && fs.existsSync(primaryRoot)) {
+      const cfgDir = path.join(primaryRoot, 'data', 'config');
+      try { fs.mkdirSync(cfgDir, { recursive: true }); } catch {}
+      try {
+        fs.writeFileSync(path.join(cfgDir, 'CUSTOM_LINKED_FOLDERS.json'), JSON.stringify(merged, null, 2), 'utf8');
+      } catch {}
     }
   } catch {}
   return merged;
@@ -1421,18 +1591,18 @@ function enrichBridgeStateWithLinkedFolders(st) {
     // 6. Các Folder TONG HOP liên kết
     const tongHopByKey = linked.tongHopByKey || {};
     const defaultActiveKeyTongHop = activeKey === 'homeless'
-      ? path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP')
+      ? path.join(studioRoot, 'PROJECTS', 'PROJECTS_HOMELESS', 'TONG HOP')
       : activeKey === 'mafia'
-        ? path.join(studioRoot, 'PROJECTS', 'TONG HOP')
+        ? path.join(studioRoot, 'PROJECTS', 'PROJECTS_MAFIA', 'TONG HOP')
         : activeKey === 'mexico'
-          ? path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP')
-          : path.join(studioRoot, `PROJECTS_${activeKey}`, 'TONG HOP');
+          ? path.join(studioRoot, 'PROJECTS', 'PROJECTS_MEXICO', 'TONG HOP')
+          : path.join(studioRoot, 'PROJECTS', `PROJECTS_${activeKey}`, 'TONG HOP');
 
     s.activeKey = activeKey;
     s.activeKeyTongHopFolder = tongHopByKey[activeKey] || s.activeKeyTongHopFolder || defaultActiveKeyTongHop;
-    s.tongHopHomelessFolder = linked.tongHopHomelessFolder || tongHopByKey.homeless || path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP');
-    s.tongHopMafiaFolder = linked.tongHopMafiaFolder || tongHopByKey.mafia || path.join(studioRoot, 'PROJECTS', 'TONG HOP');
-    s.tongHopMexicoFolder = linked.tongHopMexicoFolder || tongHopByKey.mexico || path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP');
+    s.tongHopHomelessFolder = linked.tongHopHomelessFolder || tongHopByKey.homeless || path.join(studioRoot, 'PROJECTS', 'PROJECTS_HOMELESS', 'TONG HOP');
+    s.tongHopMafiaFolder = linked.tongHopMafiaFolder || tongHopByKey.mafia || path.join(studioRoot, 'PROJECTS', 'PROJECTS_MAFIA', 'TONG HOP');
+    s.tongHopMexicoFolder = linked.tongHopMexicoFolder || tongHopByKey.mexico || path.join(studioRoot, 'PROJECTS', 'PROJECTS_MEXICO', 'TONG HOP');
     s.scriptStudioRoot = studioRoot;
     st.lockedConfigSummary = s;
     st.linkedFolders = linked;

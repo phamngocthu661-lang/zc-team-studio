@@ -204,8 +204,27 @@ def _normalize_niche_key(niche: str) -> str:
 
 def _get_memory_file_paths(studio_root: str, niche: str) -> tuple[str, str]:
     niche_clean = _normalize_niche_key(niche)
-    niche_path = os.path.join(studio_root, f"CHANNEL_MEMORY_{niche_clean.upper()}.json")
-    shared_path = os.path.join(studio_root, "CHANNEL_MEMORY.json")
+    mem_dir = os.path.join(studio_root, "data", "memory")
+    os.makedirs(mem_dir, exist_ok=True)
+    # Tự động di chuyển các file CHANNEL_MEMORY*.json cũ ở thư mục gốc vào data/memory/
+    try:
+        import shutil
+        for entry in os.listdir(studio_root):
+            if entry.startswith("CHANNEL_MEMORY") and entry.endswith(".json"):
+                old_f = os.path.join(studio_root, entry)
+                new_f = os.path.join(mem_dir, entry)
+                if os.path.isfile(old_f):
+                    if not os.path.exists(new_f):
+                        shutil.move(old_f, new_f)
+                    else:
+                        try:
+                            os.remove(old_f)
+                        except Exception:
+                            pass
+    except Exception:
+        pass
+    niche_path = os.path.join(mem_dir, f"CHANNEL_MEMORY_{niche_clean.upper()}.json")
+    shared_path = os.path.join(mem_dir, "CHANNEL_MEMORY.json")
     return niche_path, shared_path
 
 
@@ -376,13 +395,14 @@ def extract_story_metadata_from_project(project_dir: str, project_id: str = "", 
 
 
 def _get_projects_dir_for_niche(studio_root: str, niche_clean: str) -> str:
+    projects_base = os.path.join(studio_root, "PROJECTS")
     if niche_clean.lower() in KNOWN_12_FOLDER_KEYS:
-        return os.path.join(studio_root, f"PROJECTS_{KNOWN_12_FOLDER_KEYS[niche_clean.lower()]}")
+        return os.path.join(projects_base, f"PROJECTS_{KNOWN_12_FOLDER_KEYS[niche_clean.lower()]}")
     if niche_clean == "mexico":
-        return os.path.join(studio_root, "PROJECTS_MEXICO")
+        return os.path.join(projects_base, "PROJECTS_MEXICO")
     if niche_clean == "homeless":
-        return os.path.join(studio_root, "PROJECTS_HOMELESS")
-    return os.path.join(studio_root, "PROJECTS")
+        return os.path.join(projects_base, "PROJECTS_HOMELESS")
+    return os.path.join(projects_base, "PROJECTS_MAFIA")
 
 
 def load_or_backfill_channel_memory(studio_root: str, niche: str, exclude_project_id: str = "") -> dict:

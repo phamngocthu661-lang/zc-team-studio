@@ -7,9 +7,13 @@ STUDIO_WEB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if STUDIO_WEB_ROOT not in sys.path:
     sys.path.insert(0, STUDIO_WEB_ROOT)
 
-from engine.chatgpt_web_client import sweep_completed_and_idle_tabs_across_all_accounts
+from engine.chatgpt_web_client import (
+    STUDIO_WEB_ROOT as RESOLVED_STUDIO_ROOT,
+    sweep_completed_and_idle_tabs_across_all_accounts,
+)
 
-LIVE_LOG_PATH = os.path.join(STUDIO_WEB_ROOT, "LIVE_STUDIO_LOG.txt")
+LIVE_LOG_PATH = os.path.join(RESOLVED_STUDIO_ROOT, "data", "logs", "LIVE_STUDIO_LOG.txt")
+os.makedirs(os.path.dirname(LIVE_LOG_PATH), exist_ok=True)
 
 
 def log_sweeper(msg: str):

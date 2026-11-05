@@ -5,8 +5,19 @@ dist/
 Ban-Giao-Khach-Hang-EXE/
 resources/
 tools/
+.vscode/
+.vbs-user-data/
 
-# Customer Local Data, Databases & Browser Profiles (Protected during OTA)
+# Dev Machine Documentation, Tests, Scripts & Publisher Tools (Do NOT push to customer OTA)
+docs/
+tests/
+scripts/
+sample-data/
+stitch_redesign_screens/
+push_update_github.py
+DAY_CAP_NHAT_LEN_GITHUB.bat
+
+# Customer Local Data, Projects, Databases & Browser Profiles (Protected during OTA)
 data/
 BROWSER_PROFILE/
 BROWSER_PROFILE_*/
@@ -15,27 +26,28 @@ PROJECTS_*/
 TONG HOP/
 Kho_Green/
 Kho_Voice_12_Topics_Master/
-sample-data/output/*
-!sample-data/output/.gitkeep
+QUEUE_BACKLOG*.json
+CHANNEL_MEMORY*.json
+TIEN_DO_*.md
+LIVE_STUDIO_LOG.txt
+CUSTOM_LINKED_FOLDERS.json
+CHAT_CONVERSATION_POOL.json
 
 # Private Admin License Secrets (NEVER push private signing keys)
-admin-tools/keys-production/
-admin-tools/*.key
-admin-tools/*.key.json
+admin-tools/
 ADMIN_MASTER_SECRET.json
 ADMIN_LICENSE_DB.json
 VBS-License-Admin/
 MO_UNG_DUNG_CAP_KEY.bat
 Mo-Ung-Dung-Quan-Ly-Key-Admin.bat
-vbs_interactive_log.txt
 *.key
 
 # Logs, Temp, Databases & Heavy Archives/Videos
+logs/
 *.log
 *.db
 *.db-shm
 *.db-wal
-QUEUE_BACKLOG*.json
 engine/python_runtime/
 *.zip
 !/python_runtime/

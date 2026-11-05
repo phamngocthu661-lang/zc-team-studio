@@ -56,7 +56,10 @@ class ScriptVideoBridgeService {
     // Cài đặt cầu nối Bàn #6 -> Bàn #7
     const savedSettings = this.database?.getSetting?.('script_video_bridge_settings', null) || {};
     const savedRoot = savedSettings.scriptStudioRoot;
-    const validSavedRoot = savedRoot && fs.existsSync(path.join(savedRoot, 'mafia_dashboard_server.py')) ? savedRoot : null;
+    const validSavedRoot = savedRoot && (
+      fs.existsSync(path.join(savedRoot, 'mafia_dashboard_server.py')) ||
+      fs.existsSync(path.join(savedRoot, 'resources', 'app', 'mafia_dashboard_server.py'))
+    ) ? savedRoot : null;
     this.settings = {
       enabled: savedSettings.enabled !== false,
       // 'STREAMING': Tạo kịch bản xong chuyển qua tạo video luôn (Cuốn chiếu từng bài)
@@ -168,12 +171,26 @@ class ScriptVideoBridgeService {
   }
 
   _detectScriptStudioRoot() {
+    const exeDir = path.dirname(process.execPath);
+    if (
+      exeDir &&
+      fs.existsSync(path.join(exeDir, 'Video Batch Studio.exe')) &&
+      fs.existsSync(path.join(exeDir, 'resources', 'app', 'mafia_dashboard_server.py'))
+    ) {
+      return exeDir;
+    }
     for (const candidate of DEFAULT_SCRIPT_STUDIO_DIRS) {
       try {
         if (
           fs.existsSync(path.join(candidate, 'mafia_dashboard_server.py')) &&
           fs.existsSync(path.join(candidate, 'engine', 'websocket'))
         ) {
+          if (
+            path.basename(candidate).toLowerCase() === 'app' &&
+            path.basename(path.dirname(candidate)).toLowerCase() === 'resources'
+          ) {
+            return path.resolve(candidate, '..', '..');
+          }
           return candidate;
         }
       } catch {}
@@ -181,11 +198,33 @@ class ScriptVideoBridgeService {
     for (const candidate of DEFAULT_SCRIPT_STUDIO_DIRS) {
       try {
         if (fs.existsSync(path.join(candidate, 'mafia_dashboard_server.py'))) {
+          if (
+            path.basename(candidate).toLowerCase() === 'app' &&
+            path.basename(path.dirname(candidate)).toLowerCase() === 'resources'
+          ) {
+            return path.resolve(candidate, '..', '..');
+          }
           return candidate;
         }
       } catch {}
     }
     return DEFAULT_SCRIPT_STUDIO_DIRS[0];
+  }
+
+  _resolveServerScriptForRoot(rootDir) {
+    const appDir = path.resolve(__dirname, '..', '..', '..');
+    const candidates = [
+      rootDir ? path.join(rootDir, 'resources', 'app', 'mafia_dashboard_server.py') : null,
+      rootDir ? path.join(rootDir, 'mafia_dashboard_server.py') : null,
+      path.join(appDir, 'mafia_dashboard_server.py'),
+      'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\mafia_dashboard_server.py'
+    ].filter(Boolean);
+    for (const c of candidates) {
+      try {
+        if (fs.existsSync(c)) return c;
+      } catch {}
+    }
+    return rootDir ? path.join(rootDir, 'mafia_dashboard_server.py') : '';
   }
 
   _sendToRenderer(channel, payload) {
@@ -304,15 +343,15 @@ class ScriptVideoBridgeService {
     }
 
     let rootDir = this.settings.scriptStudioRoot;
-    if (!rootDir || !fs.existsSync(path.join(rootDir, 'mafia_dashboard_server.py'))) {
+    if (!rootDir || !fs.existsSync(this._resolveServerScriptForRoot(rootDir))) {
       rootDir = this._detectScriptStudioRoot();
       this.settings.scriptStudioRoot = rootDir;
       try {
         this.database?.setSetting?.('script_video_bridge_settings', this.settings);
       } catch {}
     }
-    const serverScript = path.join(rootDir, 'mafia_dashboard_server.py');
-    if (!fs.existsSync(serverScript)) {
+    const serverScript = this._resolveServerScriptForRoot(rootDir);
+    if (!serverScript || !fs.existsSync(serverScript)) {
       return {
         online: false,
         error: `Không tìm thấy mafia_dashboard_server.py tại ${serverScript}`
@@ -488,7 +527,9 @@ class ScriptVideoBridgeService {
       if (partial.linkedFolders) {
         const studioRoot = this.settings.scriptStudioRoot || this._detectScriptStudioRoot();
         if (studioRoot && fs.existsSync(studioRoot)) {
-          fs.writeFileSync(path.join(studioRoot, 'CUSTOM_LINKED_FOLDERS.json'), JSON.stringify(nextLinked, null, 2), 'utf8');
+          const cfgDir = path.join(studioRoot, 'data', 'config');
+          try { fs.mkdirSync(cfgDir, { recursive: true }); } catch {}
+          fs.writeFileSync(path.join(cfgDir, 'CUSTOM_LINKED_FOLDERS.json'), JSON.stringify(nextLinked, null, 2), 'utf8');
         }
       }
     } catch {}
@@ -626,12 +667,12 @@ class ScriptVideoBridgeService {
 
     const tongHopByKey = linked.tongHopByKey || {};
     const defaultActiveKeyTongHop = activeKey === 'homeless'
-      ? path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP')
+      ? path.join(studioRoot, 'PROJECTS', 'PROJECTS_HOMELESS', 'TONG HOP')
       : activeKey === 'mafia'
-        ? path.join(studioRoot, 'PROJECTS', 'TONG HOP')
+        ? path.join(studioRoot, 'PROJECTS', 'PROJECTS_MAFIA', 'TONG HOP')
         : activeKey === 'mexico'
-          ? path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP')
-          : path.join(studioRoot, `PROJECTS_${activeKey}`, 'TONG HOP');
+          ? path.join(studioRoot, 'PROJECTS', 'PROJECTS_MEXICO', 'TONG HOP')
+          : path.join(studioRoot, 'PROJECTS', `PROJECTS_${activeKey}`, 'TONG HOP');
 
     return {
       hasLockedConfig: Boolean(this.lockedVideoConfig),
@@ -659,9 +700,9 @@ class ScriptVideoBridgeService {
       jobIntroAudioMode: cfg.jobIntroAudioMode || linked.jobIntroAudioMode || 'MUTE',
       khoGreenFolder,
       activeKeyTongHopFolder: tongHopByKey[activeKey] || defaultActiveKeyTongHop,
-      tongHopHomelessFolder: linked.tongHopHomelessFolder || tongHopByKey.homeless || path.join(studioRoot, 'PROJECTS_HOMELESS', 'TONG HOP'),
-      tongHopMafiaFolder: linked.tongHopMafiaFolder || tongHopByKey.mafia || path.join(studioRoot, 'PROJECTS', 'TONG HOP'),
-      tongHopMexicoFolder: linked.tongHopMexicoFolder || tongHopByKey.mexico || path.join(studioRoot, 'PROJECTS_MEXICO', 'TONG HOP'),
+      tongHopHomelessFolder: linked.tongHopHomelessFolder || tongHopByKey.homeless || path.join(studioRoot, 'PROJECTS', 'PROJECTS_HOMELESS', 'TONG HOP'),
+      tongHopMafiaFolder: linked.tongHopMafiaFolder || tongHopByKey.mafia || path.join(studioRoot, 'PROJECTS', 'PROJECTS_MAFIA', 'TONG HOP'),
+      tongHopMexicoFolder: linked.tongHopMexicoFolder || tongHopByKey.mexico || path.join(studioRoot, 'PROJECTS', 'PROJECTS_MEXICO', 'TONG HOP'),
       outputFolder,
       disclaimerEnabled,
       disclaimerPath: cfg.disclaimerPath || '',

@@ -34,7 +34,44 @@ STUDIO_WEB_ROOT = _resolve_unified_studio_root(_CODE_ROOT)
 if STUDIO_WEB_ROOT not in sys.path:
     sys.path.insert(0, STUDIO_WEB_ROOT)
 
-BROWSER_PROFILE_DIR = os.path.join(STUDIO_WEB_ROOT, "BROWSER_PROFILE")
+BROWSER_PROFILES_ROOT = os.path.join(STUDIO_WEB_ROOT, "data", "browser_profiles")
+os.makedirs(BROWSER_PROFILES_ROOT, exist_ok=True)
+
+
+def _auto_migrate_browser_profiles_to_data():
+    try:
+        import shutil
+        for prof_name in ("BROWSER_PROFILE", "BROWSER_PROFILE_2", "BROWSER_PROFILE_3"):
+            old_p = os.path.join(STUDIO_WEB_ROOT, prof_name)
+            new_p = os.path.join(BROWSER_PROFILES_ROOT, prof_name)
+            if os.path.isdir(old_p):
+                if not os.path.exists(new_p):
+                    try:
+                        shutil.move(old_p, new_p)
+                    except Exception:
+                        try:
+                            shutil.copytree(old_p, new_p, dirs_exist_ok=True)
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        shutil.copytree(old_p, new_p, dirs_exist_ok=True)
+                        shutil.rmtree(old_p, ignore_errors=True)
+                    except Exception:
+                        pass
+        for entry in os.listdir(STUDIO_WEB_ROOT):
+            if entry.upper().startswith("MO_CUA_SO_DANG_NHAP_CHATGPT_WEB") and entry.lower().endswith(".bat"):
+                try:
+                    os.remove(os.path.join(STUDIO_WEB_ROOT, entry))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+_auto_migrate_browser_profiles_to_data()
+
+BROWSER_PROFILE_DIR = os.path.join(BROWSER_PROFILES_ROOT, "BROWSER_PROFILE")
 CDP_PORT = 9222
 CDP_HOST = f"http://127.0.0.1:{CDP_PORT}"
 
@@ -48,7 +85,7 @@ WEB_ACCOUNTS_CONFIG = [
         "index": 1,
         "label": "Acc #1",
         "port": 9222,
-        "profile_dir": os.path.join(STUDIO_WEB_ROOT, "BROWSER_PROFILE"),
+        "profile_dir": os.path.join(BROWSER_PROFILES_ROOT, "BROWSER_PROFILE"),
         "bat_name": "MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC1.bat",
         "task_name": "StudioWebChromeAcc1",
         "max_threads": MAX_THREADS_PER_ACCOUNT,
@@ -59,7 +96,7 @@ WEB_ACCOUNTS_CONFIG = [
         "index": 2,
         "label": "Acc #2",
         "port": 9223,
-        "profile_dir": os.path.join(STUDIO_WEB_ROOT, "BROWSER_PROFILE_2"),
+        "profile_dir": os.path.join(BROWSER_PROFILES_ROOT, "BROWSER_PROFILE_2"),
         "bat_name": "MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC2.bat",
         "task_name": "StudioWebChromeAcc2",
         "max_threads": MAX_THREADS_PER_ACCOUNT,
@@ -70,7 +107,7 @@ WEB_ACCOUNTS_CONFIG = [
         "index": 3,
         "label": "Acc #3",
         "port": 9224,
-        "profile_dir": os.path.join(STUDIO_WEB_ROOT, "BROWSER_PROFILE_3"),
+        "profile_dir": os.path.join(BROWSER_PROFILES_ROOT, "BROWSER_PROFILE_3"),
         "bat_name": "MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC3.bat",
         "task_name": "StudioWebChromeAcc3",
         "max_threads": MAX_THREADS_PER_ACCOUNT,
@@ -171,7 +208,8 @@ def _spawn_on_interactive_desktop(cmd_args: list[str], acc_cfg: dict = None) -> 
     cfg = acc_cfg or WEB_ACCOUNTS_CONFIG[0]
     port = cfg["port"]
     profile_dir = cfg["profile_dir"]
-    bat_path = os.path.join(STUDIO_WEB_ROOT, cfg["bat_name"])
+    os.makedirs(BROWSER_PROFILES_ROOT, exist_ok=True)
+    bat_path = os.path.join(BROWSER_PROFILES_ROOT, cfg["bat_name"])
     task_name = cfg["task_name"]
 
     exe_path = _find_browser_exe()
@@ -456,13 +494,20 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
         has_active_worker = False
 
     if not projects_root_list:
+        projects_base = os.path.join(STUDIO_WEB_ROOT, "PROJECTS")
         projects_root_list = [
-            r"D:\KEY NHẬT",
-            os.path.join(STUDIO_WEB_ROOT, "PROJECTS"),
-            os.path.join(STUDIO_WEB_ROOT, "PROJECTS_HOMELESS"),
-            os.path.join(STUDIO_WEB_ROOT, "PROJECTS_MEXICO"),
+            projects_base,
+            os.path.join(projects_base, "PROJECTS_MAFIA"),
+            os.path.join(projects_base, "PROJECTS_HOMELESS"),
+            os.path.join(projects_base, "PROJECTS_MEXICO"),
         ]
         try:
+            if os.path.isdir(projects_base):
+                for entry in os.listdir(projects_base):
+                    if entry.startswith("PROJECTS"):
+                        full_p = os.path.join(projects_base, entry)
+                        if os.path.isdir(full_p) and full_p not in projects_root_list:
+                            projects_root_list.append(full_p)
             for entry in os.listdir(STUDIO_WEB_ROOT):
                 if entry.startswith("PROJECTS"):
                     full_p = os.path.join(STUDIO_WEB_ROOT, entry)

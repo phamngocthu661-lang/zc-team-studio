@@ -66,46 +66,160 @@ if STUDIO_ROOT not in sys.path:
 
 
 def _migrate_backlog_and_projects_if_split():
-    """Nếu trước đó dữ liệu hàng đợi từng được tạo trong resources/app (_CODE_ROOT) khác với STUDIO_ROOT (exeDir), tự động gộp về STUDIO_ROOT."""
-    if os.path.normcase(os.path.abspath(_CODE_ROOT)) == os.path.normcase(os.path.abspath(STUDIO_ROOT)):
-        return
-    try:
-        for entry in os.listdir(_CODE_ROOT):
-            if entry.startswith("QUEUE_BACKLOG") and entry.endswith(".json"):
-                src_b = os.path.join(_CODE_ROOT, entry)
-                dst_b = os.path.join(STUDIO_ROOT, entry)
-                try:
-                    src_data = json.load(open(src_b, encoding="utf-8"))
-                    src_items = src_data.get("items") or []
-                    if not src_items:
-                        continue
-                    dst_data = {"max_parallel_threads": 3, "thinking_effort": "medium", "items": []}
-                    if os.path.exists(dst_b):
+    """Tự động gom gọn toàn bộ file lặp/lộn xộn ở thư mục gốc vào đúng các thư mục con chuẩn (`data/queues`, `data/memory`, `data/progress`, `data/logs`, `data/config`, `PROJECTS/PROJECTS_*`)."""
+    queues_dir = os.path.join(STUDIO_ROOT, "data", "queues")
+    memory_dir = os.path.join(STUDIO_ROOT, "data", "memory")
+    progress_dir = os.path.join(STUDIO_ROOT, "data", "progress")
+    logs_dir = os.path.join(STUDIO_ROOT, "data", "logs")
+    config_dir = os.path.join(STUDIO_ROOT, "data", "config")
+    projects_base = os.path.join(STUDIO_ROOT, "PROJECTS")
+    for d in (queues_dir, memory_dir, progress_dir, logs_dir, config_dir, projects_base):
+        os.makedirs(d, exist_ok=True)
+
+    # 1. Nếu trước đó dữ liệu hàng đợi từng được tạo trong resources/app (_CODE_ROOT) khác với STUDIO_ROOT (exeDir), gộp về data/queues
+    for scan_root in (_CODE_ROOT, STUDIO_ROOT):
+        if not os.path.isdir(scan_root):
+            continue
+        try:
+            for entry in os.listdir(scan_root):
+                src_path = os.path.join(scan_root, entry)
+                if entry.startswith("QUEUE_BACKLOG") and entry.endswith(".json") and os.path.isfile(src_path):
+                    dst_b = os.path.join(queues_dir, entry)
+                    if not os.path.exists(dst_b):
                         try:
-                            dst_data = json.load(open(dst_b, encoding="utf-8"))
+                            shutil.move(src_path, dst_b)
+                            continue
                         except Exception:
                             pass
-                    existing_pids = {x.get("project_id") for x in (dst_data.get("items") or [])}
-                    changed = False
-                    for it in src_items:
-                        pid = it.get("project_id")
-                        if pid and pid not in existing_pids:
-                            old_pdir = it.get("project_dir") or ""
-                            if old_pdir and os.path.normcase(_CODE_ROOT) in os.path.normcase(old_pdir):
-                                rel_pdir = os.path.relpath(old_pdir, _CODE_ROOT)
-                                new_pdir = os.path.join(STUDIO_ROOT, rel_pdir)
-                                if os.path.exists(old_pdir) and not os.path.exists(new_pdir):
-                                    os.makedirs(os.path.dirname(new_pdir), exist_ok=True)
-                                    shutil.copytree(old_pdir, new_pdir, dirs_exist_ok=True)
-                                it["project_dir"] = new_pdir
-                            dst_data.setdefault("items", []).append(it)
-                            existing_pids.add(pid)
-                            changed = True
-                    if changed:
-                        with open(dst_b, "w", encoding="utf-8") as f:
-                            json.dump(dst_data, f, ensure_ascii=False, indent=2)
-                except Exception:
-                    pass
+                    try:
+                        src_data = json.load(open(src_path, encoding="utf-8"))
+                        src_items = src_data.get("items") or []
+                        if src_items:
+                            dst_data = {"max_parallel_threads": 3, "thinking_effort": "medium", "items": []}
+                            if os.path.exists(dst_b):
+                                try:
+                                    dst_data = json.load(open(dst_b, encoding="utf-8"))
+                                except Exception:
+                                    pass
+                            existing_pids = {x.get("project_id") for x in (dst_data.get("items") or [])}
+                            changed = False
+                            for it in src_items:
+                                pid = it.get("project_id")
+                                if pid and pid not in existing_pids:
+                                    dst_data.setdefault("items", []).append(it)
+                                    existing_pids.add(pid)
+                                    changed = True
+                            if changed:
+                                with open(dst_b, "w", encoding="utf-8") as f:
+                                    json.dump(dst_data, f, ensure_ascii=False, indent=2)
+                        os.remove(src_path)
+                    except Exception:
+                        pass
+                elif entry.startswith("CHANNEL_MEMORY") and entry.endswith(".json") and os.path.isfile(src_path):
+                    dst_m = os.path.join(memory_dir, entry)
+                    try:
+                        if not os.path.exists(dst_m):
+                            shutil.move(src_path, dst_m)
+                        else:
+                            os.remove(src_path)
+                    except Exception:
+                        pass
+                elif entry.startswith("TIEN_DO_") and entry.endswith(".md") and os.path.isfile(src_path):
+                    dst_p = os.path.join(progress_dir, entry)
+                    try:
+                        if not os.path.exists(dst_p):
+                            shutil.move(src_path, dst_p)
+                        else:
+                            os.remove(src_path)
+                    except Exception:
+                        pass
+                elif entry in ("CUSTOM_LINKED_FOLDERS.json", "CHAT_CONVERSATION_POOL.json") and os.path.isfile(src_path):
+                    dst_c = os.path.join(config_dir, entry)
+                    try:
+                        if not os.path.exists(dst_c):
+                            shutil.move(src_path, dst_c)
+                        else:
+                            os.remove(src_path)
+                    except Exception:
+                        pass
+                elif entry == "LIVE_STUDIO_LOG.txt" and os.path.isfile(src_path):
+                    dst_l = os.path.join(logs_dir, entry)
+                    try:
+                        if not os.path.exists(dst_l):
+                            shutil.move(src_path, dst_l)
+                        else:
+                            os.remove(src_path)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    # 2. Gom toàn bộ các thư mục PROJECTS_* ở thư mục gốc vào trong thư mục duy nhất PROJECTS/
+    try:
+        for entry in os.listdir(STUDIO_ROOT):
+            if entry.startswith("PROJECTS_"):
+                old_pdir = os.path.join(STUDIO_ROOT, entry)
+                new_pdir = os.path.join(projects_base, entry)
+                if os.path.isdir(old_pdir):
+                    if not os.path.exists(new_pdir):
+                        try:
+                            shutil.move(old_pdir, new_pdir)
+                        except Exception:
+                            shutil.copytree(old_pdir, new_pdir, dirs_exist_ok=True)
+                            shutil.rmtree(old_pdir, ignore_errors=True)
+                    else:
+                        shutil.copytree(old_pdir, new_pdir, dirs_exist_ok=True)
+                        shutil.rmtree(old_pdir, ignore_errors=True)
+
+        # Gom các dự án Mafia cũ nằm trực tiếp dưới PROJECTS/ vào PROJECTS/PROJECTS_MAFIA/
+        mafia_sub = os.path.join(projects_base, "PROJECTS_MAFIA")
+        os.makedirs(mafia_sub, exist_ok=True)
+        for entry in os.listdir(projects_base):
+            if entry.startswith("PROJECTS_"):
+                continue
+            item_p = os.path.join(projects_base, entry)
+            dst_p = os.path.join(mafia_sub, entry)
+            if os.path.isdir(item_p):
+                if not os.path.exists(dst_p):
+                    try:
+                        shutil.move(item_p, dst_p)
+                    except Exception:
+                        shutil.copytree(item_p, dst_p, dirs_exist_ok=True)
+                        shutil.rmtree(item_p, ignore_errors=True)
+                else:
+                    shutil.copytree(item_p, dst_p, dirs_exist_ok=True)
+                    shutil.rmtree(item_p, ignore_errors=True)
+    except Exception:
+        pass
+
+    # 3. Cập nhật lại đường dẫn project_dir trong các file QUEUE_BACKLOG*.json nếu trỏ tới đường dẫn cũ
+    try:
+        for bfile in os.listdir(queues_dir):
+            if not (bfile.startswith("QUEUE_BACKLOG") and bfile.endswith(".json")):
+                continue
+            bpath = os.path.join(queues_dir, bfile)
+            try:
+                bdata = json.load(open(bpath, encoding="utf-8"))
+                changed = False
+                is_mafia_queue = bfile == "QUEUE_BACKLOG.json"
+                for it in (bdata.get("items") or []):
+                    pid = it.get("project_id") or ""
+                    pdir = it.get("project_dir") or ""
+                    if not pid:
+                        continue
+                    if is_mafia_queue:
+                        expected_dir = os.path.join(projects_base, "PROJECTS_MAFIA", pid)
+                    else:
+                        niche_suffix = bfile[len("QUEUE_BACKLOG_"):-len(".json")]
+                        expected_dir = os.path.join(projects_base, f"PROJECTS_{niche_suffix}", pid)
+                    if pdir != expected_dir and (not pdir or not os.path.exists(pdir) or os.path.exists(expected_dir)):
+                        it["project_dir"] = expected_dir
+                        changed = True
+                if changed:
+                    with open(bpath, "w", encoding="utf-8") as f:
+                        json.dump(bdata, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -148,10 +262,15 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
 
 def _pick_resource_dir(rel_path: str) -> str:
-    cand_code = os.path.join(_CODE_ROOT, rel_path)
-    if os.path.exists(cand_code):
-        return cand_code
-    return os.path.join(STUDIO_ROOT, rel_path)
+    for cand in (
+        os.path.join(_CODE_ROOT, "skills", rel_path),
+        os.path.join(_CODE_ROOT, rel_path),
+        os.path.join(STUDIO_ROOT, "skills", rel_path),
+        os.path.join(STUDIO_ROOT, rel_path),
+    ):
+        if os.path.exists(cand):
+            return cand
+    return os.path.join(_CODE_ROOT, "skills", rel_path)
 
 
 SKILLS_ROOT = _pick_resource_dir(os.path.join("engine", "skills_bundle"))
@@ -160,10 +279,10 @@ MEXICO_SKILLS_ROOT = _pick_resource_dir("skills_mexico")
 SKILLS_12_KEYS_ROOT = _pick_resource_dir("skills_12_keys")
 ACTIVE_NICHE = "mafia"
 ACTIVE_KEY_ID = "mafia"
-PROJECTS_ROOT = os.path.join(STUDIO_ROOT, "PROJECTS")
-BACKLOG_PATH = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG.json")
-PROGRESS_MD_PATH = os.path.join(STUDIO_ROOT, "TIEN_DO_MAFIA_STUDIO.md")
-CHAT_POOL_PATH = os.path.join(STUDIO_ROOT, "CHAT_CONVERSATION_POOL.json")
+PROJECTS_ROOT = os.path.join(STUDIO_ROOT, "PROJECTS", "PROJECTS_MAFIA")
+BACKLOG_PATH = os.path.join(STUDIO_ROOT, "data", "queues", "QUEUE_BACKLOG.json")
+PROGRESS_MD_PATH = os.path.join(STUDIO_ROOT, "data", "progress", "TIEN_DO_MAFIA_STUDIO.md")
+CHAT_POOL_PATH = os.path.join(STUDIO_ROOT, "data", "config", "CHAT_CONVERSATION_POOL.json")
 
 # Danh mục 12 Key mở rộng đặt tên theo đúng tên thư mục gốc của người dùng
 KEY_PROFILES_12 = {
@@ -314,7 +433,7 @@ KEY_PROFILES_12 = {
 }
 KEY_PROFILES_12_LOWER_MAP = {k.lower(): k for k in KEY_PROFILES_12}
 
-LIVE_STUDIO_LOG_PATH = os.path.join(STUDIO_ROOT, "LIVE_STUDIO_LOG.txt")
+LIVE_STUDIO_LOG_PATH = os.path.join(STUDIO_ROOT, "data", "logs", "LIVE_STUDIO_LOG.txt")
 PIPE_LOCK = threading.Lock()
 POOL_LOCK = threading.Lock()
 BACKLOG_LOCK = threading.Lock()
@@ -340,7 +459,9 @@ def resolve_canonical_key_id(niche: str = None) -> str:
 
 def _resolve_custom_tong_hop_dir(key_id: str, default_th_dir: str) -> str:
     try:
-        custom_file = os.path.join(STUDIO_ROOT, "CUSTOM_LINKED_FOLDERS.json")
+        custom_file = os.path.join(STUDIO_ROOT, "data", "config", "CUSTOM_LINKED_FOLDERS.json")
+        if not os.path.exists(custom_file):
+            custom_file = os.path.join(STUDIO_ROOT, "CUSTOM_LINKED_FOLDERS.json")
         if os.path.exists(custom_file):
             with open(custom_file, "r", encoding="utf-8") as f:
                 data = json.load(f) or {}
@@ -364,13 +485,19 @@ def get_niche_config(niche: str = None) -> dict:
     if not raw_in:
         raw_in = ACTIVE_KEY_ID or ACTIVE_NICHE or "mafia"
     low = raw_in.lower()
+    projects_base = os.path.join(STUDIO_ROOT, "PROJECTS")
+    queues_dir = os.path.join(STUDIO_ROOT, "data", "queues")
+    progress_dir = os.path.join(STUDIO_ROOT, "data", "progress")
+    for d in (projects_base, queues_dir, progress_dir):
+        os.makedirs(d, exist_ok=True)
+
     if low in KEY_PROFILES_12_LOWER_MAP:
         canonical_key = KEY_PROFILES_12_LOWER_MAP[low]
         meta = KEY_PROFILES_12[canonical_key]
-        p_root = os.path.join(STUDIO_ROOT, f"PROJECTS_{canonical_key}")
+        p_root = os.path.join(projects_base, f"PROJECTS_{canonical_key}")
         th_dir = _resolve_custom_tong_hop_dir(canonical_key, os.path.join(p_root, "TONG HOP"))
-        b_path = os.path.join(STUDIO_ROOT, f"QUEUE_BACKLOG_{canonical_key}.json")
-        md_path = os.path.join(STUDIO_ROOT, f"TIEN_DO_{canonical_key}.md")
+        b_path = os.path.join(queues_dir, f"QUEUE_BACKLOG_{canonical_key}.json")
+        md_path = os.path.join(progress_dir, f"TIEN_DO_{canonical_key}.md")
         s_root = os.path.join(SKILLS_12_KEYS_ROOT, canonical_key)
         lbl = meta["label"]
         return {
@@ -399,10 +526,10 @@ def get_niche_config(niche: str = None) -> dict:
         }
     n = low
     if "mexico" in n or "bà cô" in n or "ba co" in n:
-        p_root = os.path.join(STUDIO_ROOT, "PROJECTS_MEXICO")
+        p_root = os.path.join(projects_base, "PROJECTS_MEXICO")
         th_dir = _resolve_custom_tong_hop_dir("mexico", os.path.join(p_root, "TONG HOP"))
-        b_path = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG_MEXICO.json")
-        md_path = os.path.join(STUDIO_ROOT, "TIEN_DO_MEXICO_STUDIO.md")
+        b_path = os.path.join(queues_dir, "QUEUE_BACKLOG_MEXICO.json")
+        md_path = os.path.join(progress_dir, "TIEN_DO_MEXICO_STUDIO.md")
         lbl = "MEXICO BÀ CÔ — DRAMA GIA ĐÌNH MẸ GIÀ MEXICO (ES-MX V1.3)"
         return {
             "niche": "mexico",
@@ -429,10 +556,10 @@ def get_niche_config(niche: str = None) -> dict:
             "pref_max_chars": 78000,
         }
     if "homeless" in n:
-        p_root = os.path.join(STUDIO_ROOT, "PROJECTS_HOMELESS")
+        p_root = os.path.join(projects_base, "PROJECTS_HOMELESS")
         th_dir = _resolve_custom_tong_hop_dir("homeless", os.path.join(p_root, "TONG HOP"))
-        b_path = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG_HOMELESS.json")
-        md_path = os.path.join(STUDIO_ROOT, "TIEN_DO_HOMELESS_STUDIO.md")
+        b_path = os.path.join(queues_dir, "QUEUE_BACKLOG_HOMELESS.json")
+        md_path = os.path.join(progress_dir, "TIEN_DO_HOMELESS_STUDIO.md")
         lbl = "HOMELESS × ABANDONED PROPERTY × HIDDEN LEGACY (V12)"
         return {
             "niche": "homeless",
@@ -458,10 +585,10 @@ def get_niche_config(niche: str = None) -> dict:
             "pref_min_chars": 74000,
             "pref_max_chars": 78000,
         }
-    p_root = os.path.join(STUDIO_ROOT, "PROJECTS")
+    p_root = os.path.join(projects_base, "PROJECTS_MAFIA")
     th_dir = _resolve_custom_tong_hop_dir("mafia", os.path.join(p_root, "TONG HOP"))
-    b_path = os.path.join(STUDIO_ROOT, "QUEUE_BACKLOG.json")
-    md_path = os.path.join(STUDIO_ROOT, "TIEN_DO_MAFIA_STUDIO.md")
+    b_path = os.path.join(queues_dir, "QUEUE_BACKLOG.json")
+    md_path = os.path.join(progress_dir, "TIEN_DO_MAFIA_STUDIO.md")
     lbl = "MAFIA BOSS × MAID / WAITRESS / UNDERESTIMATED WOMAN"
     return {
         "niche": "mafia",
