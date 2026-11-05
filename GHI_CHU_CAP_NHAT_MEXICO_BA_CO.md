@@ -436,3 +436,19 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
    - Trong [`src/main/services/script-video-bridge-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/script-video-bridge-service.js): Bổ sung hàm `_detectJobNiche(payload, scriptPath)` gắn nhãn chuẩn xác kênh (`homeless`, `mafia`, `mexico`, `01_...`..`12_...`) cho từng video trong hàng đợi Bàn #7.
    - Trong [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js): Mặc định lọc `#bridgeQueueList` theo đúng Kênh / Key đang chọn (`🔍 Đang lọc riêng: 🏚️ BÊN HOMELESS V12`), tuyệt đối không trộn 6 video của Mafia vào 9 video của Homeless (có nút chuyển đổi nếu người dùng muốn xem tổng hợp tất cả các kênh).
    - Trong [`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py): Lọc `recent_logs` theo đúng `niche_key` đang chọn để dòng log của kênh nào chỉ hiển thị ở kênh đó.
+
+---
+
+## 34. Nâng Cấp Bản `V1.0.6 (Build #120)` — Loại Bỏ Hoàn Toàn Các Ô Chọn Bị Lặp Lại 2–3 Lần ("Trùng Cảm Giác Chọn 2 Lần")
+
+### 34.1. Vấn đề từ ảnh chụp màn hình của người dùng (`media_1793817823553_91eecd80.jpg`)
+- Trên cùng 1 màn hình Viết Kịch Bản xuất hiện nhiều ô chọn giống hệt nhau nằm sát nhau gây cảm giác phải chọn 2 lần:
+  1. **Trùng ô chọn Key / Kênh:** Hộp trên có `🔑 CHỌN KEY: 🏚️ KEY BÊN HOMELESS V12 (10/10)` (`#topChannelKeySelector`), ngay hộp dưới lại có `📝 GIAO VIỆC: 🏚️ BÊN HOMELESS V12` (`#nicheSelector`), và trên Topbar đen ngoài cùng của Electron lại có thêm 1 ô `🔑 CHỌN KEY` (`#topGlobalKeySelect`).
+  2. **Trùng ô chọn Chế độ Tiêu đề:** Hàng công cụ có dropdown `🔥 Chế độ: Viết lại Tiêu đề (Chạy từ Bàn #1)` (`#titleModeSelector`), ngay bên dưới trong `#composerBody` lại có thêm 2 nút Radio `⚡ Chế độ Tiêu đề: 🔥 Viết lại Tiêu đề (Bàn #1) | 🎯 Dùng luôn Tiêu đề đã dán`.
+  3. **Trùng ô chọn Tự động Bàn #7 & Nút chuyển Tab:** Trên thanh Command Bar đã có `🔄 Tự động Bàn #7` và thanh 4 Sub-Tab, nhưng bên dưới lại lặp lại ô `🎬 Sau khi viết xong (Bàn #7)` và 2 nút `🎬 Tab Render Video`, `📡 Tab Log`.
+
+### 34.2. Giải pháp đã triển khai (`V1.0.6 Build #120`)
+- Trong [`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py), [`assets/script_studio_dashboard.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/assets/script_studio_dashboard.html) và [`src/renderer/index.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/index.html):
+  1. **Chỉ giữ DUY NHẤT 1 ô `🔑 CHỌN KEY:`** (kèm huy hiệu số lượng `10/10`); ẩn hoàn toàn ô `📝 GIAO VIỆC` trùng lặp ở hộp dưới và ô `.key-select-shell` trên Topbar ngoài.
+  2. **Chỉ giữ DUY NHẤT 1 ô chọn `🔥 Chế độ: Viết lại Tiêu đề / 🎯 Dùng luôn Tiêu đề đã dán`** trên thanh điều khiển; ẩn dòng Radio trùng lặp và ô `🎬 Sau khi viết xong (Bàn #7)` trùng lặp bên trong `#composerBody`.
+  3. **Bỏ các nút chuyển Tab bị lặp (`🎬 Tab Render Video`, `📡 Tab Log`)** ở hàng nút dưới và ẩn logo `ZC TEAM` thứ 2 khi chạy nhúng trong Electron (`body.embedded-electron .zc-brand-badge`), giúp giao diện gọn gàng trên 1 hàng duy nhất.

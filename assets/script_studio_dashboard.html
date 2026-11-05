@@ -717,7 +717,8 @@
   .studio-subtab-pane.active {
     display: block;
   }
-  body.embedded-electron .studio-subtab-btn {
+  body.embedded-electron .studio-subtab-btn,
+  body.embedded-electron .zc-brand-badge {
     display: none !important;
   }
   .render-stats-grid {
@@ -867,8 +868,9 @@
         <button id="btnToggleComposer" class="btn btn-dark btn-sm" style="border-color:var(--gold); color:var(--gold); font-weight:700;" onclick="toggleComposerBody()" title="Thu gọn hoặc mở rộng khung nhập tiêu đề">
           <span id="composerToggleLabel">🔽 Thu nhỏ ô nhập</span>
         </button>
-        <b style="font-size:13px; color:var(--gold);">📝 GIAO VIỆC:</b>
-        <select id="nicheSelector" onchange="switchChannel(this.value)" style="font-weight:700; color:#fde68a; border-color:var(--gold); padding:5px 9px; font-size:12px;">
+        <!-- Đã ẩn ô chọn Kênh/Key thứ 2 bị trùng lặp (chỉ chọn 1 lần duy nhất tại thanh 🔑 CHỌN KEY phía trên) -->
+        <b style="display:none;">📝 GIAO VIỆC:</b>
+        <select id="nicheSelector" onchange="switchChannel(this.value)" style="display:none;">
           <option value="01_Nhom_Ong_Gia_Tra_Dua_My_US">🇺🇸 01_Nhom_Ong_Gia_Tra_Dua_My_US (Ông già trả đũa - Mỹ US)</option>
           <option value="02_Nhom_Phu_Nu_Bao_Thu_My_US">🇺🇸 02_Nhom_Phu_Nu_Bao_Thu_My_US (Phụ nữ báo thù - Mỹ US)</option>
           <option value="03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico">🇲🇽 03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico (Bà già Drama Gia đình - Mexico)</option>
@@ -885,6 +887,10 @@
           <option value="homeless">🏚️ BÊN HOMELESS V12 (7 Parts, 70k–80k ký tự)</option>
           <option value="mafia" selected>🎩 BÊN MAFIA (5–6 Parts, 44k–48k ký tự)</option>
         </select>
+        <select id="titleModeSelector" onchange="syncTitleModeSelection(this.value)" style="padding:5px 9px; font-size:11.8px; font-weight:700; color:#fde68a; border-color:var(--gold); background:#0f172a;" title="Chọn chế độ xử lý khi dán Tiêu đề: Viết lại ở Bàn #1 hoặc Dùng luôn Tiêu đề đã dán (Bỏ qua Bàn #1 ➔ Chạy thẳng Bàn #1.5)">
+          <option value="rewrite" selected>🔥 Chế độ: Viết lại Tiêu đề (Chạy từ Bàn #1)</option>
+          <option value="keep_original">🎯 Chế độ: Dùng luôn Tiêu đề đã dán — Không viết lại (Chạy thẳng Bàn #1.5)</option>
+        </select>
         <select id="maxWorkers" style="padding:5px 8px; font-size:11.8px;" title="Chế độ chia tải luồng">
           <option value="0" selected>⚡ Tự động (&le;3 KB/Acc)</option>
           <option value="1">1 Luồng</option>
@@ -898,10 +904,6 @@
           <option value="high">Effort: High</option>
           <option value="low">Effort: Low</option>
         </select>
-        <select id="titleModeSelector" onchange="syncTitleModeSelection(this.value)" style="padding:5px 9px; font-size:11.8px; font-weight:700; color:#fde68a; border-color:var(--gold); background:#0f172a;" title="Chọn chế độ xử lý khi dán Tiêu đề: Viết lại ở Bàn #1 hoặc Dùng luôn Tiêu đề đã dán (Bỏ qua Bàn #1 ➔ Chạy thẳng Bàn #1.5)">
-          <option value="rewrite" selected>🔥 Chế độ: Viết lại Tiêu đề (Chạy từ Bàn #1)</option>
-          <option value="keep_original">🎯 Chế độ: Dùng luôn Tiêu đề đã dán — Không viết lại (Bỏ qua Bàn #1 ➔ Chạy thẳng Bàn #1.5)</option>
-        </select>
       </div>
 
       <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -912,29 +914,25 @@
         <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
         <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
         <button class="btn btn-red btn-sm" style="padding:6px 10px; font-size:11.8px;" onclick="stopWorker()">⏹️ Dừng</button>
-        <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #38bdf8; color:#38bdf8;" onclick="switchStudioSubTab('render')" title="Chuyển sang Tab nhỏ Render Video để quan sát tiến độ tạo Voice & Video">🎬 Tab Render Video</button>
-        <button class="btn btn-dark btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #fde68a; color:#fde68a;" onclick="switchStudioSubTab('logs')" title="Chuyển sang Tab Nhật ký Log riêng biệt để kiểm tra chi tiết">📡 Tab Log</button>
       </div>
     </div>
 
-    <!-- KHUNG 2 Ô NHẬP TIÊU ĐỀ + CHỌN CHẾ ĐỘ TIÊU ĐỀ KHI DÁN (CÓ THỂ THU NHỎ BẰNG NÚT TRÊN) -->
+    <!-- KHUNG 2 Ô NHẬP TIÊU ĐỀ (ĐÃ ẨN THANH CHỌN TRÙNG LẶP BÊN TRONG ĐỂ CHỈ CHỌN 1 LẦN Ở TRÊN) -->
     <div id="composerBody" style="margin-top:8px; padding-top:8px; border-top:1px solid #1e293b;">
-      <!-- THANH CHỌN NHANH CHẾ ĐỘ TIÊU ĐỀ NGAY KHI DÁN + CHẾ ĐỘ TỰ ĐỘNG LÀM VIDEO LUÔN -->
-      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px; padding:7px 10px; border-radius:8px; background:rgba(15,23,42,0.85); border:1px solid #334155;">
+      <div style="display:none;">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span style="font-size:12px; font-weight:700; color:#f8fafc;">⚡ Chế độ Tiêu đề:</span>
-          <label id="lblModeRewrite" onclick="syncTitleModeSelection('rewrite')" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; cursor:pointer; font-size:11.8px; font-weight:700; border:1px solid var(--gold); background:rgba(245,185,66,0.18); color:#fde68a; transition:all 0.15s;">
-            <input type="radio" name="titlePasteModeRadio" id="radioModeRewrite" value="rewrite" checked onchange="syncTitleModeSelection('rewrite')" style="accent-color:#f5b942; cursor:pointer;" />
+          <label id="lblModeRewrite" onclick="syncTitleModeSelection('rewrite')">
+            <input type="radio" name="titlePasteModeRadio" id="radioModeRewrite" value="rewrite" checked onchange="syncTitleModeSelection('rewrite')" />
             <span>🔥 Viết lại Tiêu đề (Bàn #1)</span>
           </label>
-          <label id="lblModeKeepOriginal" onclick="syncTitleModeSelection('keep_original')" style="display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; cursor:pointer; font-size:11.8px; font-weight:700; border:1px solid #334155; background:#0f172a; color:#94a3b8; transition:all 0.15s;">
-            <input type="radio" name="titlePasteModeRadio" id="radioModeKeepOriginal" value="keep_original" onchange="syncTitleModeSelection('keep_original')" style="accent-color:#10b981; cursor:pointer;" />
+          <label id="lblModeKeepOriginal" onclick="syncTitleModeSelection('keep_original')">
+            <input type="radio" name="titlePasteModeRadio" id="radioModeKeepOriginal" value="keep_original" onchange="syncTitleModeSelection('keep_original')" />
             <span>🎯 Dùng luôn Tiêu đề đã dán (Chạy thẳng Bàn #1.5)</span>
           </label>
         </div>
-        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-          <span style="font-size:11.5px; font-weight:800; color:#00ff88;">🎬 Sau khi viết xong (Bàn #7):</span>
-          <select id="embeddedAutoVideoMode" onchange="syncEmbeddedBridgeMode(this.value)" style="padding:4px 9px; font-size:11.5px; font-weight:800; color:#00ff88; background:#06281e; border:1px solid #00ff88; border-radius:6px; cursor:pointer;">
+        <div>
+          <select id="embeddedAutoVideoMode" onchange="syncEmbeddedBridgeMode(this.value)">
             <option value="STREAMING_VIDEO" selected>⚡ Viết Kịch Bản Xong ➔ Tạo Voice + Làm Video MP4 Luôn</option>
             <option value="BATCH_VIDEO">📦 Đợi viết xong cả lô ➔ Tạo Voice + Làm Video 1 lượt</option>
             <option value="STREAMING_VOICE">🎙️ Viết Kịch Bản Xong ➔ Chỉ Tạo Voice (.wav)</option>

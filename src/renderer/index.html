@@ -31,8 +31,8 @@
     </div>
 
     <div class="top-pills">
-      <!-- BỘ CHỌN KEY / KÊNH SẢN XUẤT TOÀN CỤC -->
-      <div class="key-select-shell" title="Chọn Bộ Key / Kênh kịch bản đang vận hành">
+      <!-- BỘ CHỌN KEY / KÊNH SẢN XUẤT TOÀN CỤC (Ẩn trên Topbar để tránh trùng với ô CHỌN KEY chính trong Workspace) -->
+      <div class="key-select-shell" style="display:none;" title="Chọn Bộ Key / Kênh kịch bản đang vận hành">
         <span class="key-label"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">vpn_key</span> CHỌN KEY:</span>
         <select id="topGlobalKeySelect">
           <option value="01_Nhom_Ong_Gia_Tra_Dua_My_US">🇺🇸 01_Nhom_Ong_Gia_Tra_Dua_My_US (Ông già trả đũa · US)</option>
@@ -201,7 +201,7 @@
             <button id="btnInspectLockedConfig" type="button" class="stitch-btn-amber">
               <span class="material-symbols-outlined">fact_check</span> Xem Cấu Hình &amp; Folder
             </button>
-            <button id="btnGoToVideoConfigTab" type="button" onclick="window.switchWorkspaceSubTab('render')">
+            <button id="btnGoToVideoConfigTab" type="button" style="display:none;" onclick="window.switchWorkspaceSubTab('render')">
               <span class="material-symbols-outlined">movie_filter</span> Tab Render Video
             </button>
             <button id="btnManualRunTongHopToVideo" type="button" class="stitch-btn-emerald">
