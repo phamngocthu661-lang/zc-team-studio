@@ -75,7 +75,7 @@
           <span class="nav-label">Viết Kịch Bản &amp; Render</span>
           <span class="nav-badge">9 Bàn + GPU</span>
         </button>
-        <button class="nav" data-page="batch" style="display:none;">
+        <button class="nav" data-page="batch">
           <span class="nav-idx">02</span>
           <span class="material-symbols-outlined nav-icon">movie_filter</span>
           <span class="nav-label">Tạo Batch Video</span>
@@ -245,15 +245,15 @@
         <!-- THANH CHỌN CHẾ ĐỘ XEM LOG (CHỈ HIỆN KHI Ở TAB NHỎ SỐ 3: NHẬT KÝ LOG) -->
         <div id="zcLogModeToolbar" class="zc-log-mode-toolbar" style="display:none;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <strong style="color:#38bdf8;font-size:12.5px;">📡 CHẾ ĐỘ XEM NHẬT KÝ LOG:</strong>
-            <button type="button" id="zcBtnLogMode_SPLIT" class="zc-log-mode-btn active" onclick="window.setWorkspaceLogViewMode('SPLIT')">
-              📋 Xem Cả 2 Log Cùng Lúc (Viết Kịch Bản AI + Render Video GPU)
-            </button>
-            <button type="button" id="zcBtnLogMode_SCRIPT" class="zc-log-mode-btn" onclick="window.setWorkspaceLogViewMode('SCRIPT')">
-              ✍️ Chỉ Xem Log Viết Kịch Bản &amp; 9 Bàn Agent (Toàn màn hình)
+            <strong style="color:#38bdf8;font-size:12.5px;">📡 CHỌN LOẠI NHẬT KÝ LOG CẦN XEM:</strong>
+            <button type="button" id="zcBtnLogMode_SCRIPT" class="zc-log-mode-btn active" onclick="window.setWorkspaceLogViewMode('SCRIPT')">
+              ✍️ Log Viết Kịch Bản &amp; 9 Bàn Agent (Toàn màn hình · Theo Kênh đang chọn)
             </button>
             <button type="button" id="zcBtnLogMode_RENDER" class="zc-log-mode-btn" onclick="window.setWorkspaceLogViewMode('RENDER')">
-              🎬 Chỉ Xem Log Render Video &amp; NVENC GPU (Toàn màn hình)
+              🎬 Log Render Video &amp; NVENC GPU (Toàn màn hình)
+            </button>
+            <button type="button" id="zcBtnLogMode_SPLIT" class="zc-log-mode-btn" onclick="window.setWorkspaceLogViewMode('SPLIT')">
+              📋 Chia Đôi Xem Cả 2 Log
             </button>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
@@ -284,35 +284,44 @@
         </div>
 
         <!-- ================================================================= -->
-        <!-- TAB NHỎ SỐ 2: RENDER VIDEO & TIẾN ĐỘ GPU (BÀN #7 + BATCH VIDEO)   -->
+        <!-- TAB NHỎ SỐ 2: RENDER VIDEO & TIẾN ĐỘ GPU (BÀN #7 TOÀN MÀN HÌNH)   -->
         <!-- ================================================================= -->
         <div id="zcRenderSubTabContainer" style="display:none;">
-          <!-- KHỐI 1: TIẾN ĐỘ TỰ ĐỘNG BÀN #7 (TỪ KỊCH BẢN AI SANG VOICE & VIDEO) -->
-          <div id="bridgeQueueBox" class="panel stitch-bridge-queue" style="display:block;margin-bottom:12px;">
-            <div class="stitch-section-head" style="flex-wrap:wrap;gap:8px;">
+          <div id="bridgeQueueBox" class="panel stitch-bridge-queue" style="display:flex;flex-direction:column;height:calc(100vh - 185px);min-height:660px;margin-bottom:0;">
+            <div class="stitch-section-head" style="flex-wrap:wrap;gap:8px;padding-bottom:8px;border-bottom:1px solid #1e293b;">
               <div>
-                <strong id="bridgeQueueTitle" style="font-size:13.5px;color:#00ff88;">🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice (.wav), Phụ Đề (.srt) &amp; Render Video GPU (.mp4)</strong>
-                <div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">Tự động nhận kịch bản sạch <code>_KB.txt</code> từ Tab 1 (Viết Kịch Bản) để tạo Voice AI, khớp phụ đề Whisper GPU và xuất Video MP4.</div>
+                <strong id="bridgeQueueTitle" style="font-size:14.5px;color:#00ff88;">🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice (.wav), Phụ Đề (.srt) &amp; Render Video GPU (.mp4)</strong>
+                <div id="bridgeQueueSubtitle" style="font-size:11.5px;color:#94a3b8;margin-top:3px;">Chỉ hiển thị riêng danh sách Video của Kênh / Key đang chọn (Không trộn lẫn dữ liệu từ các Kênh khác).</div>
               </div>
               <div class="actions" style="flex-wrap:wrap;gap:6px;">
+                <button id="btnToggleBridgeChannelFilter" type="button" onclick="window.toggleBridgeChannelFilter()" style="background:#1e1b4b;color:#fde047;border:1px solid #6366f1;font-weight:700;" title="Bấm để chuyển đổi giữa: Chỉ hiện Kênh đang chọn hoặc Hiện tất cả các Kênh">
+                  🔍 Chỉ hiện Kênh đang chọn
+                </button>
                 <button id="btnPushAllReadyScriptsToBridge" type="button" class="stitch-btn-emerald" onclick="window.triggerAllReadyScriptsToBridge()">
                   <span class="material-symbols-outlined">rocket_launch</span> Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render
                 </button>
                 <button id="btnOpenBridgeOutputFolder" type="button"><span class="material-symbols-outlined">folder_open</span> Mở Folder Output Video</button>
                 <button id="btnClearBridgeCompleted" type="button"><span class="material-symbols-outlined">cleaning_services</span> Dọn mục đã xong</button>
+                <button type="button" onclick="document.querySelector('.nav[data-page=batch]')?.click()" title="Mở Tab 02 Tạo Batch Video độc lập ở thanh bên trái">
+                  <span class="material-symbols-outlined">tune</span> Mở Tab 02: Cấu Hình Batch Video
+                </button>
               </div>
             </div>
-            <div id="bridgeQueueList" class="stitch-bridge-queue-list">
-              <div style="padding:10px 12px;background:#0d1320;border:1px dashed #334155;border-radius:6px;color:#94a3b8;font-size:12px;">
-                ⏳ Hàng đợi Bàn #7 đang rảnh. Khi kịch bản ở Tab 1 viết xong (hoặc khi bạn bấm <strong>"🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render"</strong>), tiến độ tạo Voice &amp; Render Video sẽ hiển thị trực tiếp tại đây.
+            <div id="bridgeQueueList" class="stitch-bridge-queue-list" style="flex:1;max-height:none;min-height:560px;overflow-y:auto;padding-right:4px;margin-top:8px;">
+              <div style="padding:14px 16px;background:#0d1320;border:1px dashed #334155;border-radius:8px;color:#94a3b8;font-size:12.5px;">
+                ⏳ Hàng đợi Bàn #7 của kênh này đang rảnh. Khi kịch bản ở Tab 1 viết xong (hoặc khi bạn bấm <strong>"🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render"</strong>), tiến độ tạo Voice &amp; Render Video sẽ hiển thị toàn màn hình tại đây.
               </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- KHỐI 2: TẠO BATCH VIDEO HÀNG LOẠT & BẢNG TIẾN ĐỘ RENDER ĐẶT NGAY TRÊN ĐẦU -->
-          <div id="page-batch" class="zc-batch-embedded-pane">
-            <!-- Top Action Bar -->
-            <div class="stitch-page-header" style="margin-bottom:12px;">
+      <!-- ================================================================= -->
+      <!-- TAB 02: TẠO BATCH VIDEO HÀNG LOẠT (TÁCH RIÊNG ĐỘC LẬP)            -->
+      <!-- ================================================================= -->
+      <section class="page" id="page-batch">
+        <!-- Top Action Bar -->
+        <div class="stitch-page-header" style="margin-bottom:12px;">
               <div class="stitch-header-left">
                 <div class="stitch-icon-box neon">
                   <span class="material-symbols-outlined">movie_filter</span>
@@ -347,7 +356,7 @@
                 <button id="btnOpenCurrentBatchOutput" type="button" title="Mở thư mục Output">
                   <span class="material-symbols-outlined">folder_open</span>
                 </button>
-                <button type="button" onclick="window.switchWorkspaceSubTab('logs');window.setWorkspaceLogViewMode('RENDER');" title="Xem Nhật ký Log Render GPU NVENC ở Tab 3">
+                <button type="button" onclick="document.querySelector('.nav[data-page=script-studio]')?.click();window.switchWorkspaceSubTab('logs');window.setWorkspaceLogViewMode('RENDER');" title="Xem Nhật ký Log Render GPU NVENC ở Tab 3">
                   <span class="material-symbols-outlined">terminal</span> Xem Log Render
                 </button>
               </div>
@@ -739,8 +748,6 @@
                 </div>
               </div>
             </details>
-          </div>
-        </div>
           </div>
         </div>
       </section>

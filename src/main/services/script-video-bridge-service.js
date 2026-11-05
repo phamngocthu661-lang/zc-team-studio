@@ -674,7 +674,33 @@ class ScriptVideoBridgeService {
     };
   }
 
+  _detectJobNiche(payload = {}, scriptPath = '') {
+    const rawNiche = String(payload.niche || payload.channel || '').trim();
+    const combinedPath = `${scriptPath} ${payload.project_dir || ''} ${payload.projectDir || ''} ${payload.tong_hop_dir || ''} ${payload.tongHopDir || ''} ${payload.project_id || ''} ${payload.projectId || ''} ${payload.scriptName || ''}`;
+    const upper = combinedPath.toUpperCase();
+    for (const k of Object.keys(DEFAULT_VOICE_PROFILE_BY_KEY)) {
+      if (k.startsWith('0') || k.startsWith('1')) {
+        if (upper.includes(k.toUpperCase())) return k;
+      }
+    }
+    if (upper.includes('PROJECTS_HOMELESS') || upper.includes('-HOME-') || upper.includes('_HOME_')) {
+      return 'homeless';
+    }
+    if (upper.includes('PROJECTS_MEXICO') || upper.includes('-MEX-') || upper.includes('_MEX_')) {
+      return 'mexico';
+    }
+    if (upper.includes('-MAFIA-') || upper.includes('_MAFIA_')) {
+      return 'mafia';
+    }
+    if (rawNiche) return rawNiche;
+    return this.activeChannelKey || 'mafia';
+  }
+
   getPublicState() {
+    const normalizedQueue = this.queue.slice(-200).map((item) => ({
+      ...item,
+      niche: this._detectJobNiche(item, item.scriptPath)
+    }));
     return {
       online: true,
       bridgePort: BRIDGE_PORT,
@@ -688,7 +714,7 @@ class ScriptVideoBridgeService {
       lockedConfigSummary: this.summarizeLockedConfig(),
       lockedVideoConfig: this.lockedVideoConfig,
       activeJob: this.activeJob,
-      queue: this.queue.slice(-30)
+      queue: normalizedQueue
     };
   }
 
@@ -750,11 +776,12 @@ class ScriptVideoBridgeService {
 
     const baseName = path.basename(scriptPath, path.extname(scriptPath));
     const shouldWaitBatch = !forceImmediate && this.settings.triggerMode === 'BATCH_AFTER_ALL';
+    const detectedNiche = this._detectJobNiche(payload, scriptPath);
     const job = {
       id: crypto.randomUUID(),
       projectId: payload.project_id || payload.projectId || baseName,
       projectDir: payload.project_dir || payload.projectDir || '',
-      niche: payload.niche || 'mafia',
+      niche: detectedNiche,
       winnerTitle: payload.winner_title || payload.winnerTitle || '',
       scriptPath,
       scriptName: path.basename(scriptPath),

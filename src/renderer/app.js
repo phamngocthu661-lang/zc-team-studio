@@ -317,13 +317,6 @@ async function renderSubtitleBackgroundPreview(root,prefix){if(!root)return;root
 async function openSubtitlePreview(prefix){const cap=prefix==='single'?'Single':'Batch',label=prefix==='single'?'một video':'batch';state.activeRenderMode=prefix;const width=Math.max(1,Number($(`${prefix}Width`)?.value||1920)),height=Math.max(1,Number($(`${prefix}Height`)?.value||1080));let sub=renderSubtitleOverride(prefix),sample=await subtitlePreviewSample(prefix,{width,height,subtitle:subtitlePreviewOnly(sub)}),cfg=subtitleRenderBox(sub,width,height);showModal(`Preview subtitle ${label}`,`<div class="subtitle-preview-wrap"><div id="${prefix}SubtitlePreviewStage" class="subtitle-preview-stage green-template-stage" style="aspect-ratio:${width}/${height}"><div id="${prefix}SubtitleBackground" class="subtitle-preview-background"></div><div id="${prefix}SubtitleTemplateLayers" class="green-template-layers"></div><div id="${prefix}SubtitlePreviewBox" class="subtitle-preview-box"><div id="${prefix}SubtitlePreviewText" class="subtitle-preview-text">${htmlEscape(sample)}</div><span class="green-resize nw" data-resize="nw"></span><span class="green-resize ne" data-resize="ne"></span><span class="green-resize sw" data-resize="sw"></span><span class="green-resize se" data-resize="se"></span></div></div><div class="form four-col compact"><label>X<input id="subPreviewX" type="number"></label><label>Y<input id="subPreviewY" type="number"></label><label>Width<input id="subPreviewW" type="number"></label><label>Height<input id="subPreviewH" type="number"></label><label>Size sub<input id="subPreviewSize" type="number" min="8"></label><label>Màu sub<input id="subPreviewColor" type="color"></label><label>Màu viền<input id="subPreviewOutlineColor" type="color"></label></div><div class="actions"><button id="subPreviewCenter">Căn giữa</button><button id="subPreviewBottom">Căn dưới bottom</button><button id="subPreviewApply" class="primary">Áp dụng</button></div><div id="subPreviewInfo" class="source-preview-info"></div></div>`);document.querySelector('.modal-card')?.classList.add('subtitle-preview-modal');const stage=$(`${prefix}SubtitlePreviewStage`),box=$(`${prefix}SubtitlePreviewBox`),text=$(`${prefix}SubtitlePreviewText`),info=$('subPreviewInfo');await renderSubtitleBackgroundPreview($(`${prefix}SubtitleBackground`),prefix);const template=await activeGreenTemplate();await renderGreenTemplatePreview($(`${prefix}SubtitleTemplateLayers`),template,{width,height});$(`${prefix}SubtitleTemplateLayers`)?.querySelectorAll('.green-subtitle-demo').forEach(el=>el.remove());let raf=0,refreshTimer=0;function sampleSub(){return{...subtitlePreviewOnly(sub),maxWidthPercent:Math.max(MIN_SUBTITLE_BOX_WIDTH_PERCENT,Math.min(100,Math.round(cfg.width/width*1000)/10)),boxWidthPercent:Math.max(MIN_SUBTITLE_BOX_WIDTH_PERCENT,Math.min(100,Math.round(cfg.width/width*1000)/10)),boxHeightPercent:Math.max(1,Math.min(60,Math.round(cfg.height/height*1000)/10))};}async function refreshText(){const next=await subtitlePreviewSample(prefix,{width,height,subtitle:sampleSub()});sample=next;text.textContent=sample;cfg=clampCfg(cfg);}function scheduleTextRefresh(){clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>refreshText().catch(()=>{}),120);}function clampCfg(next){const minW=Math.round(width*MIN_SUBTITLE_BOX_WIDTH_PERCENT/100),minH=Math.max(24,Math.round(height*0.08));const w=Math.max(minW,Math.min(width,Math.round(next.width)));const h=Math.max(minH,Math.min(height,Math.round(next.height)));return{x:Math.max(0,Math.min(width-w,Math.round(next.x))),y:Math.max(0,Math.min(height-h,Math.round(next.y))),width:w,height:h};}function syncInputs(){if($('subPreviewX'))$('subPreviewX').value=cfg.x;if($('subPreviewY'))$('subPreviewY').value=cfg.y;if($('subPreviewW'))$('subPreviewW').value=cfg.width;if($('subPreviewH'))$('subPreviewH').value=cfg.height;if($('subPreviewSize'))$('subPreviewSize').value=Math.round(Number(sub.fontSize||32));if($('subPreviewColor'))$('subPreviewColor').value=sub.color||'#FFFFFF';if($('subPreviewOutlineColor'))$('subPreviewOutlineColor').value=sub.outlineColor||'#000000';const bottom=Math.max(0,height-cfg.y-cfg.height),maxWidthPercent=Math.round(cfg.width/width*1000)/10;info.textContent=`Canvas ${width}x${height} · Font ${sub.fontFamily} · Màu ${sub.color||'#FFFFFF'} · Màu viền ${sub.outlineColor||'#000000'} · Size input ${Math.round(Number(sub.fontSize||32))} · Preview size ${subtitleExportFontSize(sub)} · Bottom ${bottom} · Width ${maxWidthPercent}% · Outline ${sub.outlineWidth}`;}function applyBox(){const rect=stage.getBoundingClientRect(),scale=(rect.width||width)/width,renderScale=Number(sub.renderScale??1),fontPx=Math.max(8,subtitleExportFontSize(sub)*scale),outline=Math.max(0,Number(sub.outlineWidth??1)*renderScale*scale);box.style.left=`${cfg.x/width*100}%`;box.style.top=`${cfg.y/height*100}%`;box.style.width=`${cfg.width/width*100}%`;box.style.height=`${cfg.height/height*100}%`;text.style.fontFamily=sub.fontFamily||'Arial';text.style.fontWeight=String(Number(sub.fontWeight|| (sub.bold===true?700:400)));text.style.letterSpacing=Number.isFinite(Number(sub.letterSpacingEm))?`${Number(sub.letterSpacingEm)}em`:Number.isFinite(Number(sub.letterSpacingPx))?`${Number(sub.letterSpacingPx)}px`:'0';text.style.fontStyle=sub.italic===true?'italic':'normal';text.style.lineHeight=String(subtitlePreviewLineHeight(sub));text.style.fontSize=`${fontPx}px`;text.style.color=sub.color||'#FFFFFF';text.style.textShadow=subtitleOutlineShadow(outline,sub.outlineColor);syncInputs();}function scheduleBox(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;applyBox();});}document.querySelectorAll('#modalBody input').forEach(el=>el.addEventListener('input',()=>{if(el.id==='subPreviewSize'){sub={...sub,fontSize:Number(el.value||32)};cfg=clampCfg(cfg);applyBox();scheduleTextRefresh();return;}if(el.id==='subPreviewColor'){sub={...sub,color:el.value||'#FFFFFF'};applyBox();return;}if(el.id==='subPreviewOutlineColor'){sub={...sub,outlineColor:el.value||'#000000'};applyBox();return;}cfg=clampCfg({x:Number($('subPreviewX').value||0),y:Number($('subPreviewY').value||0),width:Number($('subPreviewW').value||1),height:Number($('subPreviewH').value||1)});applyBox();if(['subPreviewW','subPreviewH'].includes(el.id))scheduleTextRefresh();}));box.addEventListener('pointerdown',(ev)=>{if(ev.target.closest('.green-resize'))return;ev.preventDefault();const rect=stage.getBoundingClientRect(),start={clientX:ev.clientX,clientY:ev.clientY,x:cfg.x,y:cfg.y};box.setPointerCapture(ev.pointerId);const move=(m)=>{cfg=clampCfg({...cfg,x:start.x+(m.clientX-start.clientX)/rect.width*width,y:start.y+(m.clientY-start.clientY)/rect.height*height});scheduleBox();};const up=()=>{box.removeEventListener('pointermove',move);box.removeEventListener('pointerup',up);box.removeEventListener('pointercancel',up);};box.addEventListener('pointermove',move);box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);});box.querySelectorAll('.green-resize').forEach(handle=>handle.addEventListener('pointerdown',(ev)=>{ev.preventDefault();ev.stopPropagation();const direction=handle.dataset.resize,rect=stage.getBoundingClientRect(),start={clientX:ev.clientX,clientY:ev.clientY,x:cfg.x,y:cfg.y,w:cfg.width,h:cfg.height};handle.setPointerCapture(ev.pointerId);const move=(m)=>{let dx=(m.clientX-start.clientX)/rect.width*width,dy=(m.clientY-start.clientY)/rect.height*height,x=start.x,y=start.y,w=start.w,h=start.h;if(direction.includes('e'))w=start.w+dx;if(direction.includes('s'))h=start.h+dy;if(direction.includes('w')){w=start.w-dx;x=start.x+dx;}if(direction.includes('n')){h=start.h-dy;y=start.y+dy;}cfg=clampCfg({x,y,width:w,height:h});scheduleBox();scheduleTextRefresh();};const up=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);};handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);}));$('subPreviewCenter').onclick=()=>{cfg=clampCfg({...cfg,x:(width-cfg.width)/2});applyBox();};$('subPreviewBottom').onclick=()=>{cfg=clampCfg({...cfg,y:height-cfg.height-Number($(`${prefix}SubtitleMargin`)?.value||20)});applyBox();};$('subPreviewApply').onclick=()=>{const bottom=Math.max(0,Math.round(height-cfg.y-cfg.height)),maxWidthPercent=Math.max(MIN_SUBTITLE_BOX_WIDTH_PERCENT,Math.min(100,Math.round(cfg.width/width*1000)/10)),saved={positionMode:'absolute',fontSize:Math.max(8,Math.round(Number(sub.fontSize||32))),color:sub.color||'#FFFFFF',outlineColor:sub.outlineColor||'#000000',maxWidthPercent,boxXPercent:Math.round(cfg.x/width*1000)/10,boxYPercent:Math.round(cfg.y/height*1000)/10,boxWidthPercent:maxWidthPercent,boxHeightPercent:Math.round(cfg.height/height*1000)/10};if($(`${prefix}SubtitleSize`))$(`${prefix}SubtitleSize`).value=saved.fontSize;if($(`${prefix}SubtitleMargin`))$(`${prefix}SubtitleMargin`).value=bottom;saveSubtitlePreview(prefix,saved);closeModal();toast(`Đã áp dụng subtitle cho ${label}.`);};
 }
 function activePage(name){
-  if(name==='batch'){
-    activePage('script-studio');
-    if(typeof window.switchWorkspaceSubTab==='function'){
-      window.switchWorkspaceSubTab('render');
-    }
-    return;
-  }
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===`page-${name}`));
   document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
   if(name==='dashboard')loadDashboard();
@@ -2589,6 +2582,7 @@ async function initLicenseControls() {
     }
     $('topGlobalKeySelect').onchange = async () => {
       const ch = $('topGlobalKeySelect').value || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
+      window._currentStudioNiche = ch;
       localStorage.setItem('zc_active_channel_key', ch);
       const iframe = $('scriptStudioIframe');
       if (iframe && iframe.contentWindow) {
@@ -2597,11 +2591,13 @@ async function initLicenseControls() {
       if (typeof applyChannelKeyPresetToUi === 'function') {
         await applyChannelKeyPresetToUi(ch);
       }
-      toast(`🔑 Đã chọn Key / Kênh: ${ch} (Tự động nạp Project & Voice cố định của Key)`);
+      if (_lastBridgeState) renderScriptBridgeState(_lastBridgeState);
+      toast(`🔑 Đã chọn Key / Kênh: ${ch} (Tự động nạp Project, Voice & lọc riêng danh sách Video của Key)`);
     };
     window.addEventListener('message', (ev) => {
       if (ev?.data?.type === 'ZC_CHANNEL_KEY_CHANGED' && ev.data.channel) {
         const ch = ev.data.channel;
+        window._currentStudioNiche = ch;
         if ($('topGlobalKeySelect').value !== ch && [...$('topGlobalKeySelect').options].some(o => o.value === ch)) {
           $('topGlobalKeySelect').value = ch;
         }
@@ -2609,6 +2605,7 @@ async function initLicenseControls() {
         if (typeof applyChannelKeyPresetToUi === 'function') {
           applyChannelKeyPresetToUi(ch).catch(() => {});
         }
+        if (_lastBridgeState) renderScriptBridgeState(_lastBridgeState);
       }
     });
   }
@@ -3034,50 +3031,147 @@ function renderScriptBridgeState(st) {
 
   const queueBox = $('bridgeQueueBox');
   const queueTitle = $('bridgeQueueTitle');
+  const queueSubtitle = $('bridgeQueueSubtitle');
   const queueList = $('bridgeQueueList');
-  const items = Array.isArray(st.queue) ? st.queue : [];
+  const filterBtn = $('btnToggleBridgeChannelFilter');
+  const allItems = Array.isArray(st.queue) ? st.queue : [];
+
+  const activeChan = String(
+    window._currentStudioNiche ||
+    $('topGlobalKeySelect')?.value ||
+    localStorage.getItem('zc_active_channel_key') ||
+    st.activeChannelKey ||
+    '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico'
+  ).trim();
+
+  const detectJobChannel = (job) => {
+    const raw = String(job?.niche || '').trim();
+    if (raw) {
+      const low = raw.toLowerCase();
+      if (low === 'homeless' || low.includes('homeless')) return 'homeless';
+      if (low === 'mafia' || low.includes('mafia')) return 'mafia';
+      if (low === 'mexico') return 'mexico';
+      return raw;
+    }
+    const hay = `${job?.scriptPath || ''} ${job?.projectDir || ''} ${job?.tongHopDir || ''} ${job?.scriptName || ''} ${job?.projectId || ''}`;
+    const mKey = hay.match(/(0[1-9]|1[0-2])_[A-Za-z0-9_]+/);
+    if (mKey) return mKey[0];
+    if (/PROJECTS_HOMELESS|TONG[ _]HOP[ _]HOMELESS|-HOME-/i.test(hay)) return 'homeless';
+    if (/PROJECTS_MEXICO|TONG[ _]HOP[ _]MEXICO|-MEX-/i.test(hay)) return 'mexico';
+    if (/PROJECTS[\\\/]|-MAFIA-/i.test(hay)) return 'mafia';
+    return 'mafia';
+  };
+
+  const isSameChannelGroup = (jobChan, targetChan) => {
+    const jc = String(jobChan || '').toLowerCase();
+    const tc = String(targetChan || '').toLowerCase();
+    if (!tc) return true;
+    if (jc === tc) return true;
+    if ((jc === 'mexico' || jc === '03_nhom_ba_gia_drama_gia_dinh_mexico') &&
+        (tc === 'mexico' || tc === '03_nhom_ba_gia_drama_gia_dinh_mexico')) {
+      return true;
+    }
+    return false;
+  };
+
+  const channelDisplayLabel = (ch) => {
+    const low = String(ch || '').toLowerCase();
+    if (low === 'homeless') return '🏚️ BÊN HOMELESS V12';
+    if (low === 'mafia') return '🎩 BÊN MAFIA';
+    if (low === 'mexico' || low === '03_nhom_ba_gia_drama_gia_dinh_mexico') return '🇲🇽 MEXICO BÀ CÔ';
+    return `🔑 ${ch}`;
+  };
+
+  const showAll = Boolean(window._bridgeShowAllChannels);
+  const channelItems = allItems.filter((j) => isSameChannelGroup(detectJobChannel(j), activeChan));
+  const items = showAll ? allItems : channelItems;
+  const hiddenOtherCount = Math.max(0, allItems.length - channelItems.length);
+  const chanLabel = channelDisplayLabel(activeChan);
+
+  if (filterBtn) {
+    if (showAll) {
+      filterBtn.style.background = '#065f46';
+      filterBtn.style.color = '#6ee7b7';
+      filterBtn.style.borderColor = '#10b981';
+      filterBtn.textContent = `🌐 Đang hiện TẤT CẢ các Kênh (${allItems.length} video) ➔ Bấm để chỉ lọc [${chanLabel}]`;
+    } else {
+      filterBtn.style.background = '#1e1b4b';
+      filterBtn.style.color = '#fde047';
+      filterBtn.style.borderColor = '#6366f1';
+      filterBtn.textContent = `🔍 Đang lọc riêng: ${chanLabel} (${channelItems.length} video)${hiddenOtherCount > 0 ? ` · Đã ẩn ${hiddenOtherCount} video kênh khác` : ''}`;
+    }
+  }
+
+  if (queueSubtitle) {
+    queueSubtitle.innerHTML = showAll
+      ? `🌐 Đang hiển thị gộp <strong>tất cả các kênh (${allItems.length} video)</strong>. Bấm nút <strong>"🔍 Đang hiện TẤT CẢ..."</strong> bên phải để tách riêng từng kênh.`
+      : `🔒 Đang hiển thị độc lập dữ liệu của kênh <strong style="color:#fde047;">${htmlEscape(chanLabel)}</strong> (${channelItems.length} video)${hiddenOtherCount > 0 ? ` — Đã tách riêng <strong>${hiddenOtherCount} video</strong> của các kênh khác để không bị lẫn lộn.` : '.'}`;
+  }
 
   if (queueBox && queueList) {
-    queueBox.style.display = 'block';
+    queueBox.style.display = 'flex';
     if ($('zcBadgeSubTab_render')) {
       const activeCount0 = items.filter(x => ['RENDERING', 'WAITING_GPU', 'WAITING_BATCH'].includes(x.status)).length;
       const doneCount0 = items.filter(x => x.status === 'COMPLETED').length;
       if (activeCount0 > 0) {
-        $('zcBadgeSubTab_render').textContent = `🟢 ${activeCount0} đang render · ${doneCount0}/${items.length} MP4`;
+        $('zcBadgeSubTab_render').textContent = `🟢 ${activeCount0} đang xử lý · ${doneCount0}/${items.length} MP4`;
       } else if (items.length > 0) {
         $('zcBadgeSubTab_render').textContent = `${doneCount0}/${items.length} MP4`;
+      } else {
+        $('zcBadgeSubTab_render').textContent = '0 MP4';
       }
     }
     if (!items.length) {
       if (queueTitle) {
-        queueTitle.textContent = '🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice (.wav), Phụ Đề (.srt) & Render Video GPU (.mp4)';
+        queueTitle.textContent = `🎬 Bàn #7 [${chanLabel}] — Tiến Độ Tự Động Tạo Voice (.wav), Phụ Đề (.srt) & Render Video GPU (.mp4)`;
       }
-      queueList.innerHTML = `<div style="padding:10px 12px;background:#0d1320;border:1px dashed #334155;border-radius:6px;color:#94a3b8;font-size:12px;">⏳ Hàng đợi Bàn #7 đang rảnh. Khi kịch bản ở Tab 1 viết xong (hoặc khi bạn bấm <strong>"🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render"</strong>), tiến độ tạo Voice &amp; Render Video sẽ hiển thị trực tiếp tại đây.</div>`;
+      queueList.innerHTML = `<div style="padding:18px 16px;background:#0d1320;border:1px dashed #334155;border-radius:8px;color:#94a3b8;font-size:12.5px;">
+        ⏳ Hàng đợi Bàn #7 của kênh <strong style="color:#fde047;">${htmlEscape(chanLabel)}</strong> hiện chưa có video nào.${hiddenOtherCount > 0 ? `<br/><span style="color:#38bdf8;">💡 Đang có ${hiddenOtherCount} video thuộc kênh khác (đã được tách riêng). Bạn có thể đổi Kênh hoặc bấm nút <strong>"🔍 Đang lọc riêng..."</strong> ở góc phải nếu muốn xem tất cả.</span>` : `<br/>Khi kịch bản ở Tab 1 viết xong (hoặc khi bạn bấm <strong>"🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render"</strong>), tiến độ tạo Voice &amp; Render Video sẽ hiển thị toàn màn hình tại đây.`}
+      </div>`;
     } else {
       const activeCount = items.filter(x => ['RENDERING', 'WAITING_GPU', 'WAITING_BATCH'].includes(x.status)).length;
       const doneCount = items.filter(x => x.status === 'COMPLETED').length;
       if (queueTitle) {
-        queueTitle.textContent = `🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice & Render Video GPU (${doneCount}/${items.length} hoàn tất · ${activeCount} đang xử lý)`;
+        queueTitle.textContent = `🎬 Bàn #7 [${chanLabel}] — Tiến Độ Tự Động Tạo Voice & Render Video GPU (${doneCount}/${items.length} hoàn tất · ${activeCount} đang xử lý)`;
       }
-      queueList.innerHTML = items.slice().reverse().map((job) => {
+      const reversed = items.slice().reverse();
+      queueList.innerHTML = reversed.map((job, idx) => {
+        const pct = Math.max(0, Math.min(100, Number(job.percent || 0)));
         const statusColor = job.status === 'COMPLETED' ? '#10b981' :
           job.status === 'FAILED' ? '#ef4444' :
           job.status === 'RENDERING' ? '#38bdf8' : '#f59e0b';
+        const rowBorder = job.status === 'RENDERING' ? '#0284c7' :
+          job.status === 'COMPLETED' ? 'rgba(16,185,129,0.35)' :
+          job.status === 'FAILED' ? 'rgba(239,68,68,0.45)' : '#1e293b';
+        const jChan = detectJobChannel(job);
+        const chanBadge = showAll
+          ? `<span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#1e293b;color:#fde047;border:1px solid #334155;flex-shrink:0;">${htmlEscape(jChan.toUpperCase())}</span>`
+          : '';
         const openBtn = job.videoOutputPath
-          ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(job.videoOutputPath.replace(/\\/g, '\\\\'))}')" style="padding:2px 8px;font-size:10px;background:#065f46;color:#d1fae5;border:1px solid #10b981;border-radius:4px;cursor:pointer;">▶️ Mở MP4</button>`
+          ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(job.videoOutputPath.replace(/\\/g, '\\\\'))}')" style="padding:3px 9px;font-size:11px;font-weight:700;background:#065f46;color:#d1fae5;border:1px solid #10b981;border-radius:5px;cursor:pointer;">▶️ Mở MP4</button>`
           : (job.voiceOutputPath && job.status === 'COMPLETED'
-            ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(job.voiceOutputPath.replace(/\\/g, '\\\\'))}')" style="padding:2px 8px;font-size:10px;background:#065f46;color:#d1fae5;border:1px solid #10b981;border-radius:4px;cursor:pointer;">🔊 Mở WAV</button>`
+            ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(job.voiceOutputPath.replace(/\\/g, '\\\\'))}')" style="padding:3px 9px;font-size:11px;font-weight:700;background:#065f46;color:#d1fae5;border:1px solid #10b981;border-radius:5px;cursor:pointer;">🔊 Mở WAV</button>`
             : '');
+        const folderPath = job.tongHopDir || job.projectDir || '';
+        const folderBtn = folderPath
+          ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(folderPath.replace(/\\/g, '\\\\'))}')" style="padding:3px 8px;font-size:10.5px;background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:5px;cursor:pointer;" title="Mở thư mục chứa kịch bản & voice">📂 Folder</button>`
+          : '';
         return `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#111827;border:1px solid #1e293b;border-radius:5px;gap:10px;">
-            <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
-              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;"></span>
-              <strong style="color:#f1f5f9;white-space:nowrap;">${htmlEscape(job.scriptName || job.projectId)}</strong>
-              <span style="color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${htmlEscape(job.stage || job.status)}</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:#111827;border:1px solid ${rowBorder};border-radius:6px;gap:12px;">
+            <div style="display:flex;align-items:center;gap:9px;min-width:0;flex:1;">
+              <span style="font-family:monospace;font-size:11px;color:#64748b;min-width:24px;">#${reversed.length - idx}</span>
+              <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${statusColor};flex-shrink:0;box-shadow:0 0 6px ${statusColor};"></span>
+              ${chanBadge}
+              <strong style="color:#f8fafc;font-size:12.8px;white-space:nowrap;">${htmlEscape(job.scriptName || job.projectId)}</strong>
+              <span style="color:#94a3b8;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${htmlEscape(job.stage || job.status)}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-              <span style="font-family:monospace;color:${statusColor};font-weight:700;">${job.percent || 0}%</span>
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+              <div style="width:110px;height:6px;background:#090d16;border-radius:999px;overflow:hidden;border:1px solid #1e293b;">
+                <div style="width:${pct}%;height:100%;background:${statusColor};transition:width 0.25s;"></div>
+              </div>
+              <span style="font-family:monospace;font-size:12px;color:${statusColor};font-weight:800;min-width:38px;text-align:right;">${pct}%</span>
               ${openBtn}
+              ${folderBtn}
             </div>
           </div>
         `;
@@ -3085,6 +3179,13 @@ function renderScriptBridgeState(st) {
     }
   }
 }
+
+window.toggleBridgeChannelFilter = function() {
+  window._bridgeShowAllChannels = !window._bridgeShowAllChannels;
+  if (_lastBridgeState) {
+    renderScriptBridgeState(_lastBridgeState);
+  }
+};
 
 window.openBridgePath = function(p) {
   if (p && !String(p).startsWith('(')) api.openPath(p);
@@ -3560,8 +3661,7 @@ function setupScriptBridgeEvents() {
 
   if ($('btnGoToVideoConfigTab')) {
     $('btnGoToVideoConfigTab').onclick = () => {
-      activePage('batch');
-      toast('Hãy điều chỉnh cấu hình Video rồi bấm "🔒 Khóa Cấu Hình Video ➔ Qua Viết Kịch Bản AI".');
+      window.switchWorkspaceSubTab('render');
     };
   }
 
@@ -3577,7 +3677,7 @@ function setupScriptBridgeEvents() {
 
 
 window._activeWorkspaceSubTab = 'scripts';
-window._activeWorkspaceLogMode = 'SPLIT';
+window._activeWorkspaceLogMode = 'SCRIPT';
 
 window.switchWorkspaceSubTab = function(subtab, { notifyIframe = true } = {}) {
   const valid = ['scripts', 'render', 'logs', 'agents'];
@@ -3597,8 +3697,8 @@ window.switchWorkspaceSubTab = function(subtab, { notifyIframe = true } = {}) {
 
   const hints = {
     scripts: '✍️ Đang ở Tab 1: Soạn & Quản lý Danh sách Kịch bản (Đã tách riêng Render & Log sang Tab 2, 3)',
-    render: '🎬 Đang ở Tab 2: Quan sát Tiến độ Tạo Voice (.wav), Phụ đề (.srt), Render Video GPU (.mp4) & Cấu hình Batch',
-    logs: '📡 Đang ở Tab 3: Nhật ký Log Hệ thống riêng biệt (Theo dõi Log Viết Kịch Bản AI & Log Render Video GPU)',
+    render: '🎬 Đang ở Tab 2: Quan sát toàn màn hình Tiến độ Tạo Voice (.wav), Phụ đề (.srt) & Render Video GPU (.mp4) của Kênh đang chọn',
+    logs: '📡 Đang ở Tab 3: Nhật ký Log Hệ thống riêng biệt (Theo dõi Log Viết Kịch Bản AI hoặc Log Render Video GPU)',
     agents: '🤖 Đang ở Tab 4: Quản lý 3 Tài khoản ChatGPT Web & Sơ đồ 9 Bàn Nhân viên Agent AI'
   };
   if (hintEl) hintEl.textContent = hints[target] || '';
@@ -3608,10 +3708,11 @@ window.switchWorkspaceSubTab = function(subtab, { notifyIframe = true } = {}) {
     if (logToolbar) logToolbar.style.display = 'none';
     if (nvencLogBox) nvencLogBox.style.display = 'none';
     if (renderPane) renderPane.style.display = 'block';
+    if (_lastBridgeState) renderScriptBridgeState(_lastBridgeState);
   } else if (target === 'logs') {
     if (renderPane) renderPane.style.display = 'none';
     if (logToolbar) logToolbar.style.display = 'flex';
-    window.setWorkspaceLogViewMode(window._activeWorkspaceLogMode || 'SPLIT');
+    window.setWorkspaceLogViewMode(window._activeWorkspaceLogMode || 'SCRIPT');
     if (notifyIframe) {
       try {
         $('scriptStudioIframe')?.contentWindow?.postMessage({ type: 'ZC_SWITCH_STUDIO_SUBTAB', subtab: 'logs' }, '*');
@@ -3637,7 +3738,7 @@ window.switchWorkspaceSubTab = function(subtab, { notifyIframe = true } = {}) {
 
 window.setWorkspaceLogViewMode = function(mode) {
   const valid = ['SPLIT', 'SCRIPT', 'RENDER'];
-  const m = valid.includes(mode) ? mode : 'SPLIT';
+  const m = valid.includes(mode) ? mode : 'SCRIPT';
   window._activeWorkspaceLogMode = m;
 
   for (const k of valid) {
@@ -3709,6 +3810,18 @@ window.triggerAllReadyScriptsToBridge = function() {
     } else if (ev?.data?.type === 'ZC_OPEN_FULL_BATCH_RENDER_SUBTAB') {
       window.switchWorkspaceSubTab('render');
     } else if (ev?.data?.type === 'ZC_STUDIO_TELEMETRY_SYNC') {
+      if (ev.data.currentNiche) {
+        const prevNiche = window._currentStudioNiche;
+        window._currentStudioNiche = String(ev.data.currentNiche).trim();
+        if ($('topGlobalKeySelect') && $('topGlobalKeySelect').value !== window._currentStudioNiche &&
+            [...$('topGlobalKeySelect').options].some(o => o.value === window._currentStudioNiche)) {
+          $('topGlobalKeySelect').value = window._currentStudioNiche;
+          localStorage.setItem('zc_active_channel_key', window._currentStudioNiche);
+        }
+        if (prevNiche !== window._currentStudioNiche && _lastBridgeState) {
+          renderScriptBridgeState(_lastBridgeState);
+        }
+      }
       if ($('zcBadgeSubTab_scripts') && ev.data.scriptsCount != null) {
         $('zcBadgeSubTab_scripts').textContent = String(ev.data.scriptsCount);
       }

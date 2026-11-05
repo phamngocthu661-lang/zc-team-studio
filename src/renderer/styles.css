@@ -2100,9 +2100,11 @@ label span.material-symbols-outlined {
 .stitch-bridge-queue-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 150px;
+  gap: 7px;
+  max-height: calc(100vh - 245px);
+  min-height: 580px;
   overflow-y: auto;
+  padding-right: 4px;
 }
 
 .stitch-iframe-shell {

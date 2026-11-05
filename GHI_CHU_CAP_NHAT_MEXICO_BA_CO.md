@@ -412,3 +412,27 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
    - Tự động xóa sạch mọi biến thể `Pasted text(YYYYMMDD-HHMMSS).txtDocument`, tách riêng nhãn `[PART N]` nếu bị dính chữ, và tự động khôi phục dấu xuống dòng đoạn văn `\n\n` tại mọi vị trí câu kết thúc (`.`, `!`, `?`, `."`, `.”`) bị dính sát vào chữ cái viết hoa đầu câu tiếp theo (`them.Bracken` ➔ `them.\n\nBracken`).
 3. **Lớp 3 — Bổ sung cổng làm sạch hậu kỳ tại Bàn #6 / Bàn #7 ([`engine/tts_post_director.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/tts_post_director.py)):**
    - Cả `sanitize_and_normalize_tts_script()` (Mafia / Homeless / 12 Key US) và `sanitize_and_normalize_mexico_spanish_tts()` (Mexico `es-MX`) đều quét xóa `Pasted text(...).txtDocument` và khôi phục ngắt đoạn `\n\n` trước khi xuất `FULL_SCRIPT.txt` và `TONG HOP/{TenKichBan}_KB.txt` sang Phòng Thu Voice & Render Video.
+
+---
+
+## 33. Nâng Cấp Bản `V1.0.5 (Build #119)` — Mở Rộng Khung `Bàn #7 — Tiến Độ Tự Động Tạo Voice & Render Video GPU` Toàn Màn Hình (Hiển Thị 16–22 Video Cùng Lúc) & Tách Độc Lập 100% Dữ Liệu Giữa Các Tab / Kênh
+
+### 33.1. Vấn đề từ phản hồi thực tế của người dùng
+1. **Khung danh sách video Bàn #7 quá thấp (`max-height: 150px`):** Chỉ nhìn được 4 dòng video cùng lúc, rất khó quan sát khi chạy hàng loạt 10–20 kịch bản.
+2. **Dữ liệu và giao diện của các Tab / Kênh khác vẫn bị đưa chung vào nhau:**
+   - Trong `Bàn #7`, hệ thống gộp chung cả `6 video hoàn tất của BÊN MAFIA` với `9 video đang xử lý của BÊN HOMELESS V12` thành `(6/15 hoàn tất · 9 đang xử lý)`.
+   - Ngay bên dưới khung `Bàn #7` trong Tab nhỏ số 2 (`🎬 2. Render Video & Tiến Độ GPU`) lại nhét thêm cả trang `ĐIỀU KHIỂN & TIẾN ĐỘ RENDER BATCH VIDEO HÀNG LOẠT` (vốn là Tab `02 Tạo Batch Video` ở thanh menu trái).
+   - Trong Nhật ký Log, các dòng log của `[MAFIA]`, `[HOMELESS]` và `[MEXICO]` vẫn hiển thị lẫn vào nhau, và chế độ mặc định `SPLIT` xếp chồng cả 2 khung Log lên nhau.
+
+### 33.2. Giải pháp đã triển khai (`V1.0.5 Build #119`)
+1. **Mở rộng chiều cao khung `🎬 Bàn #7 — Tiến Độ Tự Động Tạo Voice & Render Video GPU` (`#bridgeQueueBox` & `.stitch-bridge-queue-list`) lên toàn màn hình:**
+   - Trong [`src/renderer/styles.css`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/styles.css) và [`src/renderer/index.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/index.html): Nâng chiều cao `.stitch-bridge-queue-list` từ `max-height: 150px` lên `calc(100vh - 245px)` (`min-height: 580px`, `flex: 1`), giúp quan sát trực tiếp **16–22 video cùng lúc** trên một màn hình kèm thanh tiến trình `%`, trạng thái, nút `▶️ Mở MP4`, `🔊 Mở WAV` và `📂 Folder`.
+2. **Tách độc lập 100% giao diện giữa các Tab (Không nhét trang Tab khác vào chung 1 chỗ):**
+   - Trong [`src/renderer/index.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/index.html) và [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js):
+     - **Tab nhỏ số 2 (`🎬 2. Render Video & Tiến Độ GPU`):** Chỉ hiển thị duy nhất trung tâm **`Bàn #7 — Tiến Độ Tự Động Tạo Voice & Render Video GPU`** chiếm trọn màn hình.
+     - **Khôi phục Tab `02 Tạo Batch Video` (`#page-batch`)** về lại làm Tab độc lập trên thanh menu bên trái (không nhét chồng xuống bên dưới `Bàn #7` nữa).
+     - **Tab nhỏ số 3 (`📡 3. Nhật Ký Log Hệ Thống`):** Đặt chế độ mặc định là **`SCRIPT` (Toàn màn hình 1 khung Log duy nhất)** thay vì `SPLIT` xếp chồng 2 khung Log.
+3. **Tách độc lập 100% dữ liệu giữa các Kênh / Key (`Homeless` / `Mafia` / `Mexico` / `12 Key`):**
+   - Trong [`src/main/services/script-video-bridge-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/script-video-bridge-service.js): Bổ sung hàm `_detectJobNiche(payload, scriptPath)` gắn nhãn chuẩn xác kênh (`homeless`, `mafia`, `mexico`, `01_...`..`12_...`) cho từng video trong hàng đợi Bàn #7.
+   - Trong [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js): Mặc định lọc `#bridgeQueueList` theo đúng Kênh / Key đang chọn (`🔍 Đang lọc riêng: 🏚️ BÊN HOMELESS V12`), tuyệt đối không trộn 6 video của Mafia vào 9 video của Homeless (có nút chuyển đổi nếu người dùng muốn xem tổng hợp tất cả các kênh).
+   - Trong [`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py): Lọc `recent_logs` theo đúng `niche_key` đang chọn để dòng log của kênh nào chỉ hiển thị ở kênh đó.

@@ -1086,12 +1086,24 @@ def get_full_dashboard_status(niche: str | None = None, update_selected: bool = 
         stop_worker_command()
         worker_running = False
 
-    # Đọc 120 dòng cuối của LIVE_STUDIO_LOG.txt
+    # Đọc 150 dòng cuối của LIVE_STUDIO_LOG.txt nhưng CHỈ LỌC ĐÚNG KÊNH ĐANG CHỌN (tuyệt đối không trộn log của kênh khác vào nhau)
     recent_logs = ""
     if os.path.exists(LIVE_LOG_PATH):
         try:
-            lines = open(LIVE_LOG_PATH, "r", encoding="utf-8", errors="replace").read().splitlines()
-            recent_logs = "\n".join(lines[-120:])
+            all_lines = open(LIVE_LOG_PATH, "r", encoding="utf-8", errors="replace").read().splitlines()
+            target_tag = f"[{niche_key.upper()}]"
+            other_tags = {"[MAFIA]", "[HOMELESS]", "[MEXICO]"}
+            for k12_id in KEY_PROFILES_12:
+                other_tags.add(f"[{k12_id.upper()}]")
+            other_tags.discard(target_tag)
+            filtered_lines = []
+            for ln in all_lines[-800:]:
+                ln_up = ln.upper()
+                if target_tag in ln_up:
+                    filtered_lines.append(ln)
+                elif not any(ot in ln_up for ot in other_tags):
+                    filtered_lines.append(ln)
+            recent_logs = "\n".join(filtered_lines[-150:])
         except Exception:
             pass
 
