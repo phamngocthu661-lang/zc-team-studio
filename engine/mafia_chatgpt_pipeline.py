@@ -2720,7 +2720,8 @@ def condense_homeless_stage_text(
         char_len = len(sliced)
 
     effective_ceiling = hard_max_chars
-    if char_len <= effective_ceiling:
+    raw_total_paras = len([p for p in re.split(r"\n\s*\n", sliced) if p.strip()])
+    if char_len <= effective_ceiling and raw_total_paras <= len(expected_parts) * 28:
         return sliced
 
     # Tách văn bản theo từng Part (hoặc chia thành num_p phân đoạn ảo nếu đã xóa nhãn [PART N])
@@ -2753,24 +2754,28 @@ def condense_homeless_stage_text(
     per_part_target = int(target_chars / num_p)
 
     def _condense_single_part(p_text: str, p_budget: int) -> str:
-        if len(p_text) <= p_budget + 120:
-            return p_text
         raw_paras = [p.strip() for p in re.split(r"\n\s*\n", p_text) if p.strip()]
         if len(raw_paras) <= 5:
             return p_text
+        if len(p_text) <= p_budget + 120 and len(raw_paras) <= 28:
+            return p_text
 
-        # Bước 0: Gộp các câu trần thuật ngắn đơn lẻ thành đoạn văn tự nhiên (2–4 câu)
+        # Bước 0: Gộp các câu/đoạn ngắn đơn lẻ thành đoạn văn tự nhiên (chuẩn 16–25 đoạn/Part cho TTS & Homeless V12)
+        need_aggressive_group = len(raw_paras) > 26
+        max_group_chars = 620 if need_aggressive_group else 420
+        max_group_items = 5 if need_aggressive_group else 3
         paras = []
         buf = []
         buf_len = 0
         for rp in raw_paras:
             has_q = ('"' in rp) or ("\u201c" in rp) or ("\u201d" in rp) or ("«" in rp) or ("—" in rp and len(rp) < 260)
-            if has_q or len(rp) > 220 or len(buf) >= 3 or (buf_len + len(rp) > 420):
+            block_merge = (has_q and not need_aggressive_group) or len(rp) > (360 if need_aggressive_group else 220)
+            if block_merge or len(buf) >= max_group_items or (buf_len + len(rp) > max_group_chars):
                 if buf:
                     paras.append(" ".join(buf))
                     buf = []
                     buf_len = 0
-                if has_q or len(rp) > 220:
+                if block_merge:
                     paras.append(rp)
                 else:
                     buf.append(rp)
@@ -2781,8 +2786,9 @@ def condense_homeless_stage_text(
         if buf:
             paras.append(" ".join(buf))
 
-        if len(paras) <= 5:
-            return "\n\n".join(paras)
+        joined_s0 = "\n\n".join(paras)
+        if len(paras) <= 5 or len(joined_s0) <= p_budget + 120:
+            return joined_s0
 
         # Nhận diện lần xuất hiện đầu tiên của tên riêng đầy đủ (2 từ viết hoa) để bảo vệ
         seen_names = set()

@@ -489,7 +489,7 @@ function resolveProjectImageLayers({ job, config = {}, renderConfig }) {
   }
 
   const ext = path.extname(assetPath).toLocaleLowerCase('en-US');
-  const isVideoAsset = VIDEO_EXTENSIONS.includes(ext);
+  const isVideoAsset = VIDEO_EXTENSIONS instanceof Set ? VIDEO_EXTENSIONS.has(ext) : VIDEO_EXTENSIONS.includes(ext);
   const globalGreenMode = String(config.projectImageMode || '').toUpperCase() === 'GREEN';
   const perJobCfg = findPerJobImageConfig(voiceRef, config, assetPath);
 

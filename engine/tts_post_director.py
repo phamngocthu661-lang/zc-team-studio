@@ -170,6 +170,40 @@ def sanitize_and_normalize_tts_script(raw_text: str) -> tuple[str, dict]:
 
     text = re.sub(r"\$(\d+(?:\.\d+)?)\s*([KkMmBb])\b", _expand_currency_abbr, text)
 
+    # Tiền tệ có số xu: $12.50, $1,250.75 -> 12 dollars and 50 cents
+    def _expand_currency_cents(m: re.Match) -> str:
+        nonlocal numbers_units_expanded
+        numbers_units_expanded += 1
+        d_part = m.group(1)
+        c_part = m.group(2)
+        d_word = "dollar" if d_part == "1" else "dollars"
+        if c_part == "00":
+            res = f"{d_part} {d_word}"
+        else:
+            c_int = str(int(c_part))
+            c_word = "cent" if c_int == "1" else "cents"
+            res = f"{d_part} {d_word} and {c_int} {c_word}"
+        _record_example("Currency Cents", m.group(0), res)
+        return res
+
+    text = re.sub(r"\$(\d[\d,]*)\.(\d{2})\b", _expand_currency_cents, text)
+
+    # Tiền tệ nguyên: $286, $2,400, $1 -> 286 dollars, 2,400 dollars, 1 dollar
+    def _expand_currency_plain(m: re.Match) -> str:
+        nonlocal numbers_units_expanded
+        numbers_units_expanded += 1
+        d_part = m.group(1)
+        tail_slice = m.string[m.end():m.end() + 20].lstrip().lower()
+        if re.match(r"^(?:dollars?|million|billion|thousand)\b", tail_slice):
+            res = d_part
+        else:
+            d_word = "dollar" if d_part == "1" else "dollars"
+            res = f"{d_part} {d_word}"
+        _record_example("Currency Plain", m.group(0), res)
+        return res
+
+    text = re.sub(r"\$(\d[\d,]*)\b", _expand_currency_plain, text, flags=re.IGNORECASE)
+
     # Nhiệt độ: -40°F, -15 °F, 72°F, 0°C
     def _expand_temp(m: re.Match) -> str:
         nonlocal numbers_units_expanded
@@ -275,27 +309,27 @@ def sanitize_and_normalize_tts_script(raw_text: str) -> tuple[str, dict]:
     text = re.sub(r"\b([A-Z][a-z0-9]+)\s+Dr\.(?=\s*[,.\n\"”]|$)", _smart_drive_replace, text)
 
     honorific_rules = [
-        (r"\bMr\.\s+(?=[A-Z]|and\b)", "Mister ", "Honorific Mr."),
-        (r"\bMrs\.\s+(?=[A-Z]|and\b)", "Missus ", "Honorific Mrs."),
-        (r"\bMs\.\s+(?=[A-Z]|and\b)", "Miz ", "Honorific Ms."),
-        (r"\bDr\.\s+(?=[A-Z])", "Doctor ", "Honorific Dr."),
-        (r"\bProf\.\s+(?=[A-Z])", "Professor ", "Honorific Prof."),
-        (r"\bGov\.\s+(?=[A-Z])", "Governor ", "Honorific Gov."),
-        (r"\bSen\.\s+(?=[A-Z])", "Senator ", "Honorific Sen."),
-        (r"\bRep\.\s+(?=[A-Z])", "Representative ", "Honorific Rep."),
-        (r"\bGen\.\s+(?=[A-Z])", "General ", "Honorific Gen."),
-        (r"\bCol\.\s+(?=[A-Z])", "Colonel ", "Honorific Col."),
-        (r"\bMaj\.\s+(?=[A-Z])", "Major ", "Honorific Maj."),
-        (r"\bCapt\.\s+(?=[A-Z])", "Captain ", "Honorific Capt."),
-        (r"\bLt\.\s+(?=[A-Z])", "Lieutenant ", "Honorific Lt."),
-        (r"\bSgt\.\s+(?=[A-Z])", "Sergeant ", "Honorific Sgt."),
-        (r"\bCpl\.\s+(?=[A-Z])", "Corporal ", "Honorific Cpl."),
-        (r"\bDet\.\s+(?=[A-Z])", "Detective ", "Honorific Det."),
-        (r"\bInsp\.\s+(?=[A-Z])", "Inspector ", "Honorific Insp."),
-        (r"\bRev\.\s+(?=[A-Z])", "Reverend ", "Honorific Rev."),
-        (r"\bFr\.\s+(?=[A-Z])", "Father ", "Honorific Fr."),
-        (r"\bMt\.\s+(?=[A-Z])", "Mount ", "Location Mt."),
-        (r"\bFt\.\s+(?=[A-Z])", "Fort ", "Location Ft."),
+        (r"\bMr\.(?=\s+[A-Z\"“\']|\s+and\b|\s*$|\n)", "Mister", "Honorific Mr."),
+        (r"\bMrs\.(?=\s+[A-Z\"“\']|\s+and\b|\s*$|\n)", "Missus", "Honorific Mrs."),
+        (r"\bMs\.(?=\s+[A-Z\"“\']|\s+and\b|\s*$|\n)", "Miz", "Honorific Ms."),
+        (r"\bDr\.(?=\s+[A-Z\"“\'])", "Doctor", "Honorific Dr."),
+        (r"\bProf\.(?=\s+[A-Z\"“\'])", "Professor", "Honorific Prof."),
+        (r"\bGov\.(?=\s+[A-Z\"“\'])", "Governor", "Honorific Gov."),
+        (r"\bSen\.(?=\s+[A-Z\"“\'])", "Senator", "Honorific Sen."),
+        (r"\bRep\.(?=\s+[A-Z\"“\'])", "Representative", "Honorific Rep."),
+        (r"\bGen\.(?=\s+[A-Z\"“\'])", "General", "Honorific Gen."),
+        (r"\bCol\.(?=\s+[A-Z\"“\'])", "Colonel", "Honorific Col."),
+        (r"\bMaj\.(?=\s+[A-Z\"“\'])", "Major", "Honorific Maj."),
+        (r"\bCapt\.(?=\s+[A-Z\"“\'])", "Captain", "Honorific Capt."),
+        (r"\bLt\.(?=\s+[A-Z\"“\'])", "Lieutenant", "Honorific Lt."),
+        (r"\bSgt\.(?=\s+[A-Z\"“\'])", "Sergeant", "Honorific Sgt."),
+        (r"\bCpl\.(?=\s+[A-Z\"“\'])", "Corporal", "Honorific Cpl."),
+        (r"\bDet\.(?=\s+[A-Z\"“\'])", "Detective", "Honorific Det."),
+        (r"\bInsp\.(?=\s+[A-Z\"“\'])", "Inspector", "Honorific Insp."),
+        (r"\bRev\.(?=\s+[A-Z\"“\'])", "Reverend", "Honorific Rev."),
+        (r"\bFr\.(?=\s+[A-Z\"“\'])", "Father", "Honorific Fr."),
+        (r"\bMt\.(?=\s+[A-Z\"“\'])", "Mount", "Location Mt."),
+        (r"\bFt\.(?=\s+[A-Z\"“\'])", "Fort", "Location Ft."),
         (r"\b([A-Z][a-z]+),?\s+Jr\.(?=\s*[,.\n\"”\s]|$)", r"\1 Junior", "Suffix Jr."),
         (r"\b([A-Z][a-z]+),?\s+Sr\.(?=\s*[,.\n\"”\s]|$)", r"\1 Senior", "Suffix Sr."),
         (r"\b([A-Z][a-z]+)\s+Ave\.(?=\s*[,.\n\"”\s]|$)", r"\1 Avenue", "Street Ave."),
@@ -314,7 +348,7 @@ def sanitize_and_normalize_tts_script(raw_text: str) -> tuple[str, dict]:
             text = re.sub(pat, repl, text)
 
     # ------------------------------------------------------------------
-    # 4. CHUẨN HÓA DẤU CÂU & NHỊP NGẮT GIỌNG TTS
+    # 4. CHUẨN HÓA DẤU CÂU, KHỬ ĐOẠN TRÙNG LẶP & NHỊP NGẮT GIỌNG TTS
     # ------------------------------------------------------------------
     # Chuẩn hóa dấu chấm lửng >= 4 dấu chấm thành 3 dấu chấm
     dots_m = re.findall(r"\.{4,}", text)
@@ -331,6 +365,24 @@ def sanitize_and_normalize_tts_script(raw_text: str) -> tuple[str, dict]:
     # Dọn khoảng trắng thừa trên cùng 1 dòng & giới hạn tối đa 2 dòng xuống hàng liên tiếp
     text = re.sub(r"[ \t]{2,}", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+    # Loại bỏ đoạn văn dài (>60 ký tự) bị lặp lại nguyên văn và đảm bảo mọi đoạn kết thúc bằng dấu câu hợp lệ
+    raw_paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    seen_norm_paras = set()
+    healed_paras = []
+    for p in raw_paras:
+        norm_p = re.sub(r"\s+", " ", p.lower())
+        if len(norm_p) > 60:
+            if norm_p in seen_norm_paras:
+                strange_chars_removed += 1
+                _record_example("Duplicate Paragraph", p[:50] + "...", "(removed)")
+                continue
+            seen_norm_paras.add(norm_p)
+        if not re.search(r'[.!?""\u201d\'\u2019…—]\s*$', p):
+            p = p + "."
+            punctuation_normalized += 1
+        healed_paras.append(p)
+    text = "\n\n".join(healed_paras)
 
     total_fixes = (
         strange_chars_removed
