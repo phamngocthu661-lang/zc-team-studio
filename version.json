@@ -1,10 +1,11 @@
 {
-  "version": "V1.0.6",
-  "build_number": 120,
-  "released_at": "2026-11-05 08:58:21",
+  "version": "V1.0.7",
+  "build_number": 121,
+  "released_at": "2026-11-05 09:15:35",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.7 (Build #121) - 2026-11-05 09:15:35] Bản V1.0.7: Tự động Reset & Mở lại hoàn toàn ứng dụng (Full App Relaunch) sau khi cập nhật OTA + Tự động đóng sạch 100% toàn bộ các ứng dụng & tiến trình liên quan (Python 8098, VoiceStudio 3900, Chrome ChatGPT 9222-9224, FFmpeg/Whisper) khi tắt ứng dụng",
     "[V1.0.6 (Build #120) - 2026-11-05 08:58:21] Nâng cấp V1.0.6: Gộp gọn thanh công cụ, loại bỏ hoàn toàn các ô chọn bị lặp 2 lần (CHỌN KEY vs GIAO VIỆC, Chế độ Tiêu đề, Tự động Bàn #7)",
     "[V1.0.5 (Build #119) - 2026-11-05 08:50:19] Nâng cấp V1.0.5: Mở rộng khung Bàn #7 toàn màn hình hiển thị 16-22 video cùng lúc, tách độc lập 100% dữ liệu & giao diện giữa các Tab/Kênh (Homeless/Mafia/Mexico)",
     "[V1.0.4 (Build #118) - 2026-11-05 01:49:57] V1.0.4: Sửa triệt để lỗi dính nhãn Pasted text(.txtDocument) và lỗi dính liền các đoạn văn <p> khi thu hoạch kịch bản Homeless/Mafia/Mexico",
@@ -14,5 +15,5 @@
     "[V1.0.1 (Build #115) - 2026-11-04 11:59:44] Sửa triệt để lỗi 'The messages you submitted were too long' và 'Could not load this ChatGPT conversation' trên ChatGPT Web; cân bằng ngân sách Prompt <= 82k-84k ký tự bảo toàn 100% kịch bản truyện; tích hợp Auto-Heal tự động mở hội thoại sạch & gửi lại lệnh tức thì.",
     "Phiên bản V1.0.0 (Build #114): Sửa triệt để 100% lỗi 'The messages you submitted were too long, please edit them and resubmit.' trên ChatGPT Web: (1) Loại bỏ đính kèm trùng lặp 02_STORY_OUTLINE.md trong _build_checkpoint_context_preamble khi Prompt đã có sẵn Giàn ý/Kịch bản; (2) Khóa cứng ngân sách ký tự <= 82.000–84.000 ký tự/tin nhắn ở Bước 2, Bước 3, Bước 4A (Vòng 1..6), Bước 4B và Bước 5 cho cả 15 Key mà vẫn BẢO TOÀN 100% văn bản kịch bản truyện (CURRENT REVISION BASELINE / CURRENT WORKING SCRIPT); (3) Xóa sạch triệt để ô .ProseMirror và bỏ dán trùng headLine trước khi dán Prompt để không bao giờ nhân đôi văn bản khi cửa sổ Chrome chạy ngầm; (4) Tích hợp Auto-Heal tự động phát hiện 'The messages you submitted were too long', tự động nén gọn khối Reference phụ trợ và gửi lại ngay lập tức trên hội thoại sạch."
   ],
-  "release_date": "2026-11-05 08:58:21"
+  "release_date": "2026-11-05 09:15:35"
 }

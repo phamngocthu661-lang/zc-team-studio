@@ -49,15 +49,39 @@ const PROTECTED_CUSTOMER_NAMES = new Set([
 ]);
 
 class UpdaterService {
-  constructor({ getMainWindow, scriptBridgeService } = {}) {
+  constructor({ getMainWindow, scriptBridgeService, relaunchApp } = {}) {
     this.getMainWindow = typeof getMainWindow === 'function' ? getMainWindow : () => getMainWindow;
     this.scriptBridgeService = scriptBridgeService || null;
+    this.onRelaunch = typeof relaunchApp === 'function' ? relaunchApp : null;
     this.appDir = path.resolve(__dirname, '..', '..', '..');
     this.studioRoot = this._resolveStudioRoot();
     this.exeDir = this._resolveExeDir();
     this._lastCheckResult = null;
     this._lastCheckAt = 0;
     this._isUpdating = false;
+    this._relaunchScheduled = false;
+  }
+
+  relaunchApp() {
+    if (this._relaunchScheduled) return;
+    this._relaunchScheduled = true;
+    if (typeof this.onRelaunch === 'function') {
+      try {
+        this.onRelaunch();
+        return;
+      } catch {}
+    }
+    try {
+      const { app } = require('electron');
+      if (this.scriptBridgeService && typeof this.scriptBridgeService.shutdown === 'function') {
+        try {
+          this.scriptBridgeService.shutdown({ killVoiceStudio: true, killChrome: true, killFfmpeg: true });
+        } catch {}
+      }
+      const cleanArgs = process.argv.slice(1).filter((arg) => arg !== '--relaunch-after-update');
+      app.relaunch({ args: [...cleanArgs, '--relaunch-after-update'] });
+      app.exit(0);
+    } catch {}
   }
 
   _resolveStudioRoot() {
@@ -480,45 +504,30 @@ class UpdaterService {
         } catch {}
       }
 
-      emitProgress(92, 'Đang khởi động lại Engine Kịch Bản (Port 8098) và làm mới giao diện...');
-      if (this.scriptBridgeService) {
-        try {
-          const freshPath = require.resolve('./script-video-bridge-service');
-          delete require.cache[freshPath];
-          const { ScriptVideoBridgeService: FreshBridgeClass } = require('./script-video-bridge-service');
-          if (FreshBridgeClass && FreshBridgeClass.prototype) {
-            for (const fnName of ['_resolvePythonExecutable', '_detectScriptStudioRoot', 'ensureScriptServerRunning', 'restartScriptServer']) {
-              if (typeof FreshBridgeClass.prototype[fnName] === 'function') {
-                this.scriptBridgeService[fnName] = FreshBridgeClass.prototype[fnName].bind(this.scriptBridgeService);
-              }
-            }
-          }
-          if (this.scriptBridgeService.settings) {
-            this.scriptBridgeService.settings.scriptStudioRoot = this.scriptBridgeService._detectScriptStudioRoot();
-          }
-        } catch {}
-        if (typeof this.scriptBridgeService.restartScriptServer === 'function') {
-          try {
-            await this.scriptBridgeService.restartScriptServer();
-          } catch {}
-        }
-      }
+      emitProgress(92, 'Đang chuẩn bị đóng toàn bộ tiến trình cũ và khởi động lại ứng dụng...');
 
       this._lastCheckResult = null;
       this._lastCheckAt = 0;
       const newInfo = this.getLocalVersionInfo();
 
-      emitProgress(100, `🎉 Đã cập nhật thành công từ ${oldVersion} lên ${newInfo.version} (Build #${newInfo.build_number})!`);
+      emitProgress(100, `🎉 Đã cập nhật thành công từ ${oldVersion} lên ${newInfo.version} (Build #${newInfo.build_number})! Đang tự động reset và mở lại ứng dụng...`);
+
+      setTimeout(() => {
+        try {
+          this.relaunchApp();
+        } catch {}
+      }, 1100);
 
       return {
         ok: true,
         status: 'success',
+        shouldRelaunch: true,
         oldVersion,
         newVersion: newInfo.version,
         buildNumber: newInfo.build_number,
         changelog: newInfo.changelog,
         updatedFilesCount,
-        message: `🎉 Đã cập nhật thành công lên phiên bản ${newInfo.version} (Build #${newInfo.build_number})!`
+        message: `🎉 Đã cập nhật thành công lên phiên bản ${newInfo.version} (Build #${newInfo.build_number})! Đang tự động đóng và mở lại ứng dụng...`
       };
     } catch (err) {
       return {

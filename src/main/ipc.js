@@ -337,6 +337,13 @@ function registerIpc(ctx){const {mainWindow,database,licenseService,ffmpegServic
   ipcMain.handle('updater:localInfo', () => updaterService ? updaterService.getLocalVersionInfo() : { version: 'V1.0.0', build_number: 100 });
   ipcMain.handle('updater:check', async (_e, opts = {}) => updaterService ? await updaterService.checkForUpdates(opts) : { hasUpdate: false, currentVersion: 'V1.0.0' });
   ipcMain.handle('updater:apply', async () => updaterService ? await updaterService.applyUpdate() : { status: 'error', message: 'UpdaterService không khả dụng' });
+  ipcMain.handle('updater:relaunch', async () => {
+    if (updaterService && typeof updaterService.relaunchApp === 'function') {
+      updaterService.relaunchApp();
+      return { ok: true };
+    }
+    return { ok: false };
+  });
   ipcMain.handle('settings:get',(_e,k,f)=>database.getSetting(k,f));ipcMain.handle('settings:set',(_e,k,v)=>database.setSetting(k,v));
 
   ipcMain.handle('projects:list',()=>projectService.list());ipcMain.handle('projects:get',(_e,id)=>projectService.get(id));ipcMain.handle('projects:create',(_e,d)=>projectService.create(d));ipcMain.handle('projects:update',(_e,id,d)=>projectService.update(id,d));ipcMain.handle('projects:delete',(_e,id)=>projectService.delete(id));

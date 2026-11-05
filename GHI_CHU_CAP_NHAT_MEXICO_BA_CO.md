@@ -452,3 +452,24 @@ Toàn bộ 12 giọng mẫu từ gói `VoiceStudio_Reference_Voices_12_Topics.ra
   1. **Chỉ giữ DUY NHẤT 1 ô `🔑 CHỌN KEY:`** (kèm huy hiệu số lượng `10/10`); ẩn hoàn toàn ô `📝 GIAO VIỆC` trùng lặp ở hộp dưới và ô `.key-select-shell` trên Topbar ngoài.
   2. **Chỉ giữ DUY NHẤT 1 ô chọn `🔥 Chế độ: Viết lại Tiêu đề / 🎯 Dùng luôn Tiêu đề đã dán`** trên thanh điều khiển; ẩn dòng Radio trùng lặp và ô `🎬 Sau khi viết xong (Bàn #7)` trùng lặp bên trong `#composerBody`.
   3. **Bỏ các nút chuyển Tab bị lặp (`🎬 Tab Render Video`, `📡 Tab Log`)** ở hàng nút dưới và ẩn logo `ZC TEAM` thứ 2 khi chạy nhúng trong Electron (`body.embedded-electron .zc-brand-badge`), giúp giao diện gọn gàng trên 1 hàng duy nhất.
+
+---
+
+## 35. Nâng Cấp Bản `V1.0.7 (Build #121)` — Tự Động Reset & Mở Lại Hoàn Toàn Ứng Dụng Sau Khi Cập Nhật OTA + Đóng Toàn Bộ Các Tiến Trình Liên Quan Khi Tắt Ứng Dụng
+
+### 35.1. Yêu cầu thực tế của người dùng
+1. **Khi cập nhật ứng dụng (`🚀 Cập Nhật Ngay` / OTA Update):** Không chỉ `reload()` lại trang giao diện (`window.location.reload()`), mà phải **reset hẳn toàn bộ ứng dụng đi rồi tự động mở lại từ đầu** (`app.relaunch()` + `app.exit(0)`) để nạp mới 100% cả Main Process, Preload, Python Server `:8098` và VoiceStudio `:3900`.
+2. **Khi tắt ứng dụng (`X` đóng cửa sổ / thoát ứng dụng):** Yêu cầu **đóng sạch toàn bộ tất cả các ứng dụng và tiến trình liên quan** mà Studio đã bật lên (tránh treo ngầm tốn RAM/GPU sau khi tắt).
+
+### 35.2. Giải pháp kỹ thuật đã triển khai (`V1.0.7 Build #121`)
+1. **Đóng sạch 100% các ứng dụng & tiến trình liên quan khi tắt ứng dụng (`killScriptServerAndRelatedProcesses` & `shutdownAllStudioServices`):**
+   - Trong [`src/main/services/script-video-bridge-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/script-video-bridge-service.js) và [`src/main/main.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/main.js):
+     - Bước 1: Quét nhanh `netstat.exe -ano` (`< 50ms`) và gọi `taskkill.exe /F /T /PID` để đóng toàn bộ nhánh tiến trình (`Process Tree`) đang lắng nghe trên các cổng:
+       - **`8098..8103`** (Python Script Studio Server `mafia_dashboard_server.py` & Node fallback)
+       - **`3900`** (VoiceStudio GPU Server / `uvicorn` / `run_voicestudio_daemon.py` + `VoiceStudio.exe`)
+       - **`9222, 9223, 9224`** (Các cửa sổ trình duyệt Chrome ChatGPT Web của 3 Acc `BROWSER_PROFILE`, `BROWSER_PROFILE_2`, `BROWSER_PROFILE_3` — chỉ đóng đúng Chrome của Studio, không ảnh hưởng Chrome cá nhân của người dùng)
+     - Bước 2: Quét `Win32_Process` để đóng triệt để mọi tiến trình con đang chạy ngầm (`mafia_chatgpt_pipeline.py`, `chatgpt_web_client.py`, `faster_whisper_transcribe.py`, `tts_post_director.py`, `ffmpeg.exe`, `ffprobe.exe`).
+     - Bước 3: Trong [`src/main/preload.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/preload.js), khóa cờ `_appShuttingDownOrUpdating = true` ngay khi `beforeunload` hoặc khi bắt đầu cập nhật để ngăn Preload tự động bật lại Python Server trong lúc ứng dụng đang đóng.
+2. **Reset & Khởi động lại hoàn toàn ứng dụng sau khi cập nhật OTA (`relaunchEntireApplication`):**
+   - Trong [`src/main/services/updater-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/updater-service.js), [`src/main/ipc.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/ipc.js), [`src/main/main.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/main.js) và [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js):
+     - Ngay sau khi giải nén và chép xong bản cập nhật, hệ thống tự động gọi `relaunchEntireApplication()`: đóng cổng Bridge `3999`, tắt toàn bộ tiến trình Python/VoiceStudio/Chrome/FFmpeg cũ, sau đó gọi `app.relaunch({ args: [..., '--relaunch-after-update'] })` + `app.exit(0)` để mở lại ứng dụng mới tinh từ đầu.

@@ -4342,11 +4342,18 @@ function initOtaUpdaterControls() {
             banner.style.background = 'rgba(16,185,129,0.18)';
             banner.style.borderColor = '#10b981';
             banner.style.color = '#ecfdf5';
-            banner.innerHTML = `✅ <strong>${htmlEscape(res.message || 'Đã cập nhật thành công!')}</strong> Ứng dụng đang tự động làm mới giao diện...`;
+            banner.innerHTML = `✅ <strong>${htmlEscape(res.message || 'Đã cập nhật thành công!')}</strong> Đang đóng toàn bộ tiến trình cũ và tự động mở lại ứng dụng...`;
           }
+          btn.textContent = '🔄 Đang khởi động lại ứng dụng...';
           setTimeout(() => {
-            window.location.reload();
-          }, 1400);
+            if (api.updater?.relaunch) {
+              api.updater.relaunch().catch(() => {
+                window.location.reload();
+              });
+            } else {
+              window.location.reload();
+            }
+          }, 800);
         } else {
           toast('❌ ' + (res?.message || 'Cập nhật thất bại.'), true);
           btn.disabled = false;

@@ -1176,7 +1176,21 @@ function startNodeFallbackServer(appDir, exeDir, port = SCRIPT_STUDIO_PORT) {
   });
 }
 
+let _appShuttingDownOrUpdating = false;
+try {
+  window.addEventListener('beforeunload', () => {
+    _appShuttingDownOrUpdating = true;
+    if (_nodeFallbackServer) {
+      try { _nodeFallbackServer.close(); } catch {}
+      _nodeFallbackServer = null;
+    }
+  });
+} catch {}
+
 async function ensurePort8098FromPreload({ forceRestart = false } = {}) {
+  if (_appShuttingDownOrUpdating) {
+    return { online: false };
+  }
   if (_preloadSpawnPromise && !forceRestart) {
     return _preloadSpawnPromise;
   }
@@ -1635,7 +1649,14 @@ contextBridge.exposeInMainWorld('vbs', {
   updater: {
     localInfo: () => ipcRenderer.invoke('updater:localInfo'),
     check: (opts) => ipcRenderer.invoke('updater:check', opts),
-    apply: () => ipcRenderer.invoke('updater:apply'),
+    apply: () => {
+      _appShuttingDownOrUpdating = true;
+      return ipcRenderer.invoke('updater:apply');
+    },
+    relaunch: () => {
+      _appShuttingDownOrUpdating = true;
+      return ipcRenderer.invoke('updater:relaunch');
+    },
     onStatus: (fn) => sub('updater:status', fn),
     onProgress: (fn) => sub('updater:progress', fn)
   },

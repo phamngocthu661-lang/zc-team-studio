@@ -460,12 +460,11 @@ class ScriptVideoBridgeService {
   }
 
   async restartScriptServer() {
-    if (this.scriptServerProcess) {
-      try {
-        this.scriptServerProcess.kill();
-      } catch {}
-      this.scriptServerProcess = null;
-    }
+    this.killScriptServerAndRelatedProcesses({
+      killVoiceStudio: false,
+      killChrome: false,
+      killFfmpeg: false
+    });
     await new Promise((r) => setTimeout(r, 600));
     return this.ensureScriptServerRunning();
   }
@@ -1345,7 +1344,130 @@ foreach ($w in $sh.Windows()) {
     });
   }
 
-  async shutdown() {
+  killScriptServerAndRelatedProcesses({ killVoiceStudio = true, killChrome = true, killFfmpeg = true } = {}) {
+    const { execFileSync } = require('node:child_process');
+    const selfPid = process.pid;
+
+    if (this._nodeFallback8098Server) {
+      try {
+        this._nodeFallback8098Server.close();
+      } catch {}
+      this._nodeFallback8098Server = null;
+    }
+
+    if (this.scriptServerProcess) {
+      const childPid = this.scriptServerProcess.pid;
+      if (childPid && childPid !== selfPid) {
+        try {
+          execFileSync('taskkill.exe', ['/F', '/T', '/PID', String(childPid)], {
+            windowsHide: true,
+            timeout: 3000
+          });
+        } catch {
+          try { this.scriptServerProcess.kill(); } catch {}
+        }
+      }
+      this.scriptServerProcess = null;
+    }
+
+    // Bước 1: Quét nhanh netstat -ano (< 50ms) để tắt ngay các tiến trình đang giữ cổng 8098..8103, 3900, 9222..9224
+    try {
+      const targetPorts = new Set([8098, 8099, 8100, 8101, 8102, 8103]);
+      if (killVoiceStudio) {
+        targetPorts.add(3900);
+      }
+      if (killChrome) {
+        targetPorts.add(9222);
+        targetPorts.add(9223);
+        targetPorts.add(9224);
+      }
+
+      const netstatOut = execFileSync('netstat.exe', ['-ano'], {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 2500
+      });
+      const pidsToKill = new Set();
+      for (const rawLine of String(netstatOut || '').split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line.startsWith('TCP')) continue;
+        const parts = line.split(/\s+/);
+        if (parts.length < 5) continue;
+        const localAddr = parts[1] || '';
+        const state = (parts[3] || '').toUpperCase();
+        const pid = Number(parts[4]);
+        if (!pid || pid <= 4 || pid === selfPid) continue;
+        if (state !== 'LISTENING') continue;
+        const portMatch = localAddr.match(/:(\d+)$/);
+        if (!portMatch) continue;
+        const port = Number(portMatch[1]);
+        if (targetPorts.has(port)) {
+          pidsToKill.add(pid);
+        }
+      }
+
+      for (const pid of pidsToKill) {
+        try {
+          execFileSync('taskkill.exe', ['/F', '/T', '/PID', String(pid)], {
+            windowsHide: true,
+            timeout: 2500
+          });
+        } catch {}
+      }
+    } catch {}
+
+    if (killVoiceStudio) {
+      try {
+        execFileSync('taskkill.exe', ['/F', '/T', '/IM', 'VoiceStudio.exe'], {
+          windowsHide: true,
+          timeout: 2000
+        });
+      } catch {}
+    }
+
+    // Bước 2: Quét sâu qua Win32_Process để đóng toàn bộ tiến trình con liên quan (Python Pipeline, Whisper, VoiceStudio, Chrome Profile, FFmpeg)
+    try {
+      const clauses = [
+        "$_.CommandLine -like '*mafia_dashboard_server.py*'",
+        "$_.CommandLine -like '*mafia_chatgpt_pipeline.py*'",
+        "$_.CommandLine -like '*chatgpt_web_client.py*'",
+        "$_.CommandLine -like '*faster_whisper_transcribe.py*'",
+        "$_.CommandLine -like '*tts_post_director.py*'"
+      ];
+      if (killVoiceStudio) {
+        clauses.push("$_.CommandLine -like '*run_voicestudio_daemon.py*'");
+        clauses.push("$_.CommandLine -like '*omnivoice*'");
+        clauses.push("($_.Name -like 'python*' -and $_.CommandLine -like '*--port 3900*')");
+        clauses.push("($_.Name -like 'uvicorn*' -and $_.CommandLine -like '*3900*')");
+      }
+      if (killChrome) {
+        clauses.push("($_.Name -eq 'chrome.exe' -and ($_.CommandLine -like '*BROWSER_PROFILE*' -or $_.CommandLine -like '*--remote-debugging-port=922*'))");
+      }
+      if (killFfmpeg) {
+        clauses.push("(($_.Name -eq 'ffmpeg.exe' -or $_.Name -eq 'ffprobe.exe') -and ($_.ParentProcessId -eq " + selfPid + " -or $_.CommandLine -like '*VideoBatchStudio*' -or $_.CommandLine -like '*TOOL_ZC_TEAM*' -or $_.CommandLine -like '*vbs_*'))");
+      }
+
+      const psCommand = `
+$selfPid = ${selfPid}
+$procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+  $_.ProcessId -ne $selfPid -and $_.ProcessId -ne $PID -and (
+    ${clauses.join(' -or\n    ')}
+  )
+}
+foreach ($p in $procs) {
+  try {
+    & taskkill.exe /F /T /PID $p.ProcessId 2>$null | Out-Null
+  } catch {}
+}
+`;
+      execFileSync('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', psCommand], {
+        windowsHide: true,
+        timeout: 5500
+      });
+    } catch {}
+  }
+
+  async shutdown(options = {}) {
     try {
       this.currentAbortController?.abort();
     } catch {}
@@ -1355,7 +1477,11 @@ foreach ($w in $sh.Windows()) {
       } catch {}
       this.httpServer = null;
     }
-    this.scriptServerProcess = null;
+    this.killScriptServerAndRelatedProcesses({
+      killVoiceStudio: options.killVoiceStudio !== false,
+      killChrome: options.killChrome !== false,
+      killFfmpeg: options.killFfmpeg !== false
+    });
   }
 }
 

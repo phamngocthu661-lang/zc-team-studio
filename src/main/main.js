@@ -131,11 +131,57 @@ function createWindow() {
   });
 }
 
+let shutdownStarted = false;
+let relaunchStarted = false;
+
+async function shutdownAllStudioServices({ killVoiceStudio = true, killChrome = true, killFfmpeg = true } = {}) {
+  quitting = true;
+  try {
+    subtitleOverlayService?.destroy?.();
+  } catch {}
+  await Promise.allSettled([
+    ffmpegService?.shutdown?.(),
+    scriptBridgeService?.shutdown?.({ killVoiceStudio, killChrome, killFfmpeg })
+  ]);
+  try {
+    database?.close?.();
+  } catch {}
+}
+
+function relaunchEntireApplication() {
+  if (relaunchStarted) return;
+  relaunchStarted = true;
+  quitting = true;
+  shutdownStarted = true;
+
+  const doRelaunchAndExit = () => {
+    try {
+      const cleanArgs = process.argv.slice(1).filter((arg) => arg !== '--relaunch-after-update');
+      app.relaunch({ args: [...cleanArgs, '--relaunch-after-update'] });
+    } catch {}
+    app.exit(0);
+  };
+
+  const forceRelaunchTimer = setTimeout(doRelaunchAndExit, 6500);
+  forceRelaunchTimer.unref?.();
+
+  shutdownAllStudioServices({ killVoiceStudio: true, killChrome: true, killFfmpeg: true })
+    .finally(() => {
+      clearTimeout(forceRelaunchTimer);
+      doRelaunchAndExit();
+    });
+}
+
 app.whenReady().then(async () => {
-  const alreadyRunning = await checkExistingBridgeAndFocus();
-  if (alreadyRunning) {
-    app.quit();
-    return;
+  const isRelaunchAfterUpdate = process.argv.includes('--relaunch-after-update');
+  if (isRelaunchAfterUpdate) {
+    await new Promise((r) => setTimeout(r, 700));
+  } else {
+    const alreadyRunning = await checkExistingBridgeAndFocus();
+    if (alreadyRunning) {
+      app.quit();
+      return;
+    }
   }
   const paths = appDataPaths();
   database = new AppDatabase(paths.database);
@@ -190,7 +236,8 @@ app.whenReady().then(async () => {
   });
   updaterService = new UpdaterService({
     getMainWindow: () => mainWindow,
-    scriptBridgeService
+    scriptBridgeService,
+    relaunchApp: relaunchEntireApplication
   });
   registerIpc({
     mainWindow,
@@ -261,7 +308,6 @@ app.on('window-all-closed', () => {
   }
 });
 
-let shutdownStarted = false;
 app.on('before-quit', (event) => {
   quitting = true;
   if (shutdownStarted) return;
@@ -271,17 +317,12 @@ app.on('before-quit', (event) => {
     try { subtitleOverlayService?.destroy?.(); } catch {}
     try { database?.close?.(); } catch {}
     app.exit(0);
-  }, 1200);
+  }, 6500);
   forceExitTimer.unref?.();
 
-  Promise.allSettled([
-    ffmpegService?.shutdown?.(),
-    scriptBridgeService?.shutdown?.()
-  ])
+  shutdownAllStudioServices({ killVoiceStudio: true, killChrome: true, killFfmpeg: true })
     .finally(() => {
       clearTimeout(forceExitTimer);
-      try { subtitleOverlayService?.destroy?.(); } catch {}
-      try { database?.close?.(); } catch {}
       app.exit(0);
     });
 });
