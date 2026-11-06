@@ -697,6 +697,132 @@ def sanitize_and_normalize_mexico_spanish_tts(raw_text: str) -> tuple[str, dict]
     return text, stats
 
 
+def sanitize_and_normalize_japanese_tts(raw_text: str, target_min_chars: int = 15000, target_max_chars: int = 26000) -> tuple[str, dict]:
+    """
+    BÀN #6 / BÀN #7 (`ja-JP` TTS Director):
+    Làm sạch và chuẩn hóa kịch bản tiếng Nhật (`05_Nhom_Manga_Doc_Than_Japan`, `06_Huu_Tri_Viec_Lam_Japan`):
+    - Xóa toàn bộ nhãn `[PART 1..7]`, `第1部..第7部`, `パート1..7`, thẻ HTML/XML, Markdown (`*`, `#`, `` ` ``).
+    - Giữ nguyên 100% dấu câu tiếng Nhật (`。`, `、`, `「`, `」`, `『`, `』`, `！`, `？`, `…`, `ー`).
+    - Không bao giờ tự ý thêm dấu chấm ASCII `.` vào cuối đoạn văn tiếng Nhật.
+    """
+    if not raw_text:
+        return "", {
+            "total_fixes": 0,
+            "strange_chars_removed": 0,
+            "abbreviations_expanded": 0,
+            "numbers_units_expanded": 0,
+            "punctuation_normalized": 0,
+            "spain_spanish_fixed": 0,
+            "char_range_ok": False,
+            "final_char_count": 0,
+            "final_word_count": 0,
+            "final_paragraph_count": 0,
+            "estimated_tts_minutes": 0.0,
+            "examples": [],
+        }
+
+    text = raw_text.replace("\r\n", "\n").replace("\r", "\n")
+    examples: list[str] = []
+    strange_chars_removed = 0
+    punctuation_normalized = 0
+
+    def _record_example(cat: str, before: str, after: str):
+        if len(examples) < 30 and before.strip() != after.strip():
+            examples.append(f"[{cat}] `{before.strip()}` -> `{after.strip()}`")
+
+    pasted_chip_jp = re.findall(
+        r"Pasted[ \t]+text[ \t]*\([^)\n]{1,40}\)(?:\.(?:txt|md|json|doc|docx|pdf|csv))?[ \t]*(?:Document|Tài liệu|Archivo|Documento)?",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if pasted_chip_jp:
+        strange_chars_removed += len(pasted_chip_jp)
+        _record_example("ChatGPT Paste Chip", pasted_chip_jp[0], "(removed)")
+        text = re.sub(
+            r"Pasted[ \t]+text[ \t]*\([^)\n]{1,40}\)(?:\.(?:txt|md|json|doc|docx|pdf|csv))?[ \t]*(?:Document|Tài liệu|Archivo|Documento)?",
+            "\n\n",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+    inv_matches = re.findall(r"[\u200b\u200c\u200d\ufeff\u00ad\u2060]", text)
+    if inv_matches:
+        strange_chars_removed += len(inv_matches)
+        text = re.sub(r"[\u200b\u200c\u200d\ufeff\u00ad\u2060]", "", text)
+
+    lines = text.splitlines()
+    cleaned_lines = []
+    for ln in lines:
+        s = ln.strip()
+        if re.match(
+            r"^(?:#+\s*)?(?:\*\*\s*)?(?:\[\s*)?(?:PART|PARTE|BEAT|SECTION|CHAPTER|STORY|パート)\s*\d+(?:\s*[\]\—\-\:：][^\n]*)?(?:\*\*)?$",
+            s,
+            flags=re.IGNORECASE,
+        ) or re.match(
+            r"^(?:#+\s*)?(?:\*\*\s*)?(?:\[\s*)?第\s*\d+\s*(?:部|章|話|節)(?:\s*[\]\—\-\:：][^\n]*)?(?:\*\*)?$",
+            s,
+        ):
+            strange_chars_removed += 1
+            _record_example("Header Strip (JA)", s, "(removed)")
+            continue
+        if re.match(r"^[\-\=\*_]{3,}\s*$", s):
+            strange_chars_removed += 1
+            continue
+        cleaned_lines.append(ln)
+    text = "\n".join(cleaned_lines)
+
+    html_tags = re.findall(r"</?[A-Za-z][^>\n]{0,140}>", text)
+    if html_tags:
+        strange_chars_removed += len(html_tags)
+        text = re.sub(r"</?[A-Za-z][^>\n]{0,140}>", "", text)
+
+    bracket_cues = re.findall(r"\[[^\]\n]{1,80}\]|\{[^\}\n]{1,80}\}", text)
+    if bracket_cues:
+        strange_chars_removed += len(bracket_cues)
+        _record_example("Stage Cue Bracket", bracket_cues[0], "(removed)")
+        text = re.sub(r"\[[^\]\n]{1,80}\]|\{[^\}\n]{1,80}\}", "", text)
+
+    md_stars = re.findall(r"\*{1,3}|`+", text)
+    if md_stars:
+        strange_chars_removed += len(md_stars)
+        text = re.sub(r"\*{1,3}|`+", "", text)
+
+    text = re.sub(r"(?m)^\s*#+\s+", "", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+    raw_paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    healed_paras = []
+    for p in raw_paras:
+        if not re.search(r'[。！？.!?”"\'\u2019」』）…—ー]\s*$', p):
+            p = p + "。"
+            punctuation_normalized += 1
+        healed_paras.append(p)
+    text = "\n\n".join(healed_paras)
+
+    final_chars = len(text)
+    jp_word_equiv = max(1, int(final_chars / 2.2))
+    est_minutes = round(final_chars / 350.0, 1)
+    char_range_ok = target_min_chars <= final_chars <= target_max_chars
+
+    stats = {
+        "total_fixes": strange_chars_removed + punctuation_normalized,
+        "strange_chars_removed": strange_chars_removed,
+        "abbreviations_expanded": 0,
+        "numbers_units_expanded": 0,
+        "punctuation_normalized": punctuation_normalized,
+        "spain_spanish_fixed": 0,
+        "long_sentences_count": 0,
+        "char_range_ok": char_range_ok,
+        "final_char_count": final_chars,
+        "final_word_count": jp_word_equiv,
+        "final_paragraph_count": len(healed_paras),
+        "estimated_tts_minutes": est_minutes,
+        "examples": examples,
+    }
+    return text, stats
+
+
 def run_tts_director_step_6(
     project_id: str,
     project_dir: str,
@@ -726,24 +852,41 @@ def run_tts_director_step_6(
             raw_seo = f.read()
 
     niche_norm = (niche or "").strip().lower()
+    is_japan = ("05_" in niche_norm) or ("06_" in niche_norm) or ("japan" in niche_norm)
     is_mexico = ("mexico" in niche_norm) or ("bà cô" in niche_norm) or ("ba co" in niche_norm) or ("03_" in niche_norm) or ("04_" in niche_norm) or ("07_" in niche_norm) or ("08_" in niche_norm) or ("09_" in niche_norm)
     is_mafia = ("mafia" in niche_norm) or ("nguoi_hau" in niche_norm)
 
-    if is_mexico:
+    target_min_c = 70000
+    target_max_c = 80000
+    try:
+        from engine.mafia_chatgpt_pipeline import get_niche_config
+        ncfg = get_niche_config(niche)
+        target_min_c = int(ncfg.get("target_min_chars", 70000))
+        target_max_c = int(ncfg.get("target_max_chars", 80000))
+    except Exception:
+        pass
+
+    if is_japan:
+        clean_tts_script, stats = sanitize_and_normalize_japanese_tts(raw_script, target_min_chars=target_min_c, target_max_chars=target_max_c)
+    elif is_mexico:
         clean_tts_script, stats = sanitize_and_normalize_mexico_spanish_tts(raw_script)
+        stats["char_range_ok"] = target_min_c <= stats["final_char_count"] <= target_max_c
     else:
         clean_tts_script, stats = sanitize_and_normalize_tts_script(raw_script)
+        stats["char_range_ok"] = target_min_c <= stats["final_char_count"] <= target_max_c
 
-    # Cổng khóa độ dài hậu kỳ (70.000 - 79.500 ký tự) sau khi bung số/viết tắt cho Homeless & Mexico 7 Phần
-    if not is_mafia and len(clean_tts_script) > 79200:
+    # Cổng khóa độ dài hậu kỳ theo đúng trần `target_max_c` của từng Key
+    hard_condense_trig = int(target_max_c * 0.99)
+    if not is_mafia and not is_japan and len(clean_tts_script) > hard_condense_trig:
         try:
             from engine.mafia_chatgpt_pipeline import condense_homeless_stage_text
             before_cond_len = len(clean_tts_script)
+            cond_target = int((target_min_c + target_max_c) / 2)
             clean_tts_script = condense_homeless_stage_text(
                 clean_tts_script,
-                expected_parts=[1, 2, 3, 4, 5, 6, 7],
-                target_chars=76500,
-                hard_max_chars=78800,
+                allowed_parts=[1, 2, 3, 4, 5, 6, 7],
+                target_chars=cond_target,
+                max_chars=int(target_max_c * 0.985),
             )
             words_after = re.findall(r"\b[\wÁÉÍÓÚÑáéíóúñü']+\b", clean_tts_script)
             paras_after = [p.strip() for p in re.split(r"\n\s*\n", clean_tts_script) if p.strip()]
@@ -751,10 +894,10 @@ def run_tts_director_step_6(
             stats["final_word_count"] = len(words_after)
             stats["final_paragraph_count"] = len(paras_after)
             stats["estimated_tts_minutes"] = round(len(words_after) / (145.0 if is_mexico else 150.0), 1)
-            stats["char_range_ok"] = 70000 <= len(clean_tts_script) <= 80000
+            stats["char_range_ok"] = target_min_c <= len(clean_tts_script) <= target_max_c
             stats["examples"].insert(
                 0,
-                f"[Length Calibration Lock] Đã cân chỉnh hậu kỳ từ `{before_cond_len:,}` -> `{len(clean_tts_script):,}` ký tự (chuẩn 70k–80k ký tự)",
+                f"[Length Calibration Lock] Đã cân chỉnh hậu kỳ từ `{before_cond_len:,}` -> `{len(clean_tts_script):,}` ký tự (chuẩn {target_min_c:,}–{target_max_c:,} ký tự)",
             )
         except Exception:
             pass

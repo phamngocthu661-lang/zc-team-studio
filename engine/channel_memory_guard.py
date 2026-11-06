@@ -174,6 +174,47 @@ FRESH_PROPS_AND_MECHANISMS_POOL_MEXICO = [
     "acta constitutiva de la tortillería familiar y grabaciones de seguridad del patio que prueban el despojo",
 ]
 
+FRESH_PROTAGONIST_NAMES_POOL_MEXICO_PADRE = [
+    "Don Aurelio Montemayor", "Don Efraín Villalobos", "Don Rosendo Cárdenas", "Don Ignacio Santillán",
+    "Don Prudencio Elizondo", "Don Melchor Covarrubias", "Don Baltazar Zambrano", "Don Fermín Orozco",
+    "Don Gregorio Alcántara", "Don Teodoro Peñaloza", "Don Silvestre Mondragón", "Don Arsenio Valenzuela",
+]
+
+FRESH_PROTAGONIST_NAMES_POOL_JAPAN = [
+    "佐伯 健一 (Saeki Kenichi, 42歳)", "桐生 誠 (Kiryuu Makoto, 39歳)", "藤堂 和也 (Toudou Kazuya, 45歳)",
+    "高梨 慎吾 (Takanashi Shingo, 38歳)", "黒澤 恒一 (Kurosawa Kouichi, 44歳)", "水野 隆司 (Mizuno Takashi, 41歳)",
+    "白石 俊介 (Shiraishi Shunsuke, 37歳)", "永井 浩二 (Nagai Kouji, 64歳)", "柴田 政夫 (Shibata Masao, 66歳)",
+    "原田 義男 (Harada Yoshio, 63歳)", "吉岡 敏夫 (Yoshioka Toshio, 65歳)", "森本 澄子 (Morimoto Sumiko, 62歳)",
+]
+
+FRESH_ANTAGONIST_NAMES_POOL_JAPAN = [
+    "篠原 美咲 (Shinohara Misaki) & 篠原 達也 (Tatsuya)",
+    "相沢 麗奈 (Aizawa Reina) & 橘 裕太 (Tachibana Yuuta)",
+    "神崎 麻衣 (Kanzaki Mai) & 部長・岩崎 (Iwasaki)",
+    "横山 拓海 (Yokoyama Takumi) & 義母・節子 (Setsuko)",
+    "結城 彩香 (Yuuki Ayaka) & 専務・葛西 (Kasai)",
+    "長谷川 健太 (Hasegawa Kenta) & 嫁・由香里 (Yukari)",
+]
+
+FRESH_LOCATIONS_POOL_JAPAN = [
+    "東京都・下北沢 & 世田谷区 (Shimokitazawa & Setagaya, Tokyo)",
+    "神奈川県・鎌倉 & 横浜みなとみらい (Kamakura & Yokohama)",
+    "長野県・松本市 & 安曇野 (Matsumoto & Azumino, Nagano)",
+    "静岡県・浜松市 & 伊豆高原 (Hamamatsu & Izu, Shizuoka)",
+    "京都府・宇治市 & 左京区 (Uji & Sakyo-ku, Kyoto)",
+    "福岡県・糸島市 & 博多区 (Itoshima & Hakata, Fukuoka)",
+    "北海道・小樽市 & 札幌市中央区 (Otaru & Sapporo, Hokkaido)",
+    "兵庫県・神戸市東灘区 & 芦屋 (Higashinada Kobe & Ashiya)",
+]
+
+FRESH_PROPS_AND_MECHANISMS_POOL_JAPAN = [
+    "公正証書遺言と不動産登記簿謄本（名義変更の予約と特約条項）",
+    "法人名義の通帳・印鑑証明書と税理士事務所が保管する株式譲渡契約書",
+    "退職金専用口座の取引履歴と内容証明郵便による贈与契約解除通知",
+    "特許権・著作権の使用料契約書と銀行貸金庫の鍵",
+]
+
+
 
 KNOWN_12_FOLDER_KEYS = {
     "01_nhom_ong_gia_tra_dua_my_us": "01_Nhom_Ong_Gia_Tra_Dua_My_US",
@@ -345,6 +386,23 @@ def extract_story_metadata_from_project(project_dir: str, project_id: str = "", 
             c_mx = m_mx_city.group(1).strip()
             if c_mx and c_mx not in locations:
                 locations.append(c_mx)
+
+        # Quét tên nhân vật & địa danh tiếng Nhật (Kanji/Kana) trong Outline cho Key 05 & 06
+        for m_jp_role in re.finditer(
+            r"(?:主人公|語り手|夫|妻|元妻|義母|義父|息子|娘|嫁|上司|部長|社長|先輩|同僚|主要人物|登場人物)\s*[：:\-–]\s*\*{0,2}([一-龯々ぁ-んァ-ヶー]{2,6}(?:\s*[一-龯々ぁ-んァ-ヶー]{1,6})?)",
+            outline_txt,
+        ):
+            nm_jp = m_jp_role.group(1).strip()
+            if nm_jp and nm_jp not in char_names:
+                char_names.append(nm_jp)
+
+        for m_jp_loc in re.finditer(
+            r"(東京都|神奈川県|大阪府|京都府|北海道|福岡県|愛知県|静岡県|長野県|兵庫県|千葉県|埼玉県|広島県|宮城県|[一-龯]{2,5}(?:市|区|町|村))",
+            outline_txt,
+        ):
+            loc_jp = m_jp_loc.group(1).strip()
+            if loc_jp and loc_jp not in locations:
+                locations.append(loc_jp)
 
         # Vật chứng / Clue Chain (C01..C10)
         for m_clue in re.finditer(r"^\|\s*C0[1-6]\s*\|\s*([^|\n]{4,75})\s*\|", outline_txt, flags=re.MULTILINE):
@@ -568,14 +626,23 @@ def run_canon_guard_step_1_5(
     banned_ln_lower = {x.lower() for x in banned_last_names}
 
     is_mx_lang = ("mexico" in niche_clean.lower())
-    protag_pool = FRESH_PROTAGONIST_NAMES_POOL_MEXICO if is_mx_lang else FRESH_PROTAGONIST_NAMES_POOL
-    antag_pool = FRESH_ANTAGONIST_NAMES_POOL_MEXICO if is_mx_lang else FRESH_ANTAGONIST_NAMES_POOL
-    loc_pool = (
-        FRESH_LOCATIONS_POOL_MEXICO
-        if is_mx_lang
-        else (FRESH_LOCATIONS_POOL_HOMELESS if niche_clean == "homeless" else FRESH_LOCATIONS_POOL_MAFIA)
-    )
-    props_pool = FRESH_PROPS_AND_MECHANISMS_POOL_MEXICO if is_mx_lang else FRESH_PROPS_AND_MECHANISMS_POOL
+    is_jp_lang = ("japan" in niche_clean.lower())
+    is_padre_mx = ("04_nhom_ong_gia" in niche_clean.lower() or "07_dong_que" in niche_clean.lower())
+    if is_jp_lang:
+        protag_pool = FRESH_PROTAGONIST_NAMES_POOL_JAPAN
+        antag_pool = FRESH_ANTAGONIST_NAMES_POOL_JAPAN
+        loc_pool = FRESH_LOCATIONS_POOL_JAPAN
+        props_pool = FRESH_PROPS_AND_MECHANISMS_POOL_JAPAN
+    elif is_mx_lang:
+        protag_pool = FRESH_PROTAGONIST_NAMES_POOL_MEXICO_PADRE if is_padre_mx else FRESH_PROTAGONIST_NAMES_POOL_MEXICO
+        antag_pool = FRESH_ANTAGONIST_NAMES_POOL_MEXICO
+        loc_pool = FRESH_LOCATIONS_POOL_MEXICO
+        props_pool = FRESH_PROPS_AND_MECHANISMS_POOL_MEXICO
+    else:
+        protag_pool = FRESH_PROTAGONIST_NAMES_POOL
+        antag_pool = FRESH_ANTAGONIST_NAMES_POOL
+        loc_pool = FRESH_LOCATIONS_POOL_HOMELESS if niche_clean == "homeless" else FRESH_LOCATIONS_POOL_MAFIA
+        props_pool = FRESH_PROPS_AND_MECHANISMS_POOL
 
     fresh_protagonists = []
     for cand in protag_pool:
@@ -603,16 +670,49 @@ def run_canon_guard_step_1_5(
     banned_props_str = " | ".join(banned_props[:18]) if banned_props else "(Chưa có)"
     recent_twists_str = "\n".join(recent_twists[-10:]) if recent_twists else "- (Chưa có kịch bản trước)"
 
-    if is_mx_lang:
+    if is_jp_lang:
         prompt_injection = f"""
 ================================================================================
-🛡️ CHỈ THỊ BẮT BUỘC TỪ BÀN #1.5 (`canon-guard-drama-familiar-mexico` — SỔ CÁI `CHANNEL_MEMORY_MEXICO.json`)
-(KHÓA CHỐNG TRÙNG LẶP TÊN BÀ CÔ, TÊN CON DÂU/CON RỂ/THÔNG GIA, THÀNH PHỐ MEXICO & VẬT CHỨNG PHÁP LÝ GIỮA {len(recent_stories)} KỊCH BẢN GẦN NHẤT)
+🛡️ CHỈ THỊ BẮT BUỘC TỪ BÀN #1.5 (`studio-canon-guard` — SỔ CÁI `CHANNEL_MEMORY_{niche_clean.upper()}.json`)
+(KHÓA CHỐNG TRÙNG LẶP TÊN NHÂN VẬT NHẬT BẢN, ĐỊA DANH & VẬT CHỨNG PHÁP LÝ GIỮA {len(recent_stories)} KỊCH BẢN GẦN NHẤT)
 ================================================================================
-Hệ thống Bàn #1.5 (`canon-guard-drama-familiar-mexico`) đã quét {len(recent_stories)} kịch bản gần nhất của kênh **MEXICO BÀ CÔ**.
+Hệ thống Bàn #1.5 (`studio-canon-guard`) đã quét {len(recent_stories)} kịch bản gần nhất của kênh **{niche_clean}**.
+Khi thiết kế Giàn ý 7 Phần (`[PART 1]`..`[PART 7]`) bằng tiếng Nhật (`ja-JP`) ở Bước 2 này, bạn **BẮT BUỘC TUÂN THỦ CÁC KHÓA CHỐNG TRÙNG LẶP SAU**:
+
+1. **🚫 CẤM LẶP LẠI TÊN NHÂN VẬT NHẬT BẢN ĐÃ DÙNG ({len(banned_full_names)} tên đã khóa):**
+   - **Danh sách Họ Tên đầy đủ CẤM DÙNG LẠI:** {banned_names_str}
+   - *(Lưu ý: Tuyệt đối tránh các tên AI hay lặp mặc định như: 田中太郎, 佐藤健太, 鈴木一郎, 高橋美咲 nếu đã xuất hiện ở trên).*
+
+2. **🚫 CẤM LẶP LẠI ĐỊA DANH / THÀNH PHỐ TẠI NHẬT BẢN ĐÃ DÙNG:**
+   - **Địa danh đã dùng ở các tập trước (CẤM LẶP):** {banned_locs_str}
+
+3. **🚫 CẤM LẶP LẠI MÔ-TÍP VẬT CHỨNG CŨ:**
+   - **Vật chứng đã dùng gần đây:** {banned_props_str}
+   - **Tóm tắt các kịch bản gần nhất để tránh trùng cốt truyện:**
+{recent_twists_str}
+
+4. **✅ GỢI Ý BIẾN SỐ MỚI SẠCH 100% CHO KÊNH `{niche_clean}` (CHƯA TỪNG XUẤT HIỆN TRONG SỔ CÁI):**
+   - **Gợi ý Tên Nhân vật Chính (ngôi kể `私` / `俺` / `僕`):** `{", ".join(fresh_protagonists)}`
+   - **Gợi ý Tên Nhân vật Đối trọng / Phản diện:** `{", ".join(fresh_antagonists)}`
+   - **Gợi ý Tỉnh / Thành phố tại Nhật Bản:** `{", ".join(fresh_locations)}`
+   - **Gợi ý Cơ chế Vật chứng pháp lý / Tài chính:** `{"; ".join(props_pool[:4])}`
+================================================================================
+"""
+    elif is_mx_lang:
+        mx_role_hint = (
+            "Gợi ý Tên Nhân vật Chính (Người Cha Già / Chủ trang trại `Don`, ngôi kể phù hợp với Skill)"
+            if is_padre_mx
+            else "Gợi ý Tên Nhân vật Chính / Người Mẹ Già (`Doña` / nhân vật chính theo đúng DNA Skill)"
+        )
+        prompt_injection = f"""
+================================================================================
+🛡️ CHỈ THỊ BẮT BUỘC TỪ BÀN #1.5 (`canon-guard-drama-familiar-mexico` — SỔ CÁI `CHANNEL_MEMORY_{niche_clean.upper()}.json`)
+(KHÓA CHỐNG TRÙNG LẶP TÊN NHÂN VẬT, THÀNH PHỐ MEXICO & VẬT CHỨNG PHÁP LÝ GIỮA {len(recent_stories)} KỊCH BẢN GẦN NHẤT)
+================================================================================
+Hệ thống Bàn #1.5 (`canon-guard-drama-familiar-mexico`) đã quét {len(recent_stories)} kịch bản gần nhất của kênh **{niche_clean}**.
 Khi thiết kế Giàn ý 7 Phần (`[PART 1]`..`[PART 7]`) bằng tiếng Tây Ban Nha Mexico (`es-MX`) ở Bước 2 này, bạn **BẮT BUỘC TUÂN THỦ CÁC KHÓA CHỐNG TRÙNG LẶP SAU**:
 
-1. **🚫 CẤM LẶP LẠI TÊN BÀ CÔ (NGƯỜI MẸ GIÀ) & TÊN GIA ĐÌNH PHẢN DIỆN ĐÃ DÙNG ({len(banned_full_names)} tên đã khóa):**
+1. **🚫 CẤM LẶP LẠI TÊN NHÂN VẬT CHÍNH & PHẢN DIỆN ĐÃ DÙNG ({len(banned_full_names)} tên đã khóa):**
    - **Danh sách Họ Tên đầy đủ CẤM DÙNG LẠI:** {banned_names_str}
    - **Danh sách Tên gọi (Nombres) CẤM DÙNG LẠI:** {banned_first_str}
    - **Danh sách Họ (Apellidos) CẤM DÙNG LẠI:** {banned_last_str}
@@ -626,9 +726,9 @@ Khi thiết kế Giàn ý 7 Phần (`[PART 1]`..`[PART 7]`) bằng tiếng Tây 
    - **Tóm tắt các kịch bản gần nhất để tránh trùng mô-típ phản bội:**
 {recent_twists_str}
 
-4. **✅ GỢI Ý BIẾN SỐ MỚI SẠCH 100% CHO KÊNH `MEXICO BÀ CÔ` (CHƯA TỪNG XUẤT HIỆN TRONG `CHANNEL_MEMORY_MEXICO.json`):**
-   - **Gợi ý Tên Bà Cô / Người Mẹ Già (60–80 tuổi, ngôi kể `Yo`):** `{", ".join(fresh_protagonists)}`
-   - **Gợi ý Tên Con Trai / Con Gái / Con Dâu (`nuera`) / Con Rể (`yerno`) / Bà Thông Gia (`consuegra`):** `{", ".join(fresh_antagonists)}`
+4. **✅ GỢI Ý BIẾN SỐ MỚI SẠCH 100% CHO KÊNH `{niche_clean}` (CHƯA TỪNG XUẤT HIỆN TRONG SỔ CÁI):**
+   - **{mx_role_hint}:** `{", ".join(fresh_protagonists)}`
+   - **Gợi ý Tên Nhân vật Phản diện / Gia đình (`hijo / hija / nuera / yerno / consuegra`):** `{", ".join(fresh_antagonists)}`
    - **Gợi ý Thành phố & Colonia tại Mexico:** `{", ".join(fresh_locations)}`
    - **Gợi ý Nghề nghiệp tích góp & Cơ chế vật chứng pháp lý (`escrituras / notaría / banco`):** `{"; ".join(props_pool[:4])}`
 ================================================================================
