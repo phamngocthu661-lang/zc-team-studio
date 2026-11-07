@@ -12,11 +12,44 @@ const SUBTITLE_EXTENSION_PRIORITY = new Map([
   ['.vtt', 1]
 ]);
 
-function listFiles(folder, extensions = null) {
+const SKIP_SUBDIR_NAMES = new Set(['used', 'invalid', 'temp', 'tmp', '.git', 'node_modules', '__pycache__']);
+
+function listFiles(folder, extensions = null, options = {}) {
   if (!folder || !fs.existsSync(folder)) return [];
-  return fs.readdirSync(folder, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && (!extensions || extensions.has(path.extname(entry.name).toLowerCase())))
-    .map((entry) => path.join(folder, entry.name));
+  const maxDepth = Number.isInteger(options.maxDepth) ? options.maxDepth : (options.recursive ? 2 : 0);
+  const collect = (dir, depth, limitDepth) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+    const out = [];
+    const subDirs = [];
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        if (!extensions || extensions.has(path.extname(entry.name).toLowerCase())) {
+          out.push(path.join(dir, entry.name));
+        }
+      } else if (entry.isDirectory() && depth < limitDepth) {
+        if (!SKIP_SUBDIR_NAMES.has(entry.name.toLowerCase()) && !entry.name.startsWith('.')) {
+          subDirs.push(path.join(dir, entry.name));
+        }
+      }
+    }
+    for (const sub of subDirs) {
+      out.push(...collect(sub, depth + 1, limitDepth));
+    }
+    return out;
+  };
+  const direct = collect(folder, 0, maxDepth);
+  if (direct.length > 0 || maxDepth > 0 || options.recursive === false) {
+    return direct;
+  }
+  if (extensions === VIDEO_EXTENSIONS) {
+    return collect(folder, 0, 2);
+  }
+  return direct;
 }
 
 function quickHash(filePath) {

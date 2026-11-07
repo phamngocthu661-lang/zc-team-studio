@@ -332,7 +332,7 @@ function newLayer(type){const i=(state.editor?.layers?.length||0)+1;const name=t
 
 async function loadAll(){state.projects=(await api.projects.list()).map(standardProject);state.templates=await api.templates.list();state.libraries=await api.libraries.list();state.batches=await api.batch.list();state.defaultAssets=await api.defaultAssets?.().catch(()=>({green:[],backgrounds:[]}))||{green:[],backgrounds:[]};await loadProjectAssets();fillSelects();populateProjectAssetSelects();updateGreenSourceVisibility();renderProjects();renderLibraries();renderBatchHistory();}
 function fillSelect(id,items,label,selected){const el=$(id);if(!el)return;el.innerHTML=items.map(x=>`<option value="${x.id}" ${x.id===selected?'selected':''}>${label(x)}</option>`).join('');}
-function fillSelects(){const projectId=state.selectedProject?.id;fillSelect('templateProject',state.projects,p=>p.name,projectId);fillSelect('batchProject',state.projects,p=>p.name,projectId);fillSelect('bridgeKeyProjectSelect',state.projects,p=>p.name,$('batchProject')?.value||projectId);fillSelect('singleProject',state.projects,p=>p.name,projectId);fillSelect('storyProject',state.projects,p=>p.name,projectId);fillSelect('templateSelect',state.templates,t=>t.name,state.selectedTemplate?.id);fillSelect('batchTemplate',state.templates,t=>t.name,state.selectedTemplate?.id);fillSelect('singleTemplate',state.templates,t=>t.name,state.selectedTemplate?.id);fillSelect('storyTemplate',state.templates,t=>t.name,state.selectedTemplate?.id);const savedLibId=localStorage.getItem('vbs.batchLibrary')||'';const preferredLib=state.libraries.find(l=>l.id===savedLibId)||state.libraries.find(l=>/16-6|OBS-Recordings/i.test(l.name||l.root_path||''))||state.libraries[0]||null;fillSelect('batchLibrary',state.libraries,librarySelectLabel,preferredLib?.id);fillSelect('singleLibrary',state.libraries,librarySelectLabel,preferredLib?.id);if($('mediaFolder')&&preferredLib?.root_path){const curMedia=$('mediaFolder').value||'';if(!curMedia||/scratch[\\/]+e2e_test_project/i.test(curMedia)){$('mediaFolder').value=preferredLib.root_path;try{localStorage.setItem('vbs.mediaFolder',preferredLib.root_path);}catch{}}}populateProjectAssetSelects();}
+function fillSelects(){const projectId=state.selectedProject?.id;fillSelect('templateProject',state.projects,p=>p.name,projectId);fillSelect('batchProject',state.projects,p=>p.name,projectId);fillSelect('bridgeKeyProjectSelect',state.projects,p=>p.name,$('batchProject')?.value||projectId);fillSelect('singleProject',state.projects,p=>p.name,projectId);fillSelect('storyProject',state.projects,p=>p.name,projectId);fillSelect('templateSelect',state.templates,t=>t.name,state.selectedTemplate?.id);fillSelect('batchTemplate',state.templates,t=>t.name,state.selectedTemplate?.id);fillSelect('singleTemplate',state.templates,t=>t.name,state.selectedTemplate?.id);fillSelect('storyTemplate',state.templates,t=>t.name,state.selectedTemplate?.id);const savedLibId=localStorage.getItem('vbs.batchLibrary')||'';const savedMediaNorm=String(localStorage.getItem('vbs.mediaFolder')||$('mediaFolder')?.value||'').trim().replace(/[\\/]+$/,'').toLowerCase();const preferredLib=(savedMediaNorm&&state.libraries.find(l=>String(l.root_path||'').trim().replace(/[\\/]+$/,'').toLowerCase()===savedMediaNorm))||state.libraries.find(l=>l.id===savedLibId)||state.libraries.find(l=>/16-6|OBS-Recordings/i.test(l.name||l.root_path||''))||state.libraries[0]||null;fillSelect('batchLibrary',state.libraries,librarySelectLabel,preferredLib?.id);fillSelect('singleLibrary',state.libraries,librarySelectLabel,preferredLib?.id);if($('mediaFolder')&&preferredLib?.root_path){const curMedia=$('mediaFolder').value||'';if(!curMedia||/scratch[\\/]+e2e_test_project/i.test(curMedia)){$('mediaFolder').value=preferredLib.root_path;try{localStorage.setItem('vbs.mediaFolder',preferredLib.root_path);}catch{}}}populateProjectAssetSelects();}
 function populateGpuSelectors(health){
   const selected=Number(health?.selectedGpuIndex??0),gpus=health?.gpus||[];
   const autoLabel=health?.selectedGpuName?`Tự động — ${health.selectedGpuName} (GPU ${selected})`:'Tự động quét GPU';
@@ -2852,9 +2852,9 @@ async function applyChannelKeyPresetToUi(channelKey) {
   await syncBatchConfigToBridge({ silent: true });
 }
 
-async function syncBatchConfigToBridge({ silent = true } = {}) {
+async function syncBatchConfigToBridge({ silent = true, force = false } = {}) {
   if (!api.scriptBridge?.lockConfig) return null;
-  if (silent && !state.workspaceLoaded) return null;
+  if (silent && !force && !state.workspaceLoaded) return null;
   try {
     const rawCfg = collectBatch();
     applyDisclaimerSelection(rawCfg, 'batch');
@@ -2863,6 +2863,14 @@ async function syncBatchConfigToBridge({ silent = true } = {}) {
     if (linked.mediaFolder && (!rawCfg.mediaFolder || /^E:\\OBS-Recordings/i.test(rawCfg.mediaFolder) || linked.applyStockOutputAllKeys !== false)) {
       rawCfg.mediaFolder = linked.mediaFolder;
       if ($('mediaFolder')) $('mediaFolder').value = linked.mediaFolder;
+    }
+    if (rawCfg.mediaFolder && Array.isArray(state.libraries)) {
+      const normMedia = String(rawCfg.mediaFolder).trim().replace(/[\\/]+$/, '').toLowerCase();
+      const matchedLib = state.libraries.find(l => String(l.root_path || '').trim().replace(/[\\/]+$/, '').toLowerCase() === normMedia);
+      if (matchedLib?.id) {
+        rawCfg.libraryId = matchedLib.id;
+        if ($('batchLibrary')) $('batchLibrary').value = matchedLib.id;
+      }
     }
     if (linked.outputFolder && (!rawCfg.outputFolder || /^D:\\MAFIA_STUDIO_WEB/i.test(rawCfg.outputFolder) || linked.applyStockOutputAllKeys !== false)) {
       rawCfg.outputFolder = linked.outputFolder;
@@ -3022,7 +3030,11 @@ window._autoScanStockFolderIfNeeded = async function(folderPath) {
     await api.scriptBridge?.stockReport?.(fp, true);
     const latest = await api.scriptBridge?.status?.();
     if (latest) renderScriptBridgeState(latest);
-  } catch {}
+  } catch {} finally {
+    setTimeout(() => {
+      if (_stockAutoScanningFolder === fp) _stockAutoScanningFolder = '';
+    }, 3000);
+  }
 };
 
 function buildInlineStockBadgeHtml(stSum, mediaFolder) {
@@ -3030,8 +3042,12 @@ function buildInlineStockBadgeHtml(stSum, mediaFolder) {
   if (!cleanFolder || cleanFolder.startsWith('(')) {
     return `<span style="padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;background:#450a0a;color:#fca5a5;border:1px solid #ef4444;margin-left:4px;">⚠️ Chưa chọn kho</span>`;
   }
-  if (!stSum || !stSum.folderExists) {
-    return `<span style="padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;background:#450a0a;color:#fca5a5;border:1px solid #ef4444;margin-left:4px;">⚠️ Không tìm thấy thư mục</span>`;
+  if (!stSum) {
+    setTimeout(() => window._autoScanStockFolderIfNeeded(cleanFolder), 80);
+    return `<span onclick="event.stopPropagation();window.openStockHistoryModal('${htmlEscape(cleanFolder.replace(/\\/g, '\\\\'))}', true);" style="padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;background:#1e293b;color:#38bdf8;border:1px solid #0284c7;cursor:pointer;margin-left:4px;" title="Bấm để kiểm tra & quét thời lượng kho Stock...">⏳ Đang kiểm tra kho Stock...</span>`;
+  }
+  if (stSum.folderExists === false) {
+    return `<span onclick="event.stopPropagation();window.openStockHistoryModal('${htmlEscape(cleanFolder.replace(/\\/g, '\\\\'))}', true);" style="padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;background:#450a0a;color:#fca5a5;border:1px solid #ef4444;cursor:pointer;margin-left:4px;" title="Bấm để kiểm tra lại đường dẫn thư mục: ${htmlEscape(cleanFolder)}">⚠️ Không tìm thấy thư mục</span>`;
   }
   if (stSum.needsScan) {
     setTimeout(() => window._autoScanStockFolderIfNeeded(cleanFolder), 80);
@@ -3324,10 +3340,16 @@ window.applyLinkedFolderValue = async function(kind, rawValue) {
               libraryType: 'STOCK'
             });
           }
+          if (matched?.id) {
+            try { localStorage.setItem('vbs.batchLibrary', matched.id); } catch {}
+          }
           state.libraries = await api.libraries.list();
           fillSelects();
           if (matched?.id && $('batchLibrary')) {
             $('batchLibrary').value = matched.id;
+          }
+          if (matched?.id && api.libraries?.scan) {
+            try { await api.libraries.scan(matched.id); } catch {}
           }
           await api.scriptBridge?.stockReport?.(val, true);
         } catch {}
@@ -3407,7 +3429,7 @@ window.applyLinkedFolderValue = async function(kind, rawValue) {
       toast(`📝 Đã chọn Folder TONG HOP (Kênh MEXICO BÀ CÔ): ${val}`);
     }
 
-    await syncBatchConfigToBridge({ silent: true });
+    await syncBatchConfigToBridge({ silent: true, force: true });
     const latestSt = await api.scriptBridge?.status?.();
     if (latestSt) renderScriptBridgeState(latestSt);
     if ($('modal')?.classList.contains('open') || $('modal')?.style?.display === 'flex' || document.querySelector('#modalBtnEditBatchConfig')) {

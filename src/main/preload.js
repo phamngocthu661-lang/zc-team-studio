@@ -1521,6 +1521,245 @@ function writeCustomLinkedFolders(partial = {}) {
   return merged;
 }
 
+const PRELOAD_VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.ts']);
+const PRELOAD_SKIP_DIRS = new Set(['used', 'invalid', 'temp', 'tmp', '.git', 'node_modules', '__pycache__']);
+
+function resolveSqliteDbPathInPreload() {
+  try {
+    const { appDir, exeDir, primaryRoot } = getStudioBaseDirs();
+    for (const dir of [primaryRoot, exeDir, appDir, 'D:\\ZC_TEAM\\TOOL_ZC_TEAM']) {
+      if (!dir) continue;
+      const cand = path.join(dir, 'data', 'video-batch-studio.db');
+      if (fs.existsSync(cand)) return cand;
+    }
+  } catch {}
+  return '';
+}
+
+function listDiskStockVideosInPreload(folderPath, maxDepth = 2) {
+  const raw = String(folderPath || '').trim();
+  if (!raw || raw.startsWith('(') || !fs.existsSync(raw)) return [];
+  const collect = (dir, depth, limit) => {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
+    const out = [];
+    const subs = [];
+    for (const e of entries) {
+      if (e.isFile()) {
+        if (PRELOAD_VIDEO_EXTS.has(path.extname(e.name).toLowerCase())) {
+          out.push(path.join(dir, e.name));
+        }
+      } else if (e.isDirectory() && depth < limit) {
+        if (!PRELOAD_SKIP_DIRS.has(e.name.toLowerCase()) && !e.name.startsWith('.')) {
+          subs.push(path.join(dir, e.name));
+        }
+      }
+    }
+    for (const s of subs) out.push(...collect(s, depth + 1, limit));
+    return out;
+  };
+  const top = collect(raw, 0, 0);
+  if (top.length > 0) return top;
+  return collect(raw, 0, maxDepth);
+}
+
+function computeLocalStockReportInPreload(folderPath, playbackRate = 0.75) {
+  const cleanFolder = String(folderPath || '').trim();
+  const speed = Math.max(0.1, Number(playbackRate || 0.75));
+  if (!cleanFolder || cleanFolder.startsWith('(')) {
+    const emptyStats = {
+      found: false,
+      folderExists: false,
+      folderPath: '',
+      playbackRate: speed,
+      diskVideoCount: 0,
+      unscannedFileCount: 0,
+      totalCount: 0,
+      availableCount: 0,
+      inProgressCount: 0,
+      usedCount: 0,
+      unusableCount: 0,
+      totalDurationMs: 0,
+      availableDurationMs: 0,
+      usedDurationMs: 0,
+      rawTotalDurationMs: 0,
+      rawAvailableDurationMs: 0,
+      rawUsedDurationMs: 0,
+      needsScan: false
+    };
+    return { ...emptyStats, stats: emptyStats, summary: emptyStats, files: [], assets: [], history: [], usageHistory: [] };
+  }
+
+  let folderExists = false;
+  try { folderExists = fs.existsSync(cleanFolder) && fs.statSync(cleanFolder).isDirectory(); } catch {}
+  const diskFiles = folderExists ? listDiskStockVideosInPreload(cleanFolder, 2) : [];
+  const diskVideoCount = diskFiles.length;
+
+  let library = null;
+  let assetRows = [];
+  let historyRows = [];
+  const dbPath = resolveSqliteDbPathInPreload();
+  if (dbPath && fs.existsSync(dbPath)) {
+    try {
+      const { DatabaseSync } = require('node:sqlite');
+      const db = new DatabaseSync(dbPath);
+      try {
+        const normTarget = path.resolve(cleanFolder).replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
+        const allLibs = db.prepare('SELECT * FROM media_libraries ORDER BY updated_at DESC').all();
+        library = allLibs.find((l) => String(l.root_path || '').replace(/[\\/]+$/, '').toLocaleLowerCase('en-US') === normTarget) || null;
+        if (library) {
+          assetRows = db.prepare(`
+            SELECT a.*,
+              COALESCE((SELECT MAX(m.source_end_ms) FROM matched_stock_usage m
+                WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'), 0) AS matched_consumed_ms,
+              COALESCE((SELECT COUNT(*) FROM matched_stock_usage m
+                WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'), 0) AS usage_count,
+              (SELECT m.voice_name FROM matched_stock_usage m
+                WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'
+                ORDER BY m.created_at DESC LIMIT 1) AS last_voice_name,
+              (SELECT m.output_path FROM matched_stock_usage m
+                WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'
+                ORDER BY m.created_at DESC LIMIT 1) AS last_output_path,
+              (SELECT m.created_at FROM matched_stock_usage m
+                WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'
+                ORDER BY m.created_at DESC LIMIT 1) AS last_used_at
+            FROM media_assets a
+            WHERE a.library_id=?
+            ORDER BY a.file_name COLLATE NOCASE
+          `).all(library.id);
+          historyRows = db.prepare(`
+            SELECT m.*
+            FROM matched_stock_usage m
+            WHERE m.status='COMPLETED'
+              AND (
+                m.normalized_source_path LIKE ?
+                OR m.normalized_source_path IN (SELECT normalized_path FROM media_assets WHERE library_id=?)
+              )
+            ORDER BY m.created_at DESC
+            LIMIT 300
+          `).all(`${normTarget}%`, library.id);
+        } else {
+          historyRows = db.prepare(`
+            SELECT m.*
+            FROM matched_stock_usage m
+            WHERE m.status='COMPLETED' AND m.normalized_source_path LIKE ?
+            ORDER BY m.created_at DESC
+            LIMIT 300
+          `).all(`${normTarget}%`);
+        }
+      } finally {
+        try { db.close(); } catch {}
+      }
+    } catch {}
+  }
+
+  let totalDurationMs = 0;
+  let availableDurationMs = 0;
+  let usedDurationMs = 0;
+  let rawTotalDurationMs = 0;
+  let rawAvailableDurationMs = 0;
+  let rawUsedDurationMs = 0;
+  let availableCount = 0;
+  let inProgressCount = 0;
+  let usedCount = 0;
+  let unusableCount = 0;
+
+  const files = assetRows.filter((r) => r.asset_type === 'VIDEO').map((row) => {
+    const durationMs = Math.max(0, Number(row.duration_ms || 0));
+    const rawConsumed = Math.min(durationMs, Math.max(0, Number(row.matched_consumed_ms || 0)));
+    const isFullyConsumed = row.status === 'USED' || (durationMs > 0 && rawConsumed >= Math.max(0, durationMs - 500));
+    const effectiveDurationMs = Math.round(durationMs / speed);
+    const effectiveConsumedMs = isFullyConsumed ? effectiveDurationMs : Math.min(effectiveDurationMs, Math.round(rawConsumed / speed));
+    const effectiveRemainingMs = Math.max(0, effectiveDurationMs - effectiveConsumedMs);
+    const rawRemainingMs = isFullyConsumed ? 0 : Math.max(0, durationMs - rawConsumed);
+    const percentUsed = durationMs > 0 ? (isFullyConsumed ? 100 : Math.min(99, Math.round((rawConsumed / durationMs) * 100))) : 0;
+
+    rawTotalDurationMs += durationMs;
+    totalDurationMs += effectiveDurationMs;
+    let usageStatus = 'AVAILABLE';
+    if (row.status === 'MISSING' || row.status === 'INVALID') {
+      unusableCount += 1;
+      usageStatus = 'UNUSABLE';
+    } else if (isFullyConsumed) {
+      usedCount += 1;
+      rawUsedDurationMs += durationMs;
+      usedDurationMs += effectiveDurationMs;
+      usageStatus = 'USED';
+    } else {
+      availableCount += 1;
+      if (rawConsumed > 0) {
+        inProgressCount += 1;
+        usageStatus = 'IN_PROGRESS';
+      }
+      rawAvailableDurationMs += rawRemainingMs;
+      rawUsedDurationMs += rawConsumed;
+      availableDurationMs += effectiveRemainingMs;
+      usedDurationMs += effectiveConsumedMs;
+    }
+
+    return {
+      id: row.id,
+      fileName: row.file_name,
+      filePath: row.file_path,
+      fileSizeBytes: Number(row.file_size_bytes || 0),
+      durationMs,
+      effectiveDurationMs,
+      effectiveTotalMs: effectiveDurationMs,
+      rawConsumedMs: isFullyConsumed ? durationMs : rawConsumed,
+      effectiveConsumedMs,
+      effectiveUsedMs: effectiveConsumedMs,
+      rawRemainingMs,
+      effectiveRemainingMs,
+      percentUsed,
+      consumedPercent: percentUsed,
+      status: isFullyConsumed ? 'USED' : row.status,
+      usageState: usageStatus === 'IN_PROGRESS' ? 'PARTIAL' : (usageStatus === 'USED' ? 'USED' : 'UNUSED'),
+      usageStatus,
+      usageCount: Number(row.usage_count || 0),
+      segmentsUsedCount: Number(row.usage_count || 0),
+      lastVoiceName: row.last_voice_name || '',
+      lastUsedVoice: row.last_voice_name || '',
+      lastOutputPath: row.last_output_path || '',
+      lastUsedAt: row.last_used_at || row.used_at || null
+    };
+  });
+
+  const dbTotalCount = availableCount + usedCount + unusableCount;
+  const needsScan = folderExists && diskVideoCount > 0 && dbTotalCount === 0;
+  const summary = {
+    found: Boolean(library || folderExists),
+    folderExists,
+    libraryId: library?.id || null,
+    folderPath: cleanFolder,
+    playbackRate: speed,
+    diskVideoCount,
+    unscannedFileCount: diskVideoCount,
+    totalCount: dbTotalCount || diskVideoCount,
+    availableCount,
+    inProgressCount,
+    usedCount,
+    unusableCount,
+    totalDurationMs: Math.round(totalDurationMs),
+    availableDurationMs: Math.round(availableDurationMs),
+    usedDurationMs: Math.round(usedDurationMs),
+    rawTotalDurationMs: Math.round(rawTotalDurationMs),
+    rawAvailableDurationMs: Math.round(rawAvailableDurationMs),
+    rawUsedDurationMs: Math.round(rawUsedDurationMs),
+    needsScan
+  };
+  return {
+    ...summary,
+    library,
+    libraryName: library?.name || path.basename(cleanFolder) || 'Kho Stock',
+    stats: summary,
+    summary,
+    files,
+    assets: files,
+    history: historyRows,
+    usageHistory: historyRows
+  };
+}
+
 function enrichBridgeStateWithLinkedFolders(st) {
   if (!st || typeof st !== 'object') return st;
   try {
@@ -1535,12 +1774,25 @@ function enrichBridgeStateWithLinkedFolders(st) {
     const activeKey = cfg.channelKey || st.activeChannelKey || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
     const studioRoot = linked.scriptStudioRoot || st.settings?.scriptStudioRoot || primaryRoot;
 
-    // 1. Kho Stock (mediaFolder)
-    let mediaFolder = String(cfg.mediaFolder || linked.mediaFolder || s.mediaFolder || '').trim();
+    // 1. Kho Stock (mediaFolder) — ưu tiên linked.mediaFolder người dùng vừa chọn
+    let mediaFolder = String(
+      (linked.mediaFolder && !String(linked.mediaFolder).startsWith('('))
+        ? linked.mediaFolder
+        : (cfg.mediaFolder || s.mediaFolder || '')
+    ).trim();
     if (mediaFolder && !mediaFolder.startsWith('(') && /^E:\\OBS-Recordings/i.test(mediaFolder) && !fs.existsSync(mediaFolder)) {
       mediaFolder = linked.mediaFolder || '';
     }
     s.mediaFolder = mediaFolder || '(Chưa chọn — Bấm [📁 Chọn Folder] để chọn Kho Stock Video)';
+
+    // Luôn đồng bộ s.stockSummary khớp chính xác với s.mediaFolder thực tế trên đĩa
+    const cleanMedia = (!mediaFolder || mediaFolder.startsWith('(')) ? '' : mediaFolder;
+    const sumFolder = String(s.stockSummary?.folderPath || '').trim();
+    const sameFolder = cleanMedia && sumFolder && path.resolve(cleanMedia).toLowerCase() === path.resolve(sumFolder).toLowerCase();
+    const diskExistsNow = Boolean(cleanMedia && fs.existsSync(cleanMedia));
+    if (!s.stockSummary || !sameFolder || Boolean(s.stockSummary.folderExists) !== diskExistsNow || (diskExistsNow && Number(s.stockSummary.totalCount || 0) === 0)) {
+      s.stockSummary = computeLocalStockReportInPreload(cleanMedia, Number(cfg.stockPlaybackRate || 0.75)).summary;
+    }
 
     // 2. Folder Output MP4
     let outputFolder = String(cfg.outputFolder || linked.outputFolder || s.outputFolder || '').trim();
@@ -1794,8 +2046,62 @@ contextBridge.exposeInMainWorld('vbs', {
     enqueueScript: (payload) => ipcRenderer.invoke('scriptBridge:enqueueScript', payload),
     enqueueFolder: (folderPath) => ipcRenderer.invoke('scriptBridge:enqueueFolder', folderPath),
     clearQueue: () => ipcRenderer.invoke('scriptBridge:clearQueue'),
-    stockReport: (folderPath = '', forceRescan = false) => ipcRenderer.invoke('scriptBridge:stockReport', { folderPath, forceRescan }),
-    resetStockUsage: (folderPath = '') => ipcRenderer.invoke('scriptBridge:resetStockUsage', folderPath),
+    stockReport: async (folderPath = '', forceRescan = false) => {
+      const linked = readCustomLinkedFolders();
+      const targetFolder = String(folderPath || linked.mediaFolder || '').trim();
+      try {
+        const rep = await ipcRenderer.invoke('scriptBridge:stockReport', { folderPath: targetFolder, forceRescan });
+        if (rep && rep.folderExists && (!targetFolder || path.resolve(String(rep.folderPath || '')).toLowerCase() === path.resolve(targetFolder).toLowerCase())) {
+          return rep;
+        }
+      } catch {}
+      if (targetFolder && !targetFolder.startsWith('(') && fs.existsSync(targetFolder)) {
+        try {
+          const libs = (await ipcRenderer.invoke('libraries:list').catch(() => [])) || [];
+          const norm = path.resolve(targetFolder).replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
+          let matched = libs.find((l) => String(l.root_path || '').replace(/[\\/]+$/, '').toLocaleLowerCase('en-US') === norm);
+          if (!matched) {
+            matched = await ipcRenderer.invoke('libraries:create', {
+              name: path.basename(path.resolve(targetFolder)) || 'Kho Stock Video',
+              rootPath: path.resolve(targetFolder),
+              libraryType: 'STOCK'
+            }).catch(() => null);
+          }
+          if (matched?.id && (forceRescan || Number(matched.asset_count || 0) === 0)) {
+            await ipcRenderer.invoke('libraries:scan', matched.id).catch(() => {});
+          }
+        } catch {}
+      }
+      return computeLocalStockReportInPreload(targetFolder, 0.75);
+    },
+    resetStockUsage: async (folderPath = '') => {
+      const linked = readCustomLinkedFolders();
+      const targetFolder = String(folderPath || linked.mediaFolder || '').trim();
+      try {
+        return await ipcRenderer.invoke('scriptBridge:resetStockUsage', targetFolder);
+      } catch {
+        const dbPath = resolveSqliteDbPathInPreload();
+        if (dbPath && fs.existsSync(dbPath) && targetFolder) {
+          try {
+            const { DatabaseSync } = require('node:sqlite');
+            const db = new DatabaseSync(dbPath);
+            try {
+              const norm = path.resolve(targetFolder).replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
+              const lib = db.prepare('SELECT * FROM media_libraries').all().find((l) => String(l.root_path || '').replace(/[\\/]+$/, '').toLocaleLowerCase('en-US') === norm);
+              if (lib) {
+                db.prepare("DELETE FROM matched_stock_usage WHERE normalized_source_path LIKE ? OR normalized_source_path IN (SELECT normalized_path FROM media_assets WHERE library_id=?)").run(`${norm}%`, lib.id);
+                db.prepare("UPDATE media_assets SET status='AVAILABLE', used_at=NULL WHERE library_id=? AND status IN ('USED','RESERVED','MOVING')").run(lib.id);
+              } else {
+                db.prepare("DELETE FROM matched_stock_usage WHERE normalized_source_path LIKE ?").run(`${norm}%`);
+              }
+            } finally {
+              try { db.close(); } catch {}
+            }
+          } catch {}
+        }
+        return { ok: true, report: computeLocalStockReportInPreload(targetFolder, 0.75) };
+      }
+    },
     resumeAfterStock: (newMediaFolder = '') => ipcRenderer.invoke('scriptBridge:resumeAfterStock', { newMediaFolder }),
     onInsufficientStock: (fn) => sub('scriptBridge:insufficientStock', fn),
     onState: (fn) => sub('scriptBridge:state', async (st) => {

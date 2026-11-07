@@ -600,9 +600,31 @@ class ScriptVideoBridgeService {
     return this.getPublicState();
   }
 
+  _readDiskLinkedFolders() {
+    try {
+      const studioRoot = this.settings?.scriptStudioRoot || this._detectScriptStudioRoot();
+      for (const candidate of [
+        studioRoot ? path.join(studioRoot, 'data', 'config', 'CUSTOM_LINKED_FOLDERS.json') : '',
+        studioRoot ? path.join(studioRoot, 'CUSTOM_LINKED_FOLDERS.json') : ''
+      ]) {
+        if (candidate && fs.existsSync(candidate)) {
+          return JSON.parse(fs.readFileSync(candidate, 'utf8') || '{}') || {};
+        }
+      }
+    } catch {}
+    return {};
+  }
+
   _resolveValidStockLibraryAndFolder(cfg = {}, libraries = []) {
-    const linked = this.settings?.linkedFolders || {};
-    let rawFolder = String(cfg.mediaFolder || linked.mediaFolder || '').trim();
+    const diskLinked = this._readDiskLinkedFolders();
+    const linked = { ...(this.settings?.linkedFolders || {}), ...diskLinked };
+    if (this.settings) this.settings.linkedFolders = linked;
+
+    let cfgFolder = String(cfg.mediaFolder || '').trim();
+    if (cfgFolder && /^E:\\OBS-Recordings/i.test(cfgFolder) && !fs.existsSync(cfgFolder) && linked.mediaFolder) {
+      cfgFolder = '';
+    }
+    let rawFolder = String(cfgFolder || linked.mediaFolder || '').trim();
     const isScratchTest = /scratch[\\/]+e2e_test_project/i.test(rawFolder) || rawFolder.startsWith('(');
     if (isScratchTest) {
       rawFolder = '';
@@ -623,16 +645,21 @@ class ScriptVideoBridgeService {
           });
         } catch {}
       }
-    }
-
-    if (!matchedLib) {
-      const preferredStockLib = stockLibraries.find((l) => /16-6|OBS-Recordings/i.test(l.name || l.root_path || '')) || stockLibraries[0] || libraries[0] || null;
-      matchedLib = libraries.find((l) => l.id === cfg.libraryId) || preferredStockLib;
+    } else {
+      const existingStockLibs = stockLibraries.filter((l) => l.root_path && fs.existsSync(l.root_path));
+      const preferredStockLib = existingStockLibs.find((l) => /16-6|OBS-Recordings/i.test(l.name || l.root_path || ''))
+        || existingStockLibs[0]
+        || stockLibraries.find((l) => /16-6|OBS-Recordings/i.test(l.name || l.root_path || ''))
+        || stockLibraries[0]
+        || libraries[0]
+        || null;
+      const cfgLib = libraries.find((l) => l.id === cfg.libraryId);
+      matchedLib = (cfgLib?.root_path && fs.existsSync(cfgLib.root_path)) ? cfgLib : (preferredStockLib || cfgLib);
     }
 
     const libPath = (matchedLib?.root_path && fs.existsSync(matchedLib.root_path)) ? matchedLib.root_path : '';
     const mediaFolder = rawFolder || libPath || matchedLib?.root_path || '';
-    const libraryId = matchedLib?.id || ((!isScratchTest && libraries.some((l) => l.id === cfg.libraryId)) ? cfg.libraryId : null);
+    const libraryId = matchedLib?.id || ((!rawFolder && !isScratchTest && libraries.some((l) => l.id === cfg.libraryId)) ? cfg.libraryId : null);
 
     return { matchedLib, libraryId, mediaFolder };
   }
@@ -711,8 +738,11 @@ class ScriptVideoBridgeService {
         needsScan
       };
     } catch {
+      let safeExists = false;
+      try { safeExists = Boolean(folderPath && !String(folderPath).startsWith('(') && fs.existsSync(String(folderPath).trim())); } catch {}
       return {
-        found: false,
+        found: safeExists,
+        folderExists: safeExists,
         folderPath: String(folderPath || ''),
         playbackRate: Number(playbackRate || 0.75),
         totalCount: 0,
@@ -722,7 +752,7 @@ class ScriptVideoBridgeService {
         totalDurationMs: 0,
         availableDurationMs: 0,
         usedDurationMs: 0,
-        needsScan: false
+        needsScan: safeExists
       };
     }
   }
