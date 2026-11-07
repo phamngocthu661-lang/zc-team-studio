@@ -1,7 +1,7 @@
 {
   "name": "zc-team-studio",
   "productName": "ZC TEAM",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "ZC TEAM — GPU AI Video & Script Production Studio",
   "main": "src/main/main.js",
   "scripts": {

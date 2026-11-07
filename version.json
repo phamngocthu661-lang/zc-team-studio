@@ -1,10 +1,11 @@
 {
-  "version": "V1.0.12",
-  "build_number": 126,
-  "released_at": "2026-11-07 00:21:14",
+  "version": "V1.0.13",
+  "build_number": 127,
+  "released_at": "2026-11-07 08:57:32",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.13 (Build #127) - 2026-11-07 08:57:32] V1.0.13: Sửa triệt để 11 lỗi thực chiến Pipeline 15 Key trên ChatGPT Web: Khóa định mức ký tự động theo từng Key (kspec) & diagnosed_parts_once chống vòng lặp vô tận; Khóa One-Repair Policy (1 vòng sửa) & bỏ cắt cụt [:7500] ở Bước 4B; Cô lập 100% nhãn Key ở Bàn #2-#5; Nhúng Canon Lock & Continuity Anchor vào Lần viết 2/3 và 3/3; Bảo vệ câu thoại tiếng Nhật 「...」 trong condense_homeless_stage_text; Nâng cấp khóa nguyên tử window.__zcTabOwner chống trùng Tab đa tiến trình và nâng ngưỡng Auto-Heal lên 95s tương thích chế độ Thinking.",
     "[V1.0.12 (Build #126) - 2026-11-07 00:21:14] Triệt tiêu 100% lỗi vòng lặp vô tận khi viết kịch bản trên toàn bộ 15 Key (01..12, Mexico Bà Cô, Homeless V12, Mafia V1.4) & Kiểm định End-to-End 15/15 Key (Full _KB.txt + Full _SEO.txt đạt 99/100): (1) Đồng bộ ngân sách độ dài động theo từng Key (_get_active_key_runtime_spec: 15k-25k cho Key 05, 18k-26k cho Key 06, 42k-48k cho Key 09, 40k-52k cho Key 10, 40k-50k cho Key 11, 65k-78k cho Key 12, 70k-80k cho Key 01/02/03/04/07/08/Mexico/Homeless, 44k-48k cho Mafia) kèm khóa diagnosed_parts_once chống gọi AI nối tiếp lặp vô hạn; (2) Khóa chính sách One-Repair Policy (max_rewrite_rounds = 1) và bỏ cắt cụt [:7500] ở Bước 4B; (3) Lọc sạch 100% chỉ thị gọi script .py/.json nội bộ trên cả 75 cụm Skill (15 Keys x 5 Steps); (4) Bổ sung bộ chuẩn hóa TTS tiếng Nhật (sanitize_and_normalize_japanese_tts), đếm từ CJK và nhận diện tiêu đề [PART]/[PARTE]/[STORY]/[パート]/[第N部] đa ngôn ngữ.",
     "[V1.0.11 (Build #125) - 2026-11-05 14:17:59] Khắc phục triệt để lỗi đứng ở 70% khi cập nhật OTA từ các phiên bản cũ (V1.0.6..V1.0.10): Gỡ python_runtime khỏi gói ZIP OTA để tránh lỗi Windows khóa file EBUSY trên python.exe đang chạy ngầm, bọc an toàn try/catch cho từng file khi giải nén và tự động khởi động lại ứng dụng sau khi cập nhật xong.",
     "[V1.0.10 (Build #124) - 2026-11-05 13:15:05] Nâng cấp V1.1.0 (Build #124): Kiểm định độc lập & Pass 100% toàn bộ 15 Kênh/Key (75/75 cụm Skill), chuẩn hóa 58/58 kịch bản Homeless & Mafia đạt 99/100 (bung 100% số tiền $, danh xưng viết tắt Mr./Mrs./Ms./Dr., gộp đoạn ngắn tự nhiên, khử đoạn lặp), sửa lỗi VIDEO_EXTENSIONS.has trong resolveProjectImageLayers và vượt qua 189/189 bài Unit/Integration Tests.",
@@ -20,5 +21,5 @@
     "[V1.0.1 (Build #115) - 2026-11-04 11:59:44] Sửa triệt để lỗi 'The messages you submitted were too long' và 'Could not load this ChatGPT conversation' trên ChatGPT Web; cân bằng ngân sách Prompt <= 82k-84k ký tự bảo toàn 100% kịch bản truyện; tích hợp Auto-Heal tự động mở hội thoại sạch & gửi lại lệnh tức thì.",
     "Phiên bản V1.0.0 (Build #114): Sửa triệt để 100% lỗi 'The messages you submitted were too long, please edit them and resubmit.' trên ChatGPT Web: (1) Loại bỏ đính kèm trùng lặp 02_STORY_OUTLINE.md trong _build_checkpoint_context_preamble khi Prompt đã có sẵn Giàn ý/Kịch bản; (2) Khóa cứng ngân sách ký tự <= 82.000–84.000 ký tự/tin nhắn ở Bước 2, Bước 3, Bước 4A (Vòng 1..6), Bước 4B và Bước 5 cho cả 15 Key mà vẫn BẢO TOÀN 100% văn bản kịch bản truyện (CURRENT REVISION BASELINE / CURRENT WORKING SCRIPT); (3) Xóa sạch triệt để ô .ProseMirror và bỏ dán trùng headLine trước khi dán Prompt để không bao giờ nhân đôi văn bản khi cửa sổ Chrome chạy ngầm; (4) Tích hợp Auto-Heal tự động phát hiện 'The messages you submitted were too long', tự động nén gọn khối Reference phụ trợ và gửi lại ngay lập tức trên hội thoại sạch."
   ],
-  "release_date": "2026-11-07 00:21:14"
+  "release_date": "2026-11-07 08:57:32"
 }

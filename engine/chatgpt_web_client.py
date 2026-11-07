@@ -602,14 +602,14 @@ def sweep_completed_and_idle_tabs_across_all_accounts(projects_root_list: list[s
 
             if len(controlled_tabs) >= 1:
                 for t in uncontrolled_tabs:
-                    act = force_close_or_recycle_tab(port, t.get("id"), t.get("webSocketDebuggerUrl") or "", allow_close_last=True)
+                    act = force_close_or_recycle_tab(port, t.get("id"), t.get("webSocketDebuggerUrl") or "", allow_close_last=False)
                     if act == "closed":
                         closed_cnt += 1
                         details.append(f"{label}:closed:{str(t.get('id'))[:6]}")
             else:
                 tabs_to_close = uncontrolled_tabs[:-1]
                 for t in tabs_to_close:
-                    act = force_close_or_recycle_tab(port, t.get("id"), t.get("webSocketDebuggerUrl") or "", allow_close_last=True)
+                    act = force_close_or_recycle_tab(port, t.get("id"), t.get("webSocketDebuggerUrl") or "", allow_close_last=False)
                     if act == "closed":
                         closed_cnt += 1
                         details.append(f"{label}:closed:{str(t.get('id'))[:6]}")
@@ -1222,14 +1222,15 @@ class ChatGPTWebMultiTabClient:
                         self._thread_to_acc[thread_id] = existing_aid
                     return get_account_config(existing_aid)
 
-                # 2. Nếu dự án resume có sẵn thread_id trên preferred_acc_id và Acc đó chưa vượt quá 3 luồng
-                if thread_id and pref_norm and pref_norm in logged_map:
+                # 2. Nếu dự án được chỉ định preferred_acc_id (hoặc resume từ STATE.json) và Acc đó đã đăng nhập + chưa vượt quá 3 luồng
+                if pref_norm and pref_norm in logged_map:
                     act_set = GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(pref_norm, set())
                     if project_id in act_set or len(act_set) < MAX_THREADS_PER_ACCOUNT:
                         act_set.add(project_id)
                         self._project_to_acc[project_id] = pref_norm
                         GLOBAL_PROJECT_TO_ACC[project_id] = pref_norm
-                        self._thread_to_acc[thread_id] = pref_norm
+                        if thread_id:
+                            self._thread_to_acc[thread_id] = pref_norm
                         return get_account_config(pref_norm)
 
                 # 3. Chia đều (Least-Loaded + Round-Robin) giữa tất cả các Acc đã đăng nhập và có số luồng đang chạy < 3
@@ -1238,7 +1239,19 @@ class ChatGPTWebMultiTabClient:
                 for idx, a_info in enumerate(logged_accs):
                     aid = a_info["acc_id"]
                     act_set = GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(aid, set())
-                    load_cnt = len(act_set)
+                    in_mem_load = len(act_set)
+                    cdp_conv_load = 0
+                    try:
+                        p_port = get_account_config(aid)["port"]
+                        if is_cdp_browser_running(port=p_port):
+                            t_list = _cdp_http_json("/json/list", timeout=1.5, port=p_port)
+                            cdp_conv_load = sum(
+                                1 for t_it in t_list
+                                if t_it.get("type") == "page" and "/c/" in str(t_it.get("url") or "")
+                            )
+                    except Exception:
+                        pass
+                    load_cnt = max(in_mem_load, min(cdp_conv_load, MAX_THREADS_PER_ACCOUNT - 1)) if in_mem_load == 0 else in_mem_load
                     if load_cnt < MAX_THREADS_PER_ACCOUNT:
                         rr_rank = (idx - (_ROUND_ROBIN_COUNTER % max(1, n_logged))) % max(1, n_logged)
                         candidates.append((load_cnt, rr_rank, aid))
@@ -1613,6 +1626,33 @@ class ChatGPTWebMultiTabClient:
                             return pref_tid, t["webSocketDebuggerUrl"]
 
             used_tab_ids = set(acc_tab_map.values()) | acc_reserved | acc_busy
+
+            def _try_claim_tab_for_project(ws_u: str, proj_id: str) -> bool:
+                if not ws_u:
+                    return False
+                claim_js = f"""
+                (() => {{
+                    const now = Date.now();
+                    const myProj = {json.dumps(proj_id or "anon")};
+                    const curOwner = window.__zcTabOwner || "";
+                    const curTs = window.__zcTabClaimTs || 0;
+                    const stopBtn = document.querySelector('button[data-testid="stop-button"], form button[aria-label*="Stop"]');
+                    const box = document.querySelector('#prompt-textarea, .ProseMirror[contenteditable="true"]');
+                    const hasDraft = box && (box.innerText || '').trim().length > 5;
+                    if (stopBtn || hasDraft || (curOwner && curOwner !== myProj && (now - curTs) < 240000)) {{
+                        return "BUSY";
+                    }}
+                    window.__zcTabOwner = myProj;
+                    window.__zcTabClaimTs = now;
+                    return "CLAIMED";
+                }})()
+                """
+                try:
+                    r_cl = _eval_js_in_tab(ws_u, claim_js, await_promise=False, timeout=2.5)
+                    return str(r_cl).strip() == "CLAIMED"
+                except Exception:
+                    return False
+
             for t in page_tabs:
                 u = str(t.get("url", "")).rstrip("/")
                 is_home_url = (
@@ -1625,6 +1665,7 @@ class ChatGPTWebMultiTabClient:
                     t.get("id") not in used_tab_ids
                     and is_home_url
                     and t.get("webSocketDebuggerUrl")
+                    and _try_claim_tab_for_project(t["webSocketDebuggerUrl"], project_id)
                 ):
                     acc_reserved.add(t["id"])
                     self._tab_last_used_ts[t["id"]] = time.time()
@@ -1632,11 +1673,16 @@ class ChatGPTWebMultiTabClient:
 
             for t in page_tabs:
                 u = str(t.get("url", "")).strip()
-                if t.get("id") not in used_tab_ids and u == "about:blank" and t.get("webSocketDebuggerUrl"):
+                if (
+                    t.get("id") not in used_tab_ids
+                    and u == "about:blank"
+                    and t.get("webSocketDebuggerUrl")
+                    and _try_claim_tab_for_project(t["webSocketDebuggerUrl"], project_id)
+                ):
                     acc_reserved.add(t["id"])
                     _eval_js_in_tab(
                         t["webSocketDebuggerUrl"],
-                        "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                        f"window.onbeforeunload = null; window.__zcTabOwner = {json.dumps(project_id or 'anon')}; window.__zcTabClaimTs = Date.now(); window.location.href = 'https://chatgpt.com/'; true;",
                         await_promise=False,
                     )
                     self._tab_last_used_ts[t["id"]] = time.time()
@@ -1646,7 +1692,7 @@ class ChatGPTWebMultiTabClient:
             # Nếu đã đạt giới hạn 5 Tab trên tài khoản (hoặc có Tab nhàn rỗi), tái sử dụng ngay Tab đó thay vì mở Tab mới!
             if len(page_tabs) >= MAX_OPEN_TABS_PER_ACCOUNT:
                 reused_t = _pick_reusable_idle_tab()
-                if reused_t:
+                if reused_t and _try_claim_tab_for_project(reused_t.get("webSocketDebuggerUrl", ""), project_id):
                     r_id = reused_t["id"]
                     _unbind_old_threads_from_tab(r_id)
                     acc_reserved.add(r_id)
@@ -1654,7 +1700,7 @@ class ChatGPTWebMultiTabClient:
                         self._reusable_project_tab.pop(project_id, None)
                     _eval_js_in_tab(
                         reused_t["webSocketDebuggerUrl"],
-                        "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                        f"window.onbeforeunload = null; window.__zcTabOwner = {json.dumps(project_id or 'anon')}; window.__zcTabClaimTs = Date.now(); window.location.href = 'https://chatgpt.com/'; true;",
                         await_promise=False,
                     )
                     self._tab_last_used_ts[r_id] = time.time()
@@ -1665,6 +1711,7 @@ class ChatGPTWebMultiTabClient:
             acc_reserved.add(new_t["id"])
             self._tab_last_used_ts[new_t["id"]] = time.time()
             time.sleep(4.5)
+            _try_claim_tab_for_project(new_t.get("webSocketDebuggerUrl", ""), project_id)
             return new_t["id"], new_t["webSocketDebuggerUrl"]
 
     def _compact_overlong_prompt_preserving_script(self, raw_prompt: str, max_chars: int = 80000) -> str:
@@ -2206,7 +2253,7 @@ class ChatGPTWebMultiTabClient:
                                     let joinedA = t.agent_texts.join('\\n\\n').trim();
                                     if (joinedA) {{
                                         joinedA = joinedA.replace(/Pasted\\s+text\\s*\\([^)\\n]{{1,40}}\\)(?:\\.(?:txt|md|json|doc|docx|pdf|csv))?\\s*(?:Document|Tài liệu|Archivo|Documento)?/gi, '\\n\\n');
-                                        joinedA = joinedA.replace(/(\\[\\s*(?:PART|PARTE)\\s+\\d+\\s*\\])(?=[A-ZÁÉÍÓÚÑÜ"“‘¡¿])/gi, '$1\\n\\n');
+                                        joinedA = joinedA.replace(/(\\[\\s*(?:(?:PART|PARTE|CAP[ÍI]TULO|CHAPTER|STORY|ACT|ACTO|パート)\\s*\\d+|第\\s*\\d+\\s*(?:部|章|話|節))[^\\]]*\\])(?=\\S)/gi, '$1\\n\\n');
                                         joinedA = joinedA.replace(/\\n{{3,}}/g, '\\n\\n').trim();
                                         items.push({{ type: 'agentMessage', text: joinedA }});
                                     }}
@@ -2240,7 +2287,7 @@ class ChatGPTWebMultiTabClient:
                 }});
                 let outTxt = (clone.textContent || clone.innerText || '');
                 outTxt = outTxt.replace(/Pasted\\s+text\\s*\\([^)\\n]{{1,40}}\\)(?:\\.(?:txt|md|json|doc|docx|pdf|csv))?\\s*(?:Document|Tài liệu|Archivo|Documento)?/gi, '\\n\\n');
-                outTxt = outTxt.replace(/(\\[\\s*PART\\s+\\d+\\s*\\])(?=[A-ZÁÉÍÓÚÑÜ"“‘¡¿])/gi, '$1\\n\\n');
+                outTxt = outTxt.replace(/(\\[\\s*(?:(?:PART|PARTE|CAP[ÍI]TULO|CHAPTER|STORY|ACT|ACTO|パート)\\s*\\d+|第\\s*\\d+\\s*(?:部|章|話|節))[^\\]]*\\])(?=\\S)/gi, '$1\\n\\n');
                 outTxt = outTxt.replace(/\\n{{3,}}/g, '\\n\\n').trim();
                 return outTxt;
             }}
@@ -2417,12 +2464,19 @@ class ChatGPTWebMultiTabClient:
                     );
                     const turnStates = Array.from(document.querySelectorAll('[data-talvt-turn-state]')).map(e => e.getAttribute('data-talvt-turn-state'));
                     const hasIncompleteTurn = turnStates.some(s => s && s !== 'complete');
+                    const thinkingNode = Boolean(
+                        document.querySelector('[data-testid*="thinking"], [class*="thinking"], [class*="shimmer"]') ||
+                        bodyLow.includes('thinking...') ||
+                        bodyLow.includes('đang suy nghĩ')
+                    );
                     const stopBtn = Boolean(
                         document.querySelector('button[data-testid="stop-button"]') ||
                         document.querySelector('form button[aria-label*="Stop"]') ||
                         document.querySelector('button[aria-label*="Stop streaming"]') ||
+                        document.querySelector('button[aria-label*="Stop generating"]') ||
                         document.querySelector('.result-streaming') ||
-                        hasIncompleteTurn
+                        hasIncompleteTurn ||
+                        thinkingNode
                     );
                     const streamError = Boolean(
                         !stopBtn && (
@@ -2506,9 +2560,9 @@ class ChatGPTWebMultiTabClient:
                     self._tab_last_used_ts[tab_id] = time.time()
 
                 # CƠ CHẾ TỰ CHỮA LÀNH TỨC THÌ (AUTO-HEAL):
-                # Nếu gặp lỗi "Could not load this ChatGPT conversation" / "The messages you submitted were too long" HOẶC đứng im 0 ký tự quá 28s mà không streaming:
+                # Nếu gặp lỗi "Could not load this ChatGPT conversation" / "The messages you submitted were too long" HOẶC đứng im 0 ký tự quá 95s mà không streaming:
                 zero_stuck_secs = time.time() - zero_char_since
-                if (has_load_err or has_too_long_err or has_stream_err or (not is_streaming and cur_chars == 0 and zero_stuck_secs >= 28.0)) and auto_heal_count < 3:
+                if (has_load_err or has_too_long_err or has_stream_err or (not is_streaming and cur_chars == 0 and zero_stuck_secs >= 95.0)) and auto_heal_count < 3:
                     auto_heal_count += 1
                     recovery_prompt = (
                         self._last_sent_prompt.get(thread_id)
@@ -2529,18 +2583,25 @@ class ChatGPTWebMultiTabClient:
                             else ("Stream Error" if has_stream_err else f"0 ký tự sau {int(zero_stuck_secs)}s")
                         )
                     )
+                    keep_existing_conv = (
+                        expected_min_turns > 1
+                        and not has_load_err
+                        and not has_too_long_err
+                        and _is_valid_chatgpt_uuid(thread_id)
+                    )
                     log_msg(
                         project_id,
-                        f"♻️ [AUTO-HEAL CHATGPT WEB #{auto_heal_count}/3] Phát hiện [{reason_str}] tại [{step_label}]. Đang tự động chuyển Tab về trang chủ ChatGPT sạch & gửi lại lệnh ngay lập tức!",
+                        f"♻️ [AUTO-HEAL CHATGPT WEB #{auto_heal_count}/3] Phát hiện [{reason_str}] tại [{step_label}]. Đang tự động làm mới Tab & gửi lại lệnh ngay lập tức!",
                     )
                     _update_live_note(
                         f"♻️ [{acc_label} - Auto-Heal #{auto_heal_count}] Tự động làm sạch lỗi [{reason_str}] & gửi lại [{step_label}]...",
                         elapsed,
                     )
+                    target_heal_url = f"https://chatgpt.com/c/{thread_id}" if keep_existing_conv else "https://chatgpt.com/"
                     try:
                         _eval_js_in_tab(
                             ws_url,
-                            "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                            f"window.onbeforeunload = null; window.location.href = {json.dumps(target_heal_url)}; true;",
                             await_promise=False,
                         )
                     except Exception:
@@ -2549,8 +2610,8 @@ class ChatGPTWebMultiTabClient:
                     with WEB_TAB_LOCK:
                         self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
                     tab_id, ws_url = self._get_or_create_tab_ws(
-                        thread_id="",
-                        force_new_chat=True,
+                        thread_id=thread_id if keep_existing_conv else "",
+                        force_new_chat=not keep_existing_conv,
                         acc_id=aid,
                         project_id=project_id,
                     )
@@ -2560,22 +2621,33 @@ class ChatGPTWebMultiTabClient:
                     if recovery_prompt:
                         re_res = self._inject_and_send_prompt_on_ws(ws_url, recovery_prompt)
                         if "error" not in re_res and re_res.get("ok"):
-                            new_tid = re_res.get("thread_id") or f"webtab_{aid}_{tab_id}"
+                            new_tid = re_res.get("thread_id") or (thread_id if keep_existing_conv else f"webtab_{aid}_{tab_id}")
                             thread_id = new_tid
-                            expected_min_turns = 1
+                            if not keep_existing_conv:
+                                expected_min_turns = 1
                             with WEB_TAB_LOCK:
                                 self._thread_to_tab.setdefault(aid, {})[thread_id] = tab_id
                                 self._thread_to_acc[thread_id] = aid
                             self._last_sent_prompt[thread_id] = recovery_prompt
                             _update_live_note(
-                                f"✅ [{acc_label} - Auto-Heal #{auto_heal_count}] Đã gửi lại [{step_label}] trên hội thoại sạch threadId={thread_id}!",
+                                f"✅ [{acc_label} - Auto-Heal #{auto_heal_count}] Đã gửi lại [{step_label}] trên threadId={thread_id}!",
                                 elapsed,
                                 updated_tid=thread_id,
                             )
                             log_msg(
                                 project_id,
-                                f"✅ [AUTO-HEAL THÀNH CÔNG] Đã khởi tạo đoạn chat sạch mới threadId={thread_id} cho [{step_label}] và tiếp tục chạy!",
+                                f"✅ [AUTO-HEAL THÀNH CÔNG] Đã gửi lại [{step_label}] trên threadId={thread_id} và tiếp tục chạy!",
                             )
+                        else:
+                            err_re = re_res.get("error", re_res)
+                            log_msg(
+                                project_id,
+                                f"⚠️ [AUTO-HEAL #{auto_heal_count}/3 CHƯA GỬI ĐƯỢC] {err_re}",
+                            )
+                            if auto_heal_count >= 3:
+                                raise RuntimeError(
+                                    f"[{project_id}] Auto-Heal 3/3 thất bại tại [{step_label}] trên [{acc_label}]: {err_re}"
+                                )
                     zero_char_since = time.time()
                     stable_hits = 0
                     last_char_len = 0

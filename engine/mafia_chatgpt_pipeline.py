@@ -2457,8 +2457,8 @@ def parse_winner_title_and_score(response_text: str) -> tuple[str, int]:
 
 
 def count_outline_beats(outline_text: str) -> int:
-    """Đếm số BEAT / PART trong phần DETAILED OUTLINE (Homeless V12 & MEXICO BÀ CÔ cố định 7 Parts)."""
-    if ACTIVE_NICHE in ("homeless", "mexico"):
+    """Đếm số BEAT / PART trong phần DETAILED OUTLINE (Homeless V12, MEXICO BÀ CÔ & 12 Keys cố định 7 Parts)."""
+    if ACTIVE_NICHE in ("homeless", "mexico") or ACTIVE_KEY_ID in KEY_PROFILES_12:
         return 7
     beats = set()
     for m in re.finditer(
@@ -2812,7 +2812,8 @@ def condense_homeless_stage_text(
 
     effective_ceiling = hard_max_chars
     raw_total_paras = len([p for p in re.split(r"\n\s*\n", sliced) if p.strip()])
-    if char_len <= effective_ceiling and raw_total_paras <= len(expected_parts) * 28:
+    has_cjk_dialogue = ("「" in sliced) or ("」" in sliced) or bool(re.search(r"[\u3040-\u30ff\u4e00-\u9fff]", sliced))
+    if char_len <= effective_ceiling and (has_cjk_dialogue or raw_total_paras <= len(expected_parts) * 45):
         return sliced
 
     # Tách văn bản theo từng Part (hoặc chia thành num_p phân đoạn ảo nếu đã xóa nhãn [PART N])
@@ -2878,7 +2879,7 @@ def condense_homeless_stage_text(
             paras.append(" ".join(buf))
 
         joined_s0 = "\n\n".join(paras)
-        if len(paras) <= 5 or len(joined_s0) <= p_budget + 120:
+        if len(paras) <= 5 or len(joined_s0) <= p_budget + 120 or char_len <= effective_ceiling:
             return joined_s0
 
         # Nhận diện lần xuất hiện đầu tiên của tên riêng đầy đủ (2 từ viết hoa) để bảo vệ
@@ -2920,7 +2921,10 @@ def condense_homeless_stage_text(
             if cur_len <= p_budget + 80 or idx < 2 or idx >= len(paras) - 2 or idx in first_name_para_indices:
                 pass1_paras.append(para)
                 continue
-            has_quote = ('"' in para) or ("\u201c" in para) or ("\u201d" in para) or ("«" in para) or ("「" in para)
+            has_quote = ('"' in para) or ("\u201c" in para) or ("\u201d" in para) or ("«" in para) or ("「" in para) or ("」" in para) or ("『" in para) or ("』" in para)
+            if ("「" in para) or ("」" in para):
+                pass1_paras.append(para)
+                continue
             sents = [s.strip() for s in re.split(r"(?:(?<=[.!?])\s+|(?<=[。！？])\s*)", para) if s.strip()]
             new_p = para
             if not has_quote and len(sents) >= 3 and len(para) > 210:
@@ -2933,7 +2937,7 @@ def condense_homeless_stage_text(
             elif has_quote and len(sents) >= 3 and len(para) > 320:
                 kept_s = [sents[0]]
                 for s_mid in sents[1:-1]:
-                    if ('"' in s_mid or "\u201c" in s_mid or "\u201d" in s_mid or "«" in s_mid or "「" in s_mid or protected_token_re.search(s_mid)):
+                    if ('"' in s_mid or "\u201c" in s_mid or "\u201d" in s_mid or "«" in s_mid or "»" in s_mid or "「" in s_mid or "」" in s_mid or protected_token_re.search(s_mid)):
                         kept_s.append(s_mid)
                 if sents[-1] not in kept_s:
                     kept_s.append(sents[-1])
@@ -3760,7 +3764,11 @@ def _run_single_project_pipeline_inner(
 
     # Phân bổ tài khoản ChatGPT (Chia đều cho các Acc đã đăng nhập & tối đa 1 Acc 3 luồng)
     if hasattr(client, "acquire_account_for_project"):
-        pref_acc = state.get("account_id") or (cur_hid.split(":")[-1] if ":" in cur_hid else "")
+        pref_acc = (
+            state.get("account_id")
+            or state.get("assigned_account_id")
+            or (cur_hid.split(":")[-1] if ":" in cur_hid else "")
+        )
         acc_cfg = client.acquire_account_for_project(
             project_id=project_id,
             preferred_acc_id=pref_acc,
@@ -3818,14 +3826,62 @@ def _run_single_project_pipeline_inner(
         d = client.read_full_thread(tid, state["host_id"])
         return max(min_known, len(d.get("turns", [])))
 
+    def _get_active_key_runtime_spec() -> dict:
+        cfg = get_niche_config(ACTIVE_KEY_ID or ACTIVE_NICHE)
+        locale = cfg.get("locale", "en-US")
+        t_min = int(cfg.get("target_min_chars", 70000))
+        t_max = int(cfg.get("target_max_chars", 80000))
+        p_min = int(cfg.get("pref_min_chars", int(t_min + (t_max - t_min) * 0.35)))
+        p_max = int(cfg.get("pref_max_chars", int(t_min + (t_max - t_min) * 0.80)))
+        t_mid = int((p_min + p_max) / 2)
+        n_parts = int(cfg.get("default_parts", 7 if ACTIVE_NICHE in ("homeless", "mexico") else 6))
+        per_part_target = int(t_mid / max(1, n_parts))
+        per_part_min_accept = max(1600, int(t_min / max(1, n_parts) * 0.78))
+        per_part_max = int(t_max / max(1, n_parts) * 1.03)
+        if locale == "ja-JP":
+            lang_name = "tiếng Nhật tự nhiên chuẩn bản xứ (`ja-JP`, Japanese Voice-Manga / Kuchikomi Narration)"
+            lang_short = "tiếng Nhật (`ja-JP`)"
+        elif locale == "es-MX":
+            lang_name = "tiếng Tây Ban Nha chuẩn Mexico tự nhiên (`es-MX`, español mexicano natural, TUYỆT ĐỐI KHÔNG dùng từ Tây Ban Nha châu Âu như vosotros/ordenador/zumo)"
+            lang_short = "tiếng Tây Ban Nha Mexico (`es-MX`)"
+        else:
+            lang_name = "tiếng Anh Mỹ tự nhiên (`en-US`, American English)"
+            lang_short = "tiếng Anh (`en-US`)"
+        return {
+            "cfg": cfg,
+            "key_id": cfg.get("key_id", ACTIVE_KEY_ID or ACTIVE_NICHE),
+            "is_12_key": bool(cfg.get("is_12_key") or (ACTIVE_KEY_ID in KEY_PROFILES_12)),
+            "label": cfg.get("label", ACTIVE_NICHE.upper()),
+            "locale": locale,
+            "lang": locale,
+            "lang_name": lang_name,
+            "lang_short": lang_short,
+            "t_min": t_min,
+            "t_max": t_max,
+            "p_min": p_min,
+            "p_max": p_max,
+            "t_mid": t_mid,
+            "n_parts": n_parts,
+            "per_part_target": per_part_target,
+            "per_part_min_accept": per_part_min_accept,
+            "per_part_max": per_part_max,
+        }
+
+    kspec = _get_active_key_runtime_spec()
+    diagnosed_parts_once: set[int] = set()
+
     def _build_checkpoint_context_preamble(prompt_body: str = "") -> str:
         niche_title = (
-            "MEXICO FAMILY DRAMA (MEXICO BÀ CÔ V1.3.0)"
-            if ACTIVE_NICHE == "mexico"
+            f"{kspec['label']} [{kspec['key_id']}] ({kspec['locale']})"
+            if kspec["is_12_key"]
             else (
-                "HOMELESS × ABANDONED PROPERTY × HIDDEN LEGACY (HOMELESS V12)"
-                if ACTIVE_NICHE == "homeless"
-                else "MAFIA BOSS × MAID / WAITRESS / UNDERESTIMATED WOMAN"
+                "MEXICO FAMILY DRAMA (MEXICO BÀ CÔ V1.3.0)"
+                if ACTIVE_NICHE == "mexico"
+                else (
+                    "HOMELESS × ABANDONED PROPERTY × HIDDEN LEGACY (HOMELESS V12)"
+                    if ACTIVE_NICHE == "homeless"
+                    else "MAFIA BOSS × MAID / WAITRESS / UNDERESTIMATED WOMAN"
+                )
             )
         )
         parts_ctx = [
@@ -3964,6 +4020,33 @@ def _run_single_project_pipeline_inner(
 
     def _resolve_agent_skill_meta(desk_role: str) -> tuple[str, str]:
         dr = str(desk_role or "").upper()
+        if kspec["is_12_key"]:
+            kid = kspec["key_id"]
+            if "DESK_1" in dr or "TITLE" in dr:
+                return (f"{kid}-1-title", f"01_TITULOS ({kid})")
+            if "DESK_2" in dr or "OUTLINE" in dr:
+                return (f"{kid}-2-outline", f"02_OUTLINE ({kid})")
+            if "DESK_3" in dr or "WRITER" in dr:
+                return (f"{kid}-3-writer", f"03_WRITER ({kid})")
+            if "4A" in dr or "AUDITOR" in dr:
+                return (f"{kid}-4-auditor", f"04_AUDITOR ({kid})")
+            if "4B" in dr or "REPAIR" in dr:
+                return (f"{kid}-3-writer (Repair)", f"03_WRITER Step 5 Repair ({kid})")
+            if "SEO" in dr or "DESK_5" in dr:
+                return (f"{kid}-5-seo", f"05_SEO ({kid})")
+        if ACTIVE_NICHE == "mexico":
+            if "DESK_1" in dr or "TITLE" in dr:
+                return ("mexico-1-titulos", "titulos-drama-familiar-mexico (V1.3)")
+            if "DESK_2" in dr or "OUTLINE" in dr:
+                return ("mexico-2-arquitectura", "arquitectura-drama-familiar-mexico (V1.3)")
+            if "DESK_3" in dr or "WRITER" in dr:
+                return ("mexico-3-escritor", "escritor-y-reparacion-drama-familiar-mexico (V1.3)")
+            if "4A" in dr or "AUDITOR" in dr:
+                return ("mexico-4-auditor", "auditor-forense-guion-familiar-mexico (V1.3)")
+            if "4B" in dr or "REPAIR" in dr:
+                return ("mexico-3-escritor (Repair)", "escritor-y-reparacion-drama-familiar-mexico (Step 5)")
+            if "SEO" in dr or "DESK_5" in dr:
+                return ("mexico-5-seo", "seo-thumbnail-trailer-drama-familiar-mexico (V1.3)")
         is_hl = (ACTIVE_NICHE == "homeless")
         if "DESK_1" in dr or "TITLE" in dr:
             return (
@@ -4241,7 +4324,7 @@ def _run_single_project_pipeline_inner(
             state["thread_id"] = ""
 
         full_prompt = _enforce_chatgpt_web_prompt_limit(_build_checkpoint_context_preamble(prompt) + prompt, max_chars=84000)
-        resume_prefix = "Mexico Ba Co" if ACTIVE_NICHE == "mexico" else ("Homeless V12" if ACTIVE_NICHE == "homeless" else "Mafia Story")
+        resume_prefix = kspec["key_id"] if kspec["is_12_key"] else ("Mexico Ba Co" if ACTIVE_NICHE == "mexico" else ("Homeless V12" if ACTIVE_NICHE == "homeless" else "Mafia Story"))
         tid, hid = client.create_story_thread(
             title_label=f"{resume_prefix} [{project_id}] - {active_desk}",
             prompt=full_prompt,
@@ -4269,49 +4352,6 @@ def _run_single_project_pipeline_inner(
     # ==========================================================================
     # BƯỚC 1: VIẾT LẠI TIÊU ĐỀ & CHẤM ĐIỂM (HOẶC BỎ QUA BÀN #1 NẾU CHỌN DÙNG LUÔN TIÊU ĐỀ GỐC)
     # ==========================================================================
-    def _get_active_key_runtime_spec() -> dict:
-        cfg = get_niche_config(ACTIVE_KEY_ID or ACTIVE_NICHE)
-        locale = cfg.get("locale", "en-US")
-        t_min = int(cfg.get("target_min_chars", 70000))
-        t_max = int(cfg.get("target_max_chars", 80000))
-        p_min = int(cfg.get("pref_min_chars", int(t_min + (t_max - t_min) * 0.35)))
-        p_max = int(cfg.get("pref_max_chars", int(t_min + (t_max - t_min) * 0.80)))
-        t_mid = int((p_min + p_max) / 2)
-        n_parts = int(cfg.get("default_parts", 7 if ACTIVE_NICHE in ("homeless", "mexico") else 6))
-        per_part_target = int(t_mid / max(1, n_parts))
-        per_part_min_accept = max(1600, int(t_min / max(1, n_parts) * 0.78))
-        per_part_max = int(t_max / max(1, n_parts) * 1.03)
-        if locale == "ja-JP":
-            lang_name = "tiếng Nhật tự nhiên chuẩn bản xứ (`ja-JP`, Japanese Voice-Manga / Kuchikomi Narration)"
-            lang_short = "tiếng Nhật (`ja-JP`)"
-        elif locale == "es-MX":
-            lang_name = "tiếng Tây Ban Nha chuẩn Mexico tự nhiên (`es-MX`, español mexicano natural, TUYỆT ĐỐI KHÔNG dùng từ Tây Ban Nha châu Âu như vosotros/ordenador/zumo)"
-            lang_short = "tiếng Tây Ban Nha Mexico (`es-MX`)"
-        else:
-            lang_name = "tiếng Anh Mỹ tự nhiên (`en-US`, American English)"
-            lang_short = "tiếng Anh (`en-US`)"
-        return {
-            "cfg": cfg,
-            "key_id": cfg.get("key_id", ACTIVE_KEY_ID or ACTIVE_NICHE),
-            "is_12_key": bool(cfg.get("is_12_key") or (ACTIVE_KEY_ID in KEY_PROFILES_12)),
-            "label": cfg.get("label", ACTIVE_NICHE.upper()),
-            "locale": locale,
-            "lang": locale,
-            "lang_name": lang_name,
-            "lang_short": lang_short,
-            "t_min": t_min,
-            "t_max": t_max,
-            "p_min": p_min,
-            "p_max": p_max,
-            "t_mid": t_mid,
-            "n_parts": n_parts,
-            "per_part_target": per_part_target,
-            "per_part_min_accept": per_part_min_accept,
-            "per_part_max": per_part_max,
-        }
-
-    kspec = _get_active_key_runtime_spec()
-    diagnosed_parts_once: set[int] = set()
 
     if bool(state.get("skip_title_rewrite")) and only_step != 1:
         locked_orig_title = (state.get("winner_title") or state.get("source_title") or "").strip()
@@ -4659,8 +4699,8 @@ Hãy thiết kế và xuất trọn vẹn **FULL STORY OUTLINE** cho `CURRENT FI
         if only_step == 2:
             return state
 
-    def split_script_into_part_dict(raw_txt: str, max_p: int = 7) -> dict[int, str]:
-        cleaned = extract_clean_script_text(raw_txt, start_part=1)
+    def split_script_into_part_dict(raw_txt: str, max_p: int = 7, start_part: int = 1) -> dict[int, str]:
+        cleaned = extract_clean_script_text(raw_txt, start_part=start_part)
         if not cleaned or len(cleaned) < 500:
             cleaned = clean_chatgpt_web_artifacts_and_paragraphs(raw_txt or "")
         lines = cleaned.splitlines()
@@ -4681,7 +4721,7 @@ Hãy thiết kế và xuất trọn vẹn **FULL STORY OUTLINE** cho `CURRENT FI
                 buf = []
                 continue
             if cur_p is None and ln.strip():
-                cur_p = 1 if 1 not in explicit_headings else max(1, min(explicit_headings) - 1)
+                cur_p = start_part if start_part not in explicit_headings else max(1, min(explicit_headings) - 1)
             if cur_p is not None:
                 buf.append(ln)
         if cur_p is not None:
@@ -5034,13 +5074,22 @@ QUAN TRỌNG:
                 thread_data_latest = td_ai
             pmap_a[p_idx] = p_body
         stage_a_text = f"[PART 1]\n\n{pmap_a[1]}\n\n[PART 2]\n\n{pmap_a[2]}"
-        stage_a_text = condense_homeless_stage_text(stage_a_text, allowed_parts=[1, 2], target_chars=target_a_chars, max_chars=max_a_chars)
+        if len(stage_a_text) > max_a_chars:
+            stage_a_text = condense_homeless_stage_text(stage_a_text, allowed_parts=[1, 2], target_chars=target_a_chars, max_chars=max_a_chars)
         write_text_file(ckpt_a_path, stage_a_text)
         write_text_file(grp1_path, stage_a_text)
         m_a = analyze_script_metrics(stage_a_text, start_part=1)
         log_msg(
             project_id,
             f"💾 [{step_tag} - ĐÃ LƯU LẦN VIẾT 1/3] Đã lưu `03_PART_GROUP_1.txt` + `PART_1.txt`, `PART_2.txt` ({m_a['char_count']:,} ký tự | {m_a['word_count']:,} từ)!",
+        )
+
+        outline_anchor_path = os.path.join(ckpt_dir, "02_STORY_OUTLINE.md")
+        outline_anchor_raw = read_text_file(outline_anchor_path) if os.path.exists(outline_anchor_path) else ""
+        outline_anchor_snippet = (
+            (outline_anchor_raw[:2400] + "\n...[Canon & Beats]...\n" + outline_anchor_raw[-1200:])
+            if len(outline_anchor_raw) > 3800
+            else outline_anchor_raw
         )
 
         # ======================================================================
@@ -5064,9 +5113,18 @@ QUAN TRỌNG:
             )
         else:
             lang_b_note = f"chỉ xuất nội dung truyện bằng {kspec['lang_short']}, không in lại Part 1..2"
+            part2_tail_anchor = (pmap_a.get(2, "") or stage_a_text)[-650:].strip()
             prompt_stage_b = f"""RẤT TỐT! Hệ thống Python đã lưu xong `LẦN VIẾT 1/3` (`[PART 1]` & `[PART 2]`) với độ dài chuẩn xác là **{actual_a_chars:,} ký tự / {m_a['word_count']:,} từ**.
+=== CANON LOCK & STORY CONTINUITY ANCHOR (BẮT BUỘC GIỮ ĐÚNG 100% NHÂN VẬT, POV, SỐ TIỀN & MẠCH TRUYỆN) ===
+- **CURRENT FINAL TITLE:** "{state.get('winner_title', state.get('source_title', ''))}"
+- **TÓM TẮT GIÀN Ý & CANON BƯỚC 2:**
+{outline_anchor_snippet}
+- **ĐOẠN KẾT CỦA `[PART 2]` VỪA VIẾT XONG (NỐI TIẾP TRỰC TIẾP TỪ ĐÂY SANG `[PART 3]`):**
+{part2_tail_anchor}
+=== KẾT THÚC CANON LOCK & CONTINUITY ANCHOR ===
+
 👉 YÊU CẦU TRONG LẦN VIẾT THỨ HAI NÀY (`LẦN VIẾT 2/3` — `[PART 3]` ĐẾN `[PART 5]`):
-1. KHÔNG gọi bất kỳ công cụ (tool) nào.
+1. KHÔNG gọi bất kỳ công cụ (tool) nào. Giữ nguyên 100% tên nhân vật chính, ngôi kể (POV), bối cảnh và con số tài chính của `[PART 1..2]` và Giàn ý Bước 2 ở trên.
 2. Hãy viết tiếp **TRỌN VẸN, SÂU SẮC, ĐẦY ĐỦ 100% VĂN BẢN KỊCH BẢN** bằng **{kspec['lang_name']}** từ **`[PART 3]`** (Beat `E21..E30`), **`[PART 4]`** (Beat `E31..E40`) đến hết **`[PART 5]`** (Beat `E41..E50`) theo đúng Giàn ý Bước 2 và `CANON & FORENSIC HANDOFF`.
 3. **ĐỊNH MỨC KHÓA CỨNG TỪNG PART:**
    - Mỗi Part (`[PART 3]`, `[PART 4]`, `[PART 5]`) độ dài khoảng **{per_part_b:,} ký tự / Part**.
@@ -5082,14 +5140,15 @@ QUAN TRỌNG:
             stage_b_text = slice_script_to_allowed_parts(m_b_raw["clean_text"], [3, 4, 5])
 
         # Tách riêng PART 3, PART 4, PART 5, chạy Bộ Xử Lý Lỗi AI nếu bất kỳ Part nào thiếu/cắt cụt, và lưu ngay xuống đĩa!
-        pmap_b = split_script_into_part_dict(stage_b_text, max_p=7)
+        pmap_b = split_script_into_part_dict(stage_b_text, max_p=7, start_part=3)
         for p_idx in (3, 4, 5):
             p_body, td_ai = ai_diagnose_and_complete_part(p_idx, pmap_b.get(p_idx, ""), f"{step_tag} - GROUP 2")
             if td_ai:
                 thread_data_latest = td_ai
             pmap_b[p_idx] = p_body
         stage_b_text = f"[PART 3]\n\n{pmap_b[3]}\n\n[PART 4]\n\n{pmap_b[4]}\n\n[PART 5]\n\n{pmap_b[5]}"
-        stage_b_text = condense_homeless_stage_text(stage_b_text, allowed_parts=[3, 4, 5], target_chars=target_b_chars, max_chars=max_b_chars)
+        if len(stage_b_text) > max_b_chars:
+            stage_b_text = condense_homeless_stage_text(stage_b_text, allowed_parts=[3, 4, 5], target_chars=target_b_chars, max_chars=max_b_chars)
         write_text_file(ckpt_b_path, stage_b_text)
         write_text_file(grp2_path, stage_b_text)
         m_b = analyze_script_metrics(stage_b_text, start_part=3)
@@ -5119,9 +5178,18 @@ QUAN TRỌNG:
             )
         else:
             lang_c_note = f"chỉ xuất nội dung truyện bằng {kspec['lang_short']} của Part 6 và Part 7, không in lại Part 1..5"
+            part5_tail_anchor = (pmap_b.get(5, "") or stage_b_text)[-650:].strip()
             prompt_stage_c = f"""TUYỆT VỜI! Hệ thống Python đã lưu xong `LẦN VIẾT 1/3 + LẦN VIẾT 2/3` (`[PART 1]` đến `[PART 5]`) với tổng độ dài chuẩn xác hiện tại là **{so_far_chars:,} ký tự**.
+=== CANON LOCK & STORY CONTINUITY ANCHOR (BẮT BUỘC GIỮ ĐÚNG 100% NHÂN VẬT, POV, SỐ TIỀN & MẠCH TRUYỆN) ===
+- **CURRENT FINAL TITLE:** "{state.get('winner_title', state.get('source_title', ''))}"
+- **TÓM TẮT GIÀN Ý & CANON BƯỚC 2:**
+{outline_anchor_snippet}
+- **ĐOẠN KẾT CỦA `[PART 5]` VỪA VIẾT XONG (NỐI TIẾP TRỰC TIẾP TỪ ĐÂY SANG `[PART 6]`):**
+{part5_tail_anchor}
+=== KẾT THÚC CANON LOCK & CONTINUITY ANCHOR ===
+
 👉 YÊU CẦU TRONG LẦN VIẾT THỨ BA NÀY (`LẦN VIẾT 3/3` — `[PART 6]` ĐẾN `[PART 7]`):
-1. KHÔNG gọi bất kỳ công cụ (tool) nào. Hệ thống Python sẽ lưu lại ngay và ghép nối 3 phần thành bản Full Script 7 Phần hoàn chỉnh.
+1. KHÔNG gọi bất kỳ công cụ (tool) nào. Giữ nguyên 100% tên nhân vật chính, ngôi kể (POV), bối cảnh và con số tài chính của `[PART 1..5]` và Giàn ý Bước 2 ở trên.
 2. Để tổng độ dài toàn bộ 7 Phần (`[PART 1]`..`[PART 7]`) rơi chính xác vào tâm vàng **{kspec['p_min']:,} – {kspec['p_max']:,} ký tự** (khung hợp lệ **{kspec['t_min']:,} – {kspec['t_max']:,} ký tự**), hãy xuất tiếp **TRỌN VẸN, ĐẦY ĐỦ 100% VĂN BẢN KỊCH BẢN** bằng **{kspec['lang_name']}** của **`[PART 6]`** (Beat `E51..E60`) và **`[PART 7]`** (Beat `E61..E70`).
 3. **ĐỊNH MỨC KHÓA CỨNG TỪNG PART:**
    - Mỗi Part (`[PART 6]` và `[PART 7]`) độ dài khoảng **{int(target_c_chars/2):,} ký tự / Part**.
@@ -5137,19 +5205,20 @@ QUAN TRỌNG:
             stage_c_text = slice_script_to_allowed_parts(m_c_raw["clean_text"], [6, 7])
 
         # Tách riêng PART 6 và PART 7, chạy Bộ Xử Lý Lỗi AI nếu bất kỳ Part nào thiếu/cắt cụt, và lưu ngay xuống đĩa!
-        pmap_c = split_script_into_part_dict(stage_c_text, max_p=7)
+        pmap_c = split_script_into_part_dict(stage_c_text, max_p=7, start_part=6)
         for p_idx in (6, 7):
             p_body, td_ai = ai_diagnose_and_complete_part(p_idx, pmap_c.get(p_idx, ""), f"{step_tag} - GROUP 3")
             if td_ai:
                 thread_data_latest = td_ai
             pmap_c[p_idx] = p_body
         stage_c_text = f"[PART 6]\n\n{pmap_c[6]}\n\n[PART 7]\n\n{pmap_c[7]}"
-        stage_c_text = condense_homeless_stage_text(
-            stage_c_text,
-            allowed_parts=[6, 7],
-            target_chars=target_c_chars,
-            max_chars=max_c_chars,
-        )
+        if len(stage_c_text) > max_c_chars:
+            stage_c_text = condense_homeless_stage_text(
+                stage_c_text,
+                allowed_parts=[6, 7],
+                target_chars=target_c_chars,
+                max_chars=max_c_chars,
+            )
         write_text_file(ckpt_c_path, stage_c_text)
         write_text_file(grp3_path, stage_c_text)
         m_c = analyze_script_metrics(stage_c_text, start_part=6)
@@ -7610,6 +7679,7 @@ if __name__ == "__main__":
         parser.add_argument("--limit", type=int, default=0, help="Giới hạn số lượng dự án lấy ra chạy trong đợt này (0 = chạy hết)")
         parser.add_argument("--step", type=int, default=0, choices=[0, 1, 2, 3, 4, 5], help="Chạy riêng 1 bước (1..5) hoặc 0 để chạy trọn vẹn/tiếp tục từ checkpoint")
         parser.add_argument("--thinking", type=str, default="medium", choices=["low", "medium", "high"], help="Mức suy luận của model ChatGPT (mặc định: medium)")
+        parser.add_argument("--account", type=str, default="", help="Ưu tiên tài khoản ChatGPT Web (acc_1, acc_2, acc_3)")
 
         args = parser.parse_args()
         set_active_niche(args.niche)
@@ -7655,6 +7725,17 @@ if __name__ == "__main__":
                 except Exception:
                     pass
             log_msg(pid_single, f"🚀 Khởi chạy đơn luồng kịch bản [{pid_single}] (Kênh: {cfg_single['label']} | model={args.thinking})...")
+
+            if args.account:
+                st_p_acc = os.path.join(pdir_norm, "STATE.json")
+                try:
+                    st_d_acc = json.load(open(st_p_acc, encoding="utf-8")) if os.path.exists(st_p_acc) else {"project_id": pid_single, "project_dir": pdir_norm}
+                    st_d_acc["account_id"] = args.account.strip()
+                    st_d_acc["assigned_account_id"] = args.account.strip()
+                    st_d_acc["host_id"] = f"chatgpt_web:{args.account.strip()}"
+                    write_json_file(st_p_acc, st_d_acc)
+                except Exception:
+                    pass
 
             def _set_single_note(note_text: str):
                 st_p = os.path.join(pdir_norm, "STATE.json")
