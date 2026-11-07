@@ -63,6 +63,33 @@ class UpdaterService {
     try {
       this.ensureCleanCustomerDirectoryLayout();
     } catch {}
+    setTimeout(() => {
+      this.ensureBundledGreenAssetsOnDisk().catch(() => {});
+    }, 2500);
+  }
+
+  async ensureBundledGreenAssetsOnDisk() {
+    const targetGreenDir = path.join(this.exeDir || this.studioRoot || this.appDir, 'Kho_Green');
+    try { fs.mkdirSync(targetGreenDir, { recursive: true }); } catch {}
+    const mcFiles = ['MC-001.mp4', 'MC-002.mp4', 'MC-003.mp4', 'MC-004.mp4', 'MC-005.mp4', 'MC-006.mp4', 'MC-007.mp4'];
+    const localInfo = this.getLocalVersionInfo();
+    const repo = localInfo.repo || DEFAULT_GITHUB_REPO;
+    const branch = localInfo.branch || DEFAULT_GITHUB_BRANCH;
+    for (const fileName of mcFiles) {
+      const dstPath = path.join(targetGreenDir, fileName);
+      if (fs.existsSync(dstPath)) {
+        try {
+          if (fs.statSync(dstPath).size > 100000) continue;
+        } catch {}
+      }
+      const rawUrl = `https://raw.githubusercontent.com/${repo}/${encodeURIComponent(branch)}/Kho_Green/${encodeURIComponent(fileName)}`;
+      try {
+        const buf = await this._httpsGetBuffer(rawUrl, {}, 120000);
+        if (buf && buf.length > 100000) {
+          fs.writeFileSync(dstPath, buf);
+        }
+      } catch {}
+    }
   }
 
   ensureCleanCustomerDirectoryLayout() {
@@ -592,6 +619,7 @@ class UpdaterService {
           'python_runtime',
           'skills',
           'Kho_Voice',
+          'Kho_Green',
           'scripts',
           'tests',
           'docs'
@@ -670,7 +698,7 @@ class UpdaterService {
         if (!fs.existsSync(path.join(resolvedExe, 'resources', 'app'))) continue;
         visitedExeDirs.add(resolvedExe);
 
-        for (const sub of ['Kho_Voice', 'python_runtime']) {
+        for (const sub of ['Kho_Voice', 'Kho_Green', 'python_runtime']) {
           if (fs.existsSync(path.join(srcRoot, sub))) {
             copyRecursiveCount(path.join(srcRoot, sub), path.join(resolvedExe, sub));
           }

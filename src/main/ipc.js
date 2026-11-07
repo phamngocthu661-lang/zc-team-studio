@@ -152,6 +152,37 @@ function migrateAndSyncGreenStorage(database, paths){
         }
       }
     }
+    // Tự động nhận diện và đăng ký mọi file video/ảnh mới được chép trực tiếp vào thư mục Kho_Green (VD: MC-001.mp4..MC-007.mp4)
+    const knownPaths=new Set(database.listProjectAssets().map((a)=>String(a.normalized_path||a.file_path||'').toLocaleLowerCase('en-US')));
+    if(fs.existsSync(greenRoot)){
+      for(const entry of fs.readdirSync(greenRoot,{withFileTypes:true})){
+        if(!entry.isFile())continue;
+        const ext=path.extname(entry.name).toLowerCase();
+        const isVid=VIDEO_EXTENSIONS.has(ext);
+        const isImg=IMAGE_EXTENSIONS.has(ext);
+        if(!isVid&&!isImg)continue;
+        const full=path.resolve(greenRoot,entry.name);
+        const norm=full.toLocaleLowerCase('en-US');
+        if(knownPaths.has(norm))continue;
+        try{
+          const st=fs.statSync(full);
+          const baseName=path.basename(entry.name,ext);
+          database.createProjectAsset({
+            assetType:isVid?'GREEN_VIDEO':'GREEN_IMAGE',
+            name:baseName,
+            fileName:entry.name,
+            filePath:full,
+            fileSizeBytes:st.size,
+            durationMs:0,
+            width:1920,
+            height:1080,
+            hasAudio:false,
+            metadata:{autoDiscoveredFromKhoGreen:true}
+          });
+          knownPaths.add(norm);
+        }catch{}
+      }
+    }
   }catch(err){
     console.warn('[Kho_Green] Lỗi đồng bộ Kho_Green:',err.message);
   }

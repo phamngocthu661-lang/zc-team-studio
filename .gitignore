@@ -24,7 +24,6 @@ BROWSER_PROFILE_*/
 PROJECTS/
 PROJECTS_*/
 TONG HOP/
-Kho_Green/
 Kho_Voice_12_Topics_Master/
 QUEUE_BACKLOG*.json
 CHANNEL_MEMORY*.json
@@ -58,5 +57,7 @@ python_runtime/
 *.mkv
 *.mov
 *.avi
+!Kho_Green/
+!Kho_Green/**
 __pycache__/
 *.pyc
