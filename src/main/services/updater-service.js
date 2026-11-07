@@ -73,7 +73,14 @@ class UpdaterService {
     try { fs.mkdirSync(targetGreenDir, { recursive: true }); } catch {}
     const mcFiles = [
       'MC-001.mp4', 'MC-002.mp4', 'MC-003.mp4', 'MC-004.mp4', 'MC-005.mp4', 'MC-006.mp4', 'MC-007.mp4',
-      'sub-001.mp4', 'sub-002.mp4', 'sub-003.mp4', 'sub-004.mp4', 'sub-005.mp4', 'sub-006.mp4'
+      'sub-001.mp4', 'sub-002.mp4', 'sub-003.mp4', 'sub-004.mp4', 'sub-005.mp4', 'sub-006.mp4',
+      'Chó 1.mp4', 'Chó 2.mp4',
+      'Gấu 1.mp4', 'Gấu 2.mp4',
+      'Meo 1.mp4', 'Meo 2.mp4',
+      'Sóng 1.mp4', 'Sóng 2.mp4', 'Sóng 3.mp4', 'Sóng 4.mp4', 'Sóng 5.mp4',
+      'SUB 1.mp4', 'SUB 2.mp4', 'SUB 3.mp4', 'SUB 4.mp4', 'SUB 5.mp4',
+      'Thỏ 1.mp4', 'Thỏ 2.mp4',
+      'Vịt 1.mp4', 'Vịt 2.mp4'
     ];
     const localInfo = this.getLocalVersionInfo();
     const repo = localInfo.repo || DEFAULT_GITHUB_REPO;

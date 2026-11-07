@@ -1,10 +1,11 @@
 {
-  "version": "V1.0.17",
-  "build_number": 131,
-  "released_at": "2026-11-07 16:54:55",
+  "version": "V1.0.18",
+  "build_number": 132,
+  "released_at": "2026-11-07 20:47:48",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.18 (Build #132) - 2026-11-07 20:47:48] Bổ sung 20 video Phông Xanh mới (Chó 1..2, Gấu 1..2, Meo 1..2, Sóng 1..5, SUB 1..5, Thỏ 1..2, Vịt 1..2) vào Kho_Green",
     "[V1.0.17 (Build #131) - 2026-11-07 16:54:55] Bổ sung 06 video Phông Xanh sub-001..sub-006 vào Kho_Green & Nâng cấp Quản lý Kho Stock (Hiển thị thời lượng còn lại, Lịch sử dùng Stock, Khóa chống lặp 100% và Tự động tạm dừng khi hết Stock)",
     "[V1.0.16 (Build #130) - 2026-11-07 16:06:26] V1.0.16 (Build #130): Bổ sung trọn bộ 07 video Phông Xanh MC mới (MC-001.mp4 .. MC-007.mp4 chuẩn 1920x1080) vào Kho_Green, tự động tải về và đăng ký vào Kho Tài Nguyên Toàn Cục (Kho_Green) & Thiết kế Template khi máy khách cập nhật.",
     "[V1.0.15 (Build #129) - 2026-11-07 10:44:43] V1.0.15 (Build #129): Khắc phục triệt để lỗi không chọn Model ChatGPT trước khi viết: (1) Chờ nút Select ChatGPT model xuất hiện trên DOM khi vừa mở Tab mới trước khi dán chữ; (2) Mở menu Radix UI bằng chuỗi sự kiện chuột chuẩn PointerEvent('pointerdown') (triggerRadixClick); (3) Tự động chọn đúng cả 2 tầng trong menu ChatGPT: Tích chọn Model Radio (GPT-6 hoặc GPT-5.6 Sol) + Điều chỉnh thanh trượt 3 nấc Thinking Effort (0=Instant/Low, 1=Medium, 2=High) và tự động khóa chế độ ChatGPT (không nhảy sang Codex); (4) Nâng cấp thanh chọn Model & Effort trên giao diện Studio.",
@@ -18,8 +19,7 @@
     "[V1.0.7 (Build #121) - 2026-11-05 09:15:35] Bản V1.0.7: Tự động Reset & Mở lại hoàn toàn ứng dụng (Full App Relaunch) sau khi cập nhật OTA + Tự động đóng sạch 100% toàn bộ các ứng dụng & tiến trình liên quan (Python 8098, VoiceStudio 3900, Chrome ChatGPT 9222-9224, FFmpeg/Whisper) khi tắt ứng dụng",
     "[V1.0.6 (Build #120) - 2026-11-05 08:58:21] Nâng cấp V1.0.6: Gộp gọn thanh công cụ, loại bỏ hoàn toàn các ô chọn bị lặp 2 lần (CHỌN KEY vs GIAO VIỆC, Chế độ Tiêu đề, Tự động Bàn #7)",
     "[V1.0.5 (Build #119) - 2026-11-05 08:50:19] Nâng cấp V1.0.5: Mở rộng khung Bàn #7 toàn màn hình hiển thị 16-22 video cùng lúc, tách độc lập 100% dữ liệu & giao diện giữa các Tab/Kênh (Homeless/Mafia/Mexico)",
-    "[V1.0.4 (Build #118) - 2026-11-05 01:49:57] V1.0.4: Sửa triệt để lỗi dính nhãn Pasted text(.txtDocument) và lỗi dính liền các đoạn văn <p> khi thu hoạch kịch bản Homeless/Mafia/Mexico",
-    "[V1.0.3 (Build #117) - 2026-11-04 22:17:48] Fix dynamic HTML loading in mafia_dashboard_server.py for V1.0.3 (Build #117)"
+    "[V1.0.4 (Build #118) - 2026-11-05 01:49:57] V1.0.4: Sửa triệt để lỗi dính nhãn Pasted text(.txtDocument) và lỗi dính liền các đoạn văn <p> khi thu hoạch kịch bản Homeless/Mafia/Mexico"
   ],
-  "release_date": "2026-11-07 16:54:55"
+  "release_date": "2026-11-07 20:47:48"
 }
