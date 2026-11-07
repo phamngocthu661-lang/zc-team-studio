@@ -60,6 +60,133 @@ class UpdaterService {
     this._lastCheckAt = 0;
     this._isUpdating = false;
     this._relaunchScheduled = false;
+    try {
+      this.ensureCleanCustomerDirectoryLayout();
+    } catch {}
+  }
+
+  ensureCleanCustomerDirectoryLayout() {
+    const customerExeDirs = [
+      this.exeDir,
+      this.studioRoot,
+      path.join(this.studioRoot || '', 'Ban-Giao-Khach-Hang-EXE', 'VideoBatchStudio')
+    ];
+    const visitedExeDirs = new Set();
+    for (const targetExeDir of customerExeDirs) {
+      if (!targetExeDir) continue;
+      const resolvedExe = path.resolve(targetExeDir);
+      if (visitedExeDirs.has(resolvedExe) || !fs.existsSync(resolvedExe)) continue;
+      if (resolvedExe.toLowerCase() === path.resolve('D:\\ZC_TEAM\\TOOL_ZC_TEAM').toLowerCase()) continue;
+      const resAppDir = path.join(resolvedExe, 'resources', 'app');
+      if (!fs.existsSync(resAppDir)) continue;
+      visitedExeDirs.add(resAppDir);
+      visitedExeDirs.add(resolvedExe);
+
+      // 1. Bảo toàn & gom các thư mục Skill từ bản cũ (V1.0.0..V1.0.7) vào resources/app/skills/ trước khi dọn thư mục ngoài
+      const appSkillsDir = path.join(resAppDir, 'skills');
+      try { fs.mkdirSync(appSkillsDir, { recursive: true }); } catch {}
+      for (const legacySkill of ['skills_12_keys', 'skills_mexico', 'skills_homeless', 'DOCSMOI', '.agents']) {
+        const dstSkill = path.join(appSkillsDir, legacySkill);
+        const candidates = [
+          path.join(resAppDir, legacySkill),
+          path.join(resolvedExe, 'skills', legacySkill),
+          path.join(resolvedExe, legacySkill)
+        ];
+        for (const srcCand of candidates) {
+          if (fs.existsSync(srcCand) && !fs.existsSync(dstSkill)) {
+            try {
+              fs.renameSync(srcCand, dstSkill);
+            } catch {
+              try {
+                fs.cpSync(srcCand, dstSkill, { recursive: true, force: true });
+              } catch {}
+            }
+          }
+        }
+        const looseInApp = path.join(resAppDir, legacySkill);
+        if (fs.existsSync(looseInApp) && fs.existsSync(dstSkill)) {
+          try { fs.rmSync(looseInApp, { recursive: true, force: true }); } catch {}
+        }
+      }
+
+      // 2. Gom dữ liệu khách hàng vào data/ và PROJECTS/ trước khi dọn file rác máy code
+      const queuesDir = path.join(resolvedExe, 'data', 'queues');
+      const memoryDir = path.join(resolvedExe, 'data', 'memory');
+      const progressDir = path.join(resolvedExe, 'data', 'progress');
+      const logsDir = path.join(resolvedExe, 'data', 'logs');
+      const configDir = path.join(resolvedExe, 'data', 'config');
+      const profilesDir = path.join(resolvedExe, 'data', 'browser_profiles');
+      const projectsBase = path.join(resolvedExe, 'PROJECTS');
+      for (const d of [queuesDir, memoryDir, progressDir, logsDir, configDir, profilesDir, projectsBase]) {
+        try { fs.mkdirSync(d, { recursive: true }); } catch {}
+      }
+
+      for (const entry of fs.readdirSync(resolvedExe, { withFileTypes: true })) {
+        const name = entry.name;
+        const full = path.join(resolvedExe, name);
+        if (entry.isFile()) {
+          if (name.startsWith('QUEUE_BACKLOG') && name.endsWith('.json')) {
+            const dst = path.join(queuesDir, name);
+            if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+            try { fs.unlinkSync(full); } catch {}
+          } else if (name.startsWith('CHANNEL_MEMORY') && name.endsWith('.json')) {
+            const dst = path.join(memoryDir, name);
+            if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+            try { fs.unlinkSync(full); } catch {}
+          } else if (name.startsWith('TIEN_DO_') && name.endsWith('.md')) {
+            const dst = path.join(progressDir, name);
+            if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+            try { fs.unlinkSync(full); } catch {}
+          } else if (name === 'LIVE_STUDIO_LOG.txt') {
+            const dst = path.join(logsDir, name);
+            if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+            try { fs.unlinkSync(full); } catch {}
+          } else if (name === 'CUSTOM_LINKED_FOLDERS.json' || name === 'CHAT_CONVERSATION_POOL.json') {
+            const dst = path.join(configDir, name);
+            if (!fs.existsSync(dst)) { try { fs.copyFileSync(full, dst); } catch {} }
+            try { fs.unlinkSync(full); } catch {}
+          }
+        } else if (entry.isDirectory()) {
+          if (name === 'BROWSER_PROFILE' || name === 'BROWSER_PROFILE_2' || name === 'BROWSER_PROFILE_3') {
+            const dst = path.join(profilesDir, name);
+            if (!fs.existsSync(dst)) {
+              try { fs.renameSync(full, dst); } catch {}
+            }
+          } else if (name.startsWith('PROJECTS_')) {
+            const dst = path.join(projectsBase, name);
+            if (!fs.existsSync(dst)) {
+              try { fs.renameSync(full, dst); } catch {}
+            }
+          }
+        }
+      }
+
+      // 3. Xóa sạch các thư mục và file máy code bị lẫn ở thư mục gốc của khách
+      for (const dName of [
+        'src', 'engine', 'assets', 'skills', 'skills_12_keys', 'skills_homeless', 'skills_mexico',
+        'DOCSMOI', '.agents', 'docs', 'tests', 'scripts', 'sample-data', 'stitch_redesign_screens', 'VBS-License-Admin'
+      ]) {
+        const p = path.join(resolvedExe, dName);
+        if (fs.existsSync(p)) {
+          try { fs.rmSync(p, { recursive: true, force: true }); } catch {}
+        }
+      }
+      for (const fName of [
+        '.gitignore', 'AGENTS.md', 'CHANGELOG.md', 'CODE_VA_CACH_HOAT_DONG_LIEN_KET_CHATGPT_TOAN_TAP.txt',
+        'GHI_CHU_CAP_NHAT_MEXICO_BA_CO.md', 'MANIFEST.txt', 'OWNER_NOTICE.txt', 'Program.md', 'README.md',
+        'SO_DO_KIEN_TRUC_VA_GIAO_DIEN_UNG_DUNG.md', 'START_HERE.txt', 'TONG_KET_QUY_TRINH_AGENT_CHATGPT_WEB_TOAN_TAP.txt',
+        'LICENSE.txt', 'mafia_dashboard_server.py', 'organize_12_keys_skills.py', 'push_update_github.py',
+        'package.json', 'package-lock.json', 'Chay-Ung-Dung.bat', 'KHOI_DONG_STUDIO_WEB.bat',
+        'MO_VIDEO_BATCH_STUDIO.bat', 'Mo-Ung-Dung-Quan-Ly-Key-Admin.bat',
+        'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC1.bat', 'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC2.bat',
+        'MO_CUA_SO_DANG_NHAP_CHATGPT_WEB_ACC3.bat', 'Test_Sub_CapCut_1Phut.mp4'
+      ]) {
+        const p = path.join(resolvedExe, fName);
+        if (fs.existsSync(p)) {
+          try { fs.unlinkSync(p); } catch {}
+        }
+      }
+    }
   }
 
   relaunchApp() {
