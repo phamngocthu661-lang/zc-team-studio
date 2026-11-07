@@ -7678,7 +7678,7 @@ if __name__ == "__main__":
         parser.add_argument("--max_workers", type=int, default=3, help="Số luồng chạy song song tối đa (mặc định: 3)")
         parser.add_argument("--limit", type=int, default=0, help="Giới hạn số lượng dự án lấy ra chạy trong đợt này (0 = chạy hết)")
         parser.add_argument("--step", type=int, default=0, choices=[0, 1, 2, 3, 4, 5], help="Chạy riêng 1 bước (1..5) hoặc 0 để chạy trọn vẹn/tiếp tục từ checkpoint")
-        parser.add_argument("--thinking", type=str, default="medium", choices=["low", "medium", "high"], help="Mức suy luận của model ChatGPT (mặc định: medium)")
+        parser.add_argument("--thinking", type=str, default="gpt-6:medium", help="Model & mức suy luận của ChatGPT (VD: gpt-6:medium, gpt-6:high, gpt-6:low, gpt-5.6:medium, medium, high, low)")
         parser.add_argument("--account", type=str, default="", help="Ưu tiên tài khoản ChatGPT Web (acc_1, acc_2, acc_3)")
 
         args = parser.parse_args()

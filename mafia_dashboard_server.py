@@ -1989,10 +1989,13 @@ HTML_PAGE = r"""<!DOCTYPE html>
           <option value="6">6 Luồng (2 Acc)</option>
           <option value="9">9 Luồng (3 Acc)</option>
         </select>
-        <select id="thinkingEffort" style="padding:5px 8px; font-size:11.8px;" title="Độ sâu suy luận ChatGPT">
-          <option value="medium" selected>Effort: Medium</option>
-          <option value="high">Effort: High</option>
-          <option value="low">Effort: Low</option>
+        <select id="thinkingEffort" style="padding:5px 8px; font-size:11.8px; font-weight:700; color:#38bdf8; border-color:#0284c7;" title="Chọn Model ChatGPT &amp; Độ sâu suy luận (Thinking Effort) — Tự động chọn đúng Model trước khi viết">
+          <option value="gpt-6:medium" selected>🤖 Model: GPT-6 • Effort: Medium (Chuẩn)</option>
+          <option value="gpt-6:high">🤖 Model: GPT-6 • Effort: High (Sâu)</option>
+          <option value="gpt-6:low">🤖 Model: GPT-6 • Effort: Instant/Low (Nhanh)</option>
+          <option value="gpt-5.6:medium">⚡ Model: GPT-5.6 Sol • Effort: Medium</option>
+          <option value="gpt-5.6:high">⚡ Model: GPT-5.6 Sol • Effort: High</option>
+          <option value="gpt-5.6:low">⚡ Model: GPT-5.6 Sol • Effort: Instant/Low</option>
         </select>
       </div>
 

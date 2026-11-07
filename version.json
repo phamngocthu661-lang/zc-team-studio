@@ -1,10 +1,11 @@
 {
-  "version": "V1.0.14",
-  "build_number": 128,
-  "released_at": "2026-11-07 09:26:00",
+  "version": "V1.0.15",
+  "build_number": 129,
+  "released_at": "2026-11-07 10:44:43",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.15 (Build #129) - 2026-11-07 10:44:43] V1.0.15 (Build #129): Khắc phục triệt để lỗi không chọn Model ChatGPT trước khi viết: (1) Chờ nút Select ChatGPT model xuất hiện trên DOM khi vừa mở Tab mới trước khi dán chữ; (2) Mở menu Radix UI bằng chuỗi sự kiện chuột chuẩn PointerEvent('pointerdown') (triggerRadixClick); (3) Tự động chọn đúng cả 2 tầng trong menu ChatGPT: Tích chọn Model Radio (GPT-6 hoặc GPT-5.6 Sol) + Điều chỉnh thanh trượt 3 nấc Thinking Effort (0=Instant/Low, 1=Medium, 2=High) và tự động khóa chế độ ChatGPT (không nhảy sang Codex); (4) Nâng cấp thanh chọn Model & Effort trên giao diện Studio.",
     "[V1.0.14 (Build #128) - 2026-11-07 09:26:00] V1.0.14 (Build #128): Phát hành chính thức bản sửa triệt để 11 lỗi thực chiến Pipeline 15 Key trên ChatGPT Web (chống vòng lặp vô tận Bước 3, khóa 1 vòng sửa Bước 4, cô lập 100% nhãn Key ở Bàn #2-#5, nhúng Canon Lock & Continuity Anchor vào Lần viết 2/3 & 3/3, bảo vệ ngoặc thoại tiếng Nhật, khóa nguyên tử window.__zcTabOwner chống trùng Tab đa tiến trình, nâng ngưỡng Auto-Heal 95s tương thích chế độ Thinking) + Tự động chuẩn hóa thư mục & gom Skill khi máy khách cập nhật từ các bản cũ (V1.0.0..V1.0.7).",
     "[V1.0.13 (Build #127) - 2026-11-07 08:57:32] V1.0.13: Sửa triệt để 11 lỗi thực chiến Pipeline 15 Key trên ChatGPT Web: Khóa định mức ký tự động theo từng Key (kspec) & diagnosed_parts_once chống vòng lặp vô tận; Khóa One-Repair Policy (1 vòng sửa) & bỏ cắt cụt [:7500] ở Bước 4B; Cô lập 100% nhãn Key ở Bàn #2-#5; Nhúng Canon Lock & Continuity Anchor vào Lần viết 2/3 và 3/3; Bảo vệ câu thoại tiếng Nhật 「...」 trong condense_homeless_stage_text; Nâng cấp khóa nguyên tử window.__zcTabOwner chống trùng Tab đa tiến trình và nâng ngưỡng Auto-Heal lên 95s tương thích chế độ Thinking.",
     "[V1.0.12 (Build #126) - 2026-11-07 00:21:14] Triệt tiêu 100% lỗi vòng lặp vô tận khi viết kịch bản trên toàn bộ 15 Key (01..12, Mexico Bà Cô, Homeless V12, Mafia V1.4) & Kiểm định End-to-End 15/15 Key (Full _KB.txt + Full _SEO.txt đạt 99/100): (1) Đồng bộ ngân sách độ dài động theo từng Key (_get_active_key_runtime_spec: 15k-25k cho Key 05, 18k-26k cho Key 06, 42k-48k cho Key 09, 40k-52k cho Key 10, 40k-50k cho Key 11, 65k-78k cho Key 12, 70k-80k cho Key 01/02/03/04/07/08/Mexico/Homeless, 44k-48k cho Mafia) kèm khóa diagnosed_parts_once chống gọi AI nối tiếp lặp vô hạn; (2) Khóa chính sách One-Repair Policy (max_rewrite_rounds = 1) và bỏ cắt cụt [:7500] ở Bước 4B; (3) Lọc sạch 100% chỉ thị gọi script .py/.json nội bộ trên cả 75 cụm Skill (15 Keys x 5 Steps); (4) Bổ sung bộ chuẩn hóa TTS tiếng Nhật (sanitize_and_normalize_japanese_tts), đếm từ CJK và nhận diện tiêu đề [PART]/[PARTE]/[STORY]/[パート]/[第N部] đa ngôn ngữ.",
@@ -18,8 +19,7 @@
     "[V1.0.4 (Build #118) - 2026-11-05 01:49:57] V1.0.4: Sửa triệt để lỗi dính nhãn Pasted text(.txtDocument) và lỗi dính liền các đoạn văn <p> khi thu hoạch kịch bản Homeless/Mafia/Mexico",
     "[V1.0.3 (Build #117) - 2026-11-04 22:17:48] Fix dynamic HTML loading in mafia_dashboard_server.py for V1.0.3 (Build #117)",
     "[V1.0.3 (Build #117) - 2026-11-04 22:16:14] Tách giao diện Viết Kịch Bản & Render thành 4 Tab nhỏ độc lập: (1) Viết Kịch Bản & Tiêu Đề gọn gàng, (2) Render Video & Tiến Độ GPU đặt bảng tiến độ lên đầu, (3) Nhật Ký Log Hệ Thống riêng biệt (kèm bộ lọc & tìm kiếm), (4) 9 Bàn Agent & 3 Acc ChatGPT.",
-    "[V1.0.2 (Build #116) - 2026-11-04 19:04:11] V1.0.2 (Build #116): Sửa triệt để lỗi kênh Homeless V12 / Mexico dừng ở DESK_3_WRITER không xuất kịch bản _KB.txt, tự động thu hoạch các Part đã viết trong đoạn chat /c/6aea..., xuất sớm _KB.txt ngay khi xong Bước 3 và chuẩn hóa điểm Title 197đ -> 97đ.",
-    "[V1.0.1 (Build #115) - 2026-11-04 11:59:44] Sửa triệt để lỗi 'The messages you submitted were too long' và 'Could not load this ChatGPT conversation' trên ChatGPT Web; cân bằng ngân sách Prompt <= 82k-84k ký tự bảo toàn 100% kịch bản truyện; tích hợp Auto-Heal tự động mở hội thoại sạch & gửi lại lệnh tức thì."
+    "[V1.0.2 (Build #116) - 2026-11-04 19:04:11] V1.0.2 (Build #116): Sửa triệt để lỗi kênh Homeless V12 / Mexico dừng ở DESK_3_WRITER không xuất kịch bản _KB.txt, tự động thu hoạch các Part đã viết trong đoạn chat /c/6aea..., xuất sớm _KB.txt ngay khi xong Bước 3 và chuẩn hóa điểm Title 197đ -> 97đ."
   ],
-  "release_date": "2026-11-07 09:26:00"
+  "release_date": "2026-11-07 10:44:43"
 }

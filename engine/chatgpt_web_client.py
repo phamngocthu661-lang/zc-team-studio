@@ -1161,6 +1161,7 @@ class ChatGPTWebMultiTabClient:
         self._project_to_acc = {}
         self._last_known_turns = {}
         self._last_sent_prompt = {}
+        self._last_sent_thinking = {}
 
     def close(self):
         pass
@@ -1768,18 +1769,34 @@ class ChatGPTWebMultiTabClient:
         )
         return txt
 
-    def _inject_and_send_prompt_on_ws(self, ws_url: str, prompt: str) -> dict:
+    @staticmethod
+    def _parse_model_and_thinking_spec(thinking: str = "medium") -> tuple[str, str]:
+        raw_spec = str(thinking or "medium").strip().lower()
+        if ":" in raw_spec:
+            parts = [p.strip() for p in raw_spec.split(":", 1)]
+            return (parts[0] or "gpt-6"), (parts[1] or "medium")
+        if raw_spec in ("low", "instant", "light", "medium", "standard", "high", "extended"):
+            return "gpt-6", raw_spec
+        if "5.6" in raw_spec or "sol" in raw_spec:
+            return "gpt-5.6", "medium"
+        return "gpt-6", "medium"
+
+    def _inject_and_send_prompt_on_ws(self, ws_url: str, prompt: str, thinking: str = "medium") -> dict:
         """
         Bơm toàn bộ Prompt vào `.ProseMirror[contenteditable="true"]` / `#prompt-textarea`
-        trên Tab Web (tự động xóa sạch ô nhập trước khi dán để không bao giờ nhân đôi văn bản,
+        trên Tab Web (tự động đợi và chọn đúng Model + Thinking Effort trước khi gõ,
+        xóa sạch ô nhập trước khi dán để không bao giờ nhân đôi văn bản,
         và tự động giới hạn <= 83.500 ký tự để triệt tiêu lỗi 'The messages you submitted were too long')
         rồi bấm nút Gửi (`aria-label="Send"`).
         """
         if len(prompt or "") > 83500:
             prompt = self._compact_overlong_prompt_preserving_script(prompt, max_chars=82000)
+        target_model, target_effort = self._parse_model_and_thinking_spec(thinking)
         js_send = f"""
         (async () => {{
             const promptText = {json.dumps(prompt)};
+            const targetModel = {json.dumps(target_model)};
+            const targetEffort = {json.dumps(target_effort)};
             function hasConversationLoadError() {{
                 const pathNow = (window.location.pathname || '').toLowerCase();
                 if (pathNow.includes('/c/webtab_')) return true;
@@ -1822,6 +1839,21 @@ class ChatGPTWebMultiTabClient:
                     || document.querySelector('form button[aria-label*="Send prompt"]')
                     || document.querySelector('form button[type="submit"]');
             }}
+            function findModelButton() {{
+                return document.querySelector('button[aria-label="Select ChatGPT model"]')
+                    || document.querySelector('[data-testid="model-switcher-dropdown-button"]');
+            }}
+            function triggerRadixClick(node) {{
+                if (!node) return;
+                const rect = node.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                node.dispatchEvent(new PointerEvent('pointerdown', {{ bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0, pointerType: 'mouse' }}));
+                node.dispatchEvent(new MouseEvent('mousedown', {{ bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0 }}));
+                node.dispatchEvent(new PointerEvent('pointerup', {{ bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0, pointerType: 'mouse' }}));
+                node.dispatchEvent(new MouseEvent('mouseup', {{ bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy, button: 0 }}));
+                node.click();
+            }}
 
             // Đợi ô nhập liệu xuất hiện (tối đa 18s)
             let el = null;
@@ -1845,6 +1877,14 @@ class ChatGPTWebMultiTabClient:
                 await new Promise(r => setTimeout(r, 500));
             }}
 
+            // Đợi nút chọn Model (Select ChatGPT model) xuất hiện trên DOM khi vừa mở Tab mới (tối đa 10s)
+            let modelBtn = findModelButton();
+            for (let mWait = 0; mWait < 25; mWait++) {{
+                modelBtn = findModelButton();
+                if (modelBtn && (modelBtn.innerText || '').trim().length > 0) break;
+                await new Promise(r => setTimeout(r, 400));
+            }}
+
             function focusAndSelectComposer(box) {{
                 if (!box) return;
                 try {{
@@ -1860,23 +1900,136 @@ class ChatGPTWebMultiTabClient:
                 }} catch (e) {{}}
             }}
 
-            // Đảm bảo nút chọn mức độ suy nghĩ (Thinking effort / Select ChatGPT model) luôn khóa chuẩn ở Medium
+            // Đảm bảo chế độ góc trên cùng là ChatGPT (không bị nhảy sang Codex) và khóa đúng Model + Thinking Effort trước khi gõ
+            let selectedModelLabel = '';
             try {{
-                const modelBtn = document.querySelector('button[aria-label="Select ChatGPT model"]');
-                if (modelBtn && !(modelBtn.innerText || '').toLowerCase().includes('medium')) {{
-                    modelBtn.click();
-                    await new Promise(r => setTimeout(r, 250));
-                    const items = Array.from(document.querySelectorAll('[role="menuitem"], [role="menuitemradio"], [role="option"]'));
-                    const medItem = items.find(x => (x.innerText || '').toLowerCase().includes('medium'));
-                    if (medItem) {{
-                        medItem.click();
-                        await new Promise(r => setTimeout(r, 200));
+                const modeBtn = document.querySelector('button[aria-label^="Switch mode"]');
+                if (modeBtn && !(modeBtn.getAttribute('aria-label') || '').toLowerCase().includes('chatgpt')) {{
+                    triggerRadixClick(modeBtn);
+                    await new Promise(r => setTimeout(r, 320));
+                    const modeItems = Array.from(document.querySelectorAll('[role="menuitem"], [role="menuitemradio"]'));
+                    const chatModeItem = modeItems.find(it => (it.innerText || '').toLowerCase().includes('chatgpt'));
+                    if (chatModeItem) {{
+                        triggerRadixClick(chatModeItem);
+                        await new Promise(r => setTimeout(r, 450));
                     }} else {{
                         document.dispatchEvent(new KeyboardEvent('keydown', {{ key: 'Escape', code: 'Escape', bubbles: true }}));
-                        document.body.click();
                     }}
                 }}
+
+                modelBtn = findModelButton();
+                if (modelBtn) {{
+                    const wantModel = (targetModel || 'gpt-6').toLowerCase().trim();
+                    const wantEffort = (targetEffort || 'medium').toLowerCase().trim();
+                    const effortMap = {{ 'low': 0, 'instant': 0, 'light': 0, 'medium': 1, 'standard': 1, 'high': 2, 'extended': 2 }};
+                    const wantVal = effortMap[wantEffort] ?? 1;
+                    const effortWords = wantVal === 0 ? ['instant', 'low', 'light'] : (wantVal === 2 ? ['high', 'extended'] : ['medium', 'standard']);
+
+                    const btnTextLow = (modelBtn.innerText || '').toLowerCase();
+                    const want56 = wantModel.includes('5.6') || wantModel.includes('sol');
+                    const has56InBtn = btnTextLow.includes('5.6') || btnTextLow.includes('sol');
+                    const effortMatchedInBtn = effortWords.some(w => btnTextLow.includes(w));
+                    const modelMatchedInBtn = want56 ? has56InBtn : !has56InBtn;
+                    const expectedSig = wantModel + ':' + wantVal;
+
+                    if (!effortMatchedInBtn || !modelMatchedInBtn || window.__zcVerifiedModelSig !== expectedSig) {{
+                        let menu = null;
+                        for (let openTry = 0; openTry < 3; openTry++) {{
+                            triggerRadixClick(modelBtn);
+                            await new Promise(r => setTimeout(r, 380));
+                            menu = document.querySelector('[role="menu"], [data-radix-menu-content]');
+                            if (menu) break;
+                        }}
+
+                        if (menu) {{
+                            // 1. Chọn đúng Model (GPT-6 vs GPT-5.6 Sol...) trong danh sách [role="menuitemradio"]
+                            let radios = Array.from(menu.querySelectorAll('[role="menuitemradio"]'));
+                            if (radios.length > 0) {{
+                                let targetRadio = radios.find(r => (r.innerText || '').toLowerCase().includes(wantModel));
+                                if (!targetRadio) {{
+                                    if (want56) {{
+                                        targetRadio = radios.find(r => /5\\.6|sol/i.test(r.innerText || ''));
+                                    }} else {{
+                                        targetRadio = radios.find(r => /gpt-6|gpt-5\\.4|o3|4o/i.test(r.innerText || '') && !/5\\.6|sol/i.test(r.innerText || '')) || radios[0];
+                                    }}
+                                }}
+                                if (targetRadio && targetRadio.getAttribute('aria-checked') !== 'true') {{
+                                    const viewToggle = menu.querySelector('[data-model-picker-view-toggle="true"], [aria-label="Select model"]');
+                                    if (viewToggle) {{
+                                        triggerRadixClick(viewToggle);
+                                        await new Promise(r => setTimeout(r, 300));
+                                    }}
+                                    radios = Array.from(document.querySelectorAll('[role="menu"] [role="menuitemradio"]'));
+                                    const radioToClick = radios.find(r => (r.innerText || '').trim() === (targetRadio.innerText || '').trim()) || targetRadio;
+                                    triggerRadixClick(radioToClick);
+                                    await new Promise(r => setTimeout(r, 340));
+                                }}
+                            }}
+
+                            // Mở lại menu nếu việc chọn Model radio vừa đóng menu
+                            menu = document.querySelector('[role="menu"], [data-radix-menu-content]');
+                            if (!menu) {{
+                                triggerRadixClick(modelBtn);
+                                await new Promise(r => setTimeout(r, 380));
+                                menu = document.querySelector('[role="menu"], [data-radix-menu-content]');
+                            }}
+
+                            // 2. Điều chỉnh thanh trượt Thinking Effort (0=Instant/Low, 1=Medium, 2=High)
+                            if (menu) {{
+                                const sliderRole = menu.querySelector('[role="slider"]');
+                                const sliderControl = menu.querySelector('[data-reasoning-slider="true"], [aria-label="Power"]');
+                                const sliderRoot = menu.querySelector('[data-model-picker-power-slider] [data-orientation="horizontal"], .Track-eoFI82');
+                                if (sliderRole && (sliderControl || sliderRoot)) {{
+                                    let curVal = parseInt(sliderRole.getAttribute('aria-valuenow') || '1', 10);
+                                    if (curVal !== wantVal && sliderRoot) {{
+                                        const rect = sliderRoot.getBoundingClientRect();
+                                        if (rect.width > 10) {{
+                                            const ratios = [0.08, 0.50, 0.92];
+                                            const clickX = rect.left + rect.width * ratios[wantVal];
+                                            const clickY = rect.top + rect.height / 2;
+                                            sliderRoot.dispatchEvent(new PointerEvent('pointerdown', {{ bubbles: true, cancelable: true, view: window, clientX: clickX, clientY: clickY, button: 0, pointerType: 'mouse' }}));
+                                            sliderRoot.dispatchEvent(new MouseEvent('mousedown', {{ bubbles: true, cancelable: true, view: window, clientX: clickX, clientY: clickY, button: 0 }}));
+                                            sliderRoot.dispatchEvent(new PointerEvent('pointerup', {{ bubbles: true, cancelable: true, view: window, clientX: clickX, clientY: clickY, button: 0, pointerType: 'mouse' }}));
+                                            sliderRoot.dispatchEvent(new MouseEvent('mouseup', {{ bubbles: true, cancelable: true, view: window, clientX: clickX, clientY: clickY, button: 0 }}));
+                                            await new Promise(r => setTimeout(r, 220));
+                                        }}
+                                    }}
+                                    const sliderRoleAfter = menu.querySelector('[role="slider"]');
+                                    curVal = sliderRoleAfter ? parseInt(sliderRoleAfter.getAttribute('aria-valuenow') || '1', 10) : curVal;
+                                    if (curVal !== wantVal && sliderControl) {{
+                                        sliderControl.focus();
+                                        const diff = wantVal - curVal;
+                                        const keyName = diff > 0 ? 'ArrowRight' : 'ArrowLeft';
+                                        for (let step = 0; step < Math.abs(diff); step++) {{
+                                            sliderControl.dispatchEvent(new KeyboardEvent('keydown', {{ key: keyName, code: keyName, bubbles: true, cancelable: true }}));
+                                            sliderControl.dispatchEvent(new KeyboardEvent('keyup', {{ key: keyName, code: keyName, bubbles: true, cancelable: true }}));
+                                            await new Promise(r => setTimeout(r, 150));
+                                        }}
+                                    }}
+                                }} else {{
+                                    const items = Array.from(menu.querySelectorAll('[role="menuitem"], [role="menuitemradio"], [role="option"]'));
+                                    const targetItem = items.find(x => effortWords.some(w => (x.innerText || '').toLowerCase().includes(w)));
+                                    if (targetItem) {{
+                                        triggerRadixClick(targetItem);
+                                        await new Promise(r => setTimeout(r, 220));
+                                    }}
+                                }}
+                            }}
+
+                            // Đóng menu gọn gàng trước khi dán văn bản vào ô nhập
+                            document.dispatchEvent(new KeyboardEvent('keydown', {{ key: 'Escape', code: 'Escape', bubbles: true }}));
+                            await new Promise(r => setTimeout(r, 180));
+                            if (document.querySelector('[role="menu"], [data-radix-menu-content]')) {{
+                                triggerRadixClick(modelBtn);
+                                await new Promise(r => setTimeout(r, 180));
+                            }}
+                            window.__zcVerifiedModelSig = expectedSig;
+                        }}
+                    }}
+                    selectedModelLabel = (modelBtn.innerText || '').trim().replace(/\\s+/g, ' ');
+                }}
             }} catch (e) {{}}
+            el = findComposerBox() || el;
 
             // Xóa sạch 100% mọi chip đính kèm cũ hoặc chữ nháp còn sót trong ô nhập (chống nhân đôi độ dài khi cửa sổ chạy ngầm)
             Array.from(document.querySelectorAll('form button')).filter(
@@ -2045,12 +2198,13 @@ class ChatGPTWebMultiTabClient:
             return JSON.stringify({{
                 ok: true,
                 thread_id: convId,
-                url: window.location.href
+                url: window.location.href,
+                selected_model_label: selectedModelLabel
             }});
         }})()
         """
         try:
-            raw = _eval_js_in_tab(ws_url, js_send, await_promise=True, timeout=75.0)
+            raw = _eval_js_in_tab(ws_url, js_send, await_promise=True, timeout=85.0)
         except Exception as e:
             return {"error": f"WebSocket eval error: {e}"}
         if not raw:
@@ -2087,7 +2241,7 @@ class ChatGPTWebMultiTabClient:
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).add(tab_id)
                 self._tab_last_used_ts[tab_id] = time.time()
-            res = self._inject_and_send_prompt_on_ws(ws_url, cur_prompt)
+            res = self._inject_and_send_prompt_on_ws(ws_url, cur_prompt, thinking=thinking)
             if "error" not in res and res.get("ok"):
                 tid = res.get("thread_id") or f"webtab_{aid}_{tab_id}"
                 with WEB_TAB_LOCK:
@@ -2095,6 +2249,7 @@ class ChatGPTWebMultiTabClient:
                     self._thread_to_acc[tid] = aid
                     self._tab_last_used_ts[tab_id] = time.time()
                 self._last_sent_prompt[tid] = cur_prompt
+                self._last_sent_thinking[tid] = thinking
                 return tid, f"chatgpt_web:{aid}"
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
@@ -2112,6 +2267,7 @@ class ChatGPTWebMultiTabClient:
         aid = acc_cfg["acc_id"]
         cur_prompt = self._compact_overlong_prompt_preserving_script(prompt, max_chars=82000) if len(prompt or "") > 83000 else prompt
         self._last_sent_prompt[thread_id] = cur_prompt
+        self._last_sent_thinking[thread_id] = thinking
         tab_id, ws_url = self._get_or_create_tab_ws(thread_id=thread_id, force_new_chat=False, acc_id=aid, project_id=project_id)
         res = {}
         for attempt in range(4):
@@ -2131,7 +2287,7 @@ class ChatGPTWebMultiTabClient:
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).add(tab_id)
                 self._tab_last_used_ts[tab_id] = time.time()
-            res = self._inject_and_send_prompt_on_ws(ws_url, cur_prompt)
+            res = self._inject_and_send_prompt_on_ws(ws_url, cur_prompt, thinking=thinking)
             if "error" not in res and res.get("ok"):
                 real_tid = res.get("thread_id") or thread_id
                 with WEB_TAB_LOCK:
@@ -2139,7 +2295,8 @@ class ChatGPTWebMultiTabClient:
                     self._thread_to_acc[real_tid] = aid
                     self._tab_last_used_ts[tab_id] = time.time()
                 self._last_sent_prompt[real_tid] = prompt
-                return {"result": {"success": True, "threadId": real_tid, "accountId": aid}}
+                self._last_sent_thinking[real_tid] = thinking
+                return {"result": {"success": True, "threadId": real_tid, "accountId": aid, "selectedModelLabel": res.get("selected_model_label", "")}}
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
             time.sleep(4.5)
@@ -2619,7 +2776,11 @@ class ChatGPTWebMultiTabClient:
                         self._active_busy_tabs.setdefault(aid, set()).add(tab_id)
                         self._tab_last_used_ts[tab_id] = time.time()
                     if recovery_prompt:
-                        re_res = self._inject_and_send_prompt_on_ws(ws_url, recovery_prompt)
+                        re_res = self._inject_and_send_prompt_on_ws(
+                            ws_url,
+                            recovery_prompt,
+                            thinking=self._last_sent_thinking.get(thread_id, "medium"),
+                        )
                         if "error" not in re_res and re_res.get("ok"):
                             new_tid = re_res.get("thread_id") or (thread_id if keep_existing_conv else f"webtab_{aid}_{tab_id}")
                             thread_id = new_tid
