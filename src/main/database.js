@@ -191,6 +191,52 @@ class AppDatabase {
       );
     `);
     this.migrateProjectAssetsToGlobal();
+    this.repairPresliceStockUsageHistory();
+  }
+
+  repairPresliceStockUsageHistory() {
+    try {
+      const badRows = this.db.prepare("SELECT id, job_id, source_path, source_start_ms, source_end_ms, render_duration_ms, playback_rate FROM matched_stock_usage WHERE source_path LIKE '%-preslice-seg-%'").all();
+      if (!badRows.length) return;
+      const updateStmt = this.db.prepare('UPDATE matched_stock_usage SET source_path=?, normalized_source_path=?, source_duration_ms=?, source_start_ms=?, source_end_ms=? WHERE id=?');
+      const deleteStmt = this.db.prepare('DELETE FROM matched_stock_usage WHERE id=?');
+      this.transaction(() => {
+        for (const row of badRows) {
+          const segMatch = String(row.source_path || '').match(/-preslice-seg-(\d+)\.mp4$/i);
+          const seqIdx = segMatch ? Number(segMatch[1]) : 0;
+          const ja = this.db.prepare(`
+            SELECT ja.trim_start_ms, ja.trim_duration_ms, ma.file_path, ma.normalized_path, ma.duration_ms
+            FROM job_assets ja
+            JOIN media_assets ma ON ma.id = ja.media_asset_id
+            WHERE ja.job_id = ? AND ja.sequence_index = ?
+            LIMIT 1
+          `).get(row.job_id, seqIdx) || this.db.prepare(`
+            SELECT ja.trim_start_ms, ja.trim_duration_ms, ma.file_path, ma.normalized_path, ma.duration_ms
+            FROM job_assets ja
+            JOIN media_assets ma ON ma.id = ja.media_asset_id
+            WHERE ja.job_id = ?
+            ORDER BY ja.sequence_index ASC
+            LIMIT 1
+          `).get(row.job_id);
+          if (ja && ja.file_path) {
+            const startMs = Math.max(0, Math.round(Number(ja.trim_start_ms || 0)));
+            const speed = Number(row.playback_rate || 0.75) || 0.75;
+            const consumedSourceMs = Math.round(Number(row.render_duration_ms || ja.trim_duration_ms || 0) * speed);
+            const endMs = Math.max(startMs, startMs + (consumedSourceMs || Math.round(Number(row.source_end_ms || 0))));
+            updateStmt.run(
+              ja.file_path,
+              String(ja.normalized_path || ja.file_path).toLocaleLowerCase('en-US'),
+              Math.round(Number(ja.duration_ms || 0)),
+              startMs,
+              endMs,
+              row.id
+            );
+          } else {
+            deleteStmt.run(row.id);
+          }
+        }
+      });
+    } catch {}
   }
 
   migrateProjectAssetsToGlobal() {
@@ -399,59 +445,91 @@ class AppDatabase {
       return this.db.prepare('DELETE FROM media_libraries WHERE id=?').run(id).changes;
     });
   }
-  upsertMediaAsset(libraryId,item) { const now=Date.now(), normalizedPath=item.filePath.toLocaleLowerCase('en-US'), existing=this.db.prepare('SELECT id,status FROM media_assets WHERE normalized_path=?').get(normalizedPath); const status=item.valid?(existing?.status===ASSET_STATUS.USED?ASSET_STATUS.USED:ASSET_STATUS.AVAILABLE):ASSET_STATUS.INVALID; const values=[libraryId,item.assetType||'VIDEO',item.fileName,item.filePath,normalizedPath,item.fileHash||null,item.fileSizeBytes||0,item.modifiedAtFs||null,item.durationMs||0,item.width||0,item.height||0,item.fpsNum||0,item.fpsDen||1,item.videoCodec||null,item.audioCodec||null,item.pixelFormat||null,item.hasAudio?1:0,status,item.error||null,JSON.stringify(item.metadata||{}),now]; if(existing){this.db.prepare(`UPDATE media_assets SET library_id=?,asset_type=?,file_name=?,file_path=?,normalized_path=?,file_hash=?,file_size_bytes=?,modified_at_fs=?,duration_ms=?,width=?,height=?,fps_num=?,fps_den=?,video_codec=?,audio_codec=?,pixel_format=?,has_audio=?,status=?,error_message=?,metadata_json=?,last_scanned_at=? WHERE id=?`).run(...values,existing.id); return existing.id;} const id=createId(); this.db.prepare(`INSERT INTO media_assets(id,library_id,asset_type,file_name,file_path,normalized_path,file_hash,file_size_bytes,modified_at_fs,duration_ms,width,height,fps_num,fps_den,video_codec,audio_codec,pixel_format,has_audio,status,error_message,metadata_json,first_seen_at,last_scanned_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id,...values.slice(0,-1),now,now); return id; }
+  upsertMediaAsset(libraryId,item) {
+    const now=Date.now(), normalizedPath=item.filePath.toLocaleLowerCase('en-US'), existing=this.db.prepare('SELECT id,status FROM media_assets WHERE normalized_path=?').get(normalizedPath);
+    const durMs=Number(item.durationMs||0);
+    let alreadyConsumed=false;
+    if(durMs>0){
+      try{
+        const prog=this.db.prepare("SELECT MAX(source_end_ms) max_end FROM matched_stock_usage WHERE normalized_source_path=? AND status='COMPLETED'").get(normalizedPath);
+        if(Number(prog?.max_end||0)>=Math.max(0,durMs-500))alreadyConsumed=true;
+      }catch{}
+    }
+    const status=item.valid?((existing?.status===ASSET_STATUS.USED||alreadyConsumed)?ASSET_STATUS.USED:ASSET_STATUS.AVAILABLE):ASSET_STATUS.INVALID;
+    const values=[libraryId,item.assetType||'VIDEO',item.fileName,item.filePath,normalizedPath,item.fileHash||null,item.fileSizeBytes||0,item.modifiedAtFs||null,item.durationMs||0,item.width||0,item.height||0,item.fpsNum||0,item.fpsDen||1,item.videoCodec||null,item.audioCodec||null,item.pixelFormat||null,item.hasAudio?1:0,status,item.error||null,JSON.stringify(item.metadata||{}),now];
+    if(existing){this.db.prepare(`UPDATE media_assets SET library_id=?,asset_type=?,file_name=?,file_path=?,normalized_path=?,file_hash=?,file_size_bytes=?,modified_at_fs=?,duration_ms=?,width=?,height=?,fps_num=?,fps_den=?,video_codec=?,audio_codec=?,pixel_format=?,has_audio=?,status=?,error_message=?,metadata_json=?,last_scanned_at=? WHERE id=?`).run(...values,existing.id); return existing.id;}
+    const id=createId(); this.db.prepare(`INSERT INTO media_assets(id,library_id,asset_type,file_name,file_path,normalized_path,file_hash,file_size_bytes,modified_at_fs,duration_ms,width,height,fps_num,fps_den,video_codec,audio_codec,pixel_format,has_audio,status,error_message,metadata_json,first_seen_at,last_scanned_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id,...values.slice(0,-1),now,now); return id;
+  }
   listMediaAssets(libraryId,status=null) { return status?this.db.prepare('SELECT * FROM media_assets WHERE library_id=? AND status=? ORDER BY file_name COLLATE NOCASE').all(libraryId,status):this.db.prepare('SELECT * FROM media_assets WHERE library_id=? ORDER BY file_name COLLATE NOCASE').all(libraryId); }
   listAvailableAssets(libraryId) { return this.listMediaAssets(libraryId,'AVAILABLE'); }
-  getMediaLibraryStats(libraryId) {
-    const stockPlaybackRate = 0.75;
-    const stockPasses = 2;
+  getMediaLibraryStats(libraryId, stockPlaybackRate = 0.75) {
+    const speed = Math.max(0.1, Number(stockPlaybackRate || 0.75));
+    const stockPasses = 1;
     const rows = this.db.prepare(`
       SELECT a.*,
         COALESCE((SELECT MAX(m.source_end_ms) FROM matched_stock_usage m
-          WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED' AND m.pass_index=1), 0) AS matched_normal_consumed_ms,
-        COALESCE((SELECT MAX(m.source_end_ms) FROM matched_stock_usage m
-          WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED' AND m.pass_index>=2), 0) AS matched_clone_consumed_ms
+          WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'), 0) AS matched_normal_consumed_ms
       FROM media_assets a
       WHERE a.library_id=?
     `).all(libraryId);
     let totalDurationMs = 0;
     let availableDurationMs = 0;
     let usedDurationMs = 0;
+    let rawTotalDurationMs = 0;
+    let rawAvailableDurationMs = 0;
+    let rawUsedDurationMs = 0;
     let availableCount = 0;
+    let inProgressCount = 0;
     let usedCount = 0;
     let unusableCount = 0;
     for (const row of rows) {
       if (row.asset_type !== 'VIDEO') continue;
       const durationMs = Math.max(0, Number(row.duration_ms || 0));
       const normalConsumedMs = Math.min(durationMs, Math.max(0, Number(row.matched_normal_consumed_ms || 0)));
-      const cloneConsumedMs = Math.min(durationMs, Math.max(0, Number(row.matched_clone_consumed_ms || 0)));
-      const totalEffectiveMs = durationMs / stockPlaybackRate * stockPasses;
-      const usedEffectiveMs = Math.min(totalEffectiveMs, (normalConsumedMs + cloneConsumedMs) / stockPlaybackRate);
+      const isFullyConsumed = row.status === 'USED' || (durationMs > 0 && normalConsumedMs >= Math.max(0, durationMs - 500));
+      const totalEffectiveMs = (durationMs / speed) * stockPasses;
+      const usedRawMs = isFullyConsumed ? durationMs : normalConsumedMs;
+      const availRawMs = isFullyConsumed ? 0 : Math.max(0, durationMs - normalConsumedMs);
+      const usedEffectiveMs = Math.min(totalEffectiveMs, usedRawMs / speed);
       const availableEffectiveMs = Math.max(0, totalEffectiveMs - usedEffectiveMs);
+
+      rawTotalDurationMs += durationMs;
       totalDurationMs += totalEffectiveMs;
-      if (row.status === 'AVAILABLE') {
+
+      if (row.status === 'MISSING' || row.status === 'INVALID') {
+        unusableCount += 1;
+      } else if (isFullyConsumed) {
+        usedCount += 1;
+        rawUsedDurationMs += durationMs;
+        usedDurationMs += totalEffectiveMs;
+      } else {
         availableCount += 1;
+        if (normalConsumedMs > 0) inProgressCount += 1;
+        rawAvailableDurationMs += availRawMs;
+        rawUsedDurationMs += usedRawMs;
         availableDurationMs += availableEffectiveMs;
         usedDurationMs += usedEffectiveMs;
-      } else if (row.status === 'USED') {
-        usedCount += 1;
-        usedDurationMs += totalEffectiveMs;
-      } else if (row.status === 'MISSING' || row.status === 'INVALID') {
-        unusableCount += 1;
       }
     }
     return {
       libraryId,
+      playbackRate: speed,
       totalDurationMs,
       availableDurationMs,
       usedDurationMs,
+      rawTotalDurationMs,
+      rawAvailableDurationMs,
+      rawUsedDurationMs,
+      totalCount: availableCount + usedCount + unusableCount,
       availableCount,
+      inProgressCount,
       usedCount,
       unusableCount,
       total_duration_ms: totalDurationMs,
       available_duration_ms: availableDurationMs,
       used_duration_ms: usedDurationMs,
       available_count: availableCount,
+      in_progress_count: inProgressCount,
       used_count: usedCount,
       unusable_count: unusableCount
     };
@@ -557,25 +635,213 @@ class AppDatabase {
 
   getMatchedStockProgress(sourcePath, sourceDurationMs=0) {
     const normalized=String(sourcePath||'').toLocaleLowerCase('en-US');
-    if(!normalized)return {sourceDurationMs:0,normalConsumedMs:0,cloneConsumedMs:0,phase:1,consumedStartMs:0};
+    const rawDur = (sourceDurationMs && typeof sourceDurationMs === 'object')
+      ? (sourceDurationMs.durationMs ?? sourceDurationMs.sourceDurationMs ?? 0)
+      : sourceDurationMs;
+    if(!normalized)return {sourceDurationMs:0,normalConsumedMs:0,cloneConsumedMs:0,phase:1,consumedStartMs:0,fullyConsumed:false};
     const rows=this.db.prepare("SELECT pass_index,MAX(source_end_ms) consumed_ms,MAX(source_duration_ms) source_duration_ms FROM matched_stock_usage WHERE normalized_source_path=? AND status='COMPLETED' GROUP BY pass_index").all(normalized);
-    const duration=Math.max(Number(sourceDurationMs||0),...rows.map((row)=>Number(row.source_duration_ms||0)));
+    const duration=Math.max(Number(rawDur||0),...rows.map((row)=>Number(row.source_duration_ms||0)));
     const normalConsumed=Math.max(0,...rows.filter((row)=>Number(row.pass_index||1)===1).map((row)=>Number(row.consumed_ms||0)));
     const cloneConsumed=Math.max(0,...rows.filter((row)=>Number(row.pass_index||1)>=2).map((row)=>Number(row.consumed_ms||0)));
-    const normalComplete=duration>0&&normalConsumed>=Math.max(0,duration-20);
+    const maxConsumed=Math.max(normalConsumed,cloneConsumed);
+    const clampedConsumed=duration>0?Math.min(maxConsumed,duration):maxConsumed;
+    const fullyConsumed=duration>0&&clampedConsumed>=Math.max(0,duration-500);
     return {
       sourceDurationMs:duration,
-      normalConsumedMs:Math.min(normalConsumed,duration||normalConsumed),
+      normalConsumedMs:clampedConsumed,
       cloneConsumedMs:Math.min(cloneConsumed,duration||cloneConsumed),
-      phase:normalComplete?2:1,
-      consumedStartMs:Math.min(normalComplete?cloneConsumed:normalConsumed,duration||normalConsumed||cloneConsumed)
+      phase:1,
+      consumedStartMs:fullyConsumed?duration:clampedConsumed,
+      fullyConsumed
     };
   }
   getMatchedStockConsumedMs(sourcePath, sourceDurationMs=0) { return this.getMatchedStockProgress(sourcePath,sourceDurationMs).consumedStartMs; }
-  recordMatchedStockUsage({batchId,jobId,voiceName,sourcePath,outputPath,sourceDurationMs,segments}) { const now=Date.now(),normalized=String(sourcePath||'').toLocaleLowerCase('en-US'); const stmt=this.db.prepare(`INSERT INTO matched_stock_usage(id,batch_id,job_id,voice_name,source_path,normalized_source_path,output_path,source_duration_ms,source_start_ms,source_end_ms,render_duration_ms,playback_rate,pass_index,flipped,zoom,action,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`); this.transaction(()=>{for(const [index,segment] of segments.entries()){const transform=segment.transform||{},sourceStartMs=Math.max(0,Math.round(Number(segment.sourceRangeStartMs??segment.trimStartMs??0))),sourceEndMs=Math.max(sourceStartMs,Math.round(Number(segment.sourceRangeEndMs??(sourceStartMs+Number(segment.sourceDurationMs||segment.durationMs||0))))),phase=Math.max(1,Math.round(Number(segment.stockPhase??segment.stockPassIndex??index+1))); stmt.run(createId(),batchId,jobId,voiceName||'',sourcePath,normalized,outputPath,Math.round(Number(sourceDurationMs||0)),sourceStartMs,sourceEndMs,Math.round(Number(segment.durationMs||0)),Number(segment.playbackRate||1),phase,transform.flip?1:0,Number(transform.scale||transform.scaleStart||1),phase>1?'CLONE_REUSE':'CONSUME_RANGE','COMPLETED',now);}}); this.audit('MATCHED_STOCK_USAGE','JOB',jobId,{sourcePath,outputPath}); }
+  markMediaStatus(assetId, status='USED') {
+    if (!assetId) return;
+    const now = Date.now();
+    this.db.prepare('UPDATE media_assets SET status=?, used_at=CASE WHEN ?=\'USED\' THEN ? ELSE used_at END WHERE id=?').run(status, status, now, assetId);
+  }
+  recordMatchedStockUsage({batchId,jobId,voiceName,sourcePath,outputPath,sourceDurationMs,segments}) {
+    const now=Date.now(),normalized=String(sourcePath||'').toLocaleLowerCase('en-US');
+    if(!normalized || normalized.includes('-preslice-seg-'))return;
+    const stmt=this.db.prepare(`INSERT INTO matched_stock_usage(id,batch_id,job_id,voice_name,source_path,normalized_source_path,output_path,source_duration_ms,source_start_ms,source_end_ms,render_duration_ms,playback_rate,pass_index,flipped,zoom,action,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    this.transaction(()=>{
+      for(const [index,segment] of (segments||[]).entries()){
+        const transform=segment.transform||{};
+        const rawStart=segment.originalRangeStartMs??segment.sourceRangeStartMs??segment.originalTrimStartMs??segment.trimStartMs??0;
+        const sourceStartMs=Math.max(0,Math.round(Number(rawStart)));
+        const rawEnd=segment.originalRangeEndMs??segment.sourceRangeEndMs??(sourceStartMs+Number(segment.sourceDurationMs||segment.durationMs||0));
+        const sourceEndMs=Math.max(sourceStartMs,Math.round(Number(rawEnd)));
+        const phase=Math.max(1,Math.round(Number(segment.stockPhase??segment.stockPassIndex??1)));
+        const srcDur=Math.round(Number(sourceDurationMs||segment.sourceDurationMs||0));
+        stmt.run(createId(),batchId,jobId,voiceName||'',sourcePath,normalized,outputPath||'',srcDur,sourceStartMs,sourceEndMs,Math.round(Number(segment.durationMs||0)),Number(segment.playbackRate||0.75),phase,transform.flip?1:0,Number(transform.scale||transform.scaleStart||1),phase>1?'CLONE_REUSE':'CONSUME_RANGE','COMPLETED',now);
+      }
+    });
+    this.audit('MATCHED_STOCK_USAGE','JOB',jobId,{sourcePath,outputPath:outputPath||''});
+  }
   markMatchedStockDeleted(sourcePath) { const normalized=String(sourcePath||'').toLocaleLowerCase('en-US'); if(!normalized)return; this.db.prepare("UPDATE matched_stock_usage SET action='FULLY_CONSUMED_DELETE',source_deleted_at=? WHERE normalized_source_path=? AND status='COMPLETED' AND source_deleted_at IS NULL").run(Date.now(),normalized); }
   markMatchedStockMoved(sourcePath) { const normalized=String(sourcePath||'').toLocaleLowerCase('en-US'); if(!normalized)return; this.db.prepare("UPDATE matched_stock_usage SET action='FULLY_CONSUMED_MOVED' WHERE normalized_source_path=? AND status='COMPLETED' AND action<>'FULLY_CONSUMED_DELETE'").run(normalized); }
   listMatchedStockUsage(batchId=null,limit=10000) { return batchId?this.db.prepare('SELECT * FROM matched_stock_usage WHERE batch_id=? ORDER BY created_at,voice_name,pass_index LIMIT ?').all(batchId,limit):this.db.prepare('SELECT * FROM matched_stock_usage ORDER BY created_at DESC LIMIT ?').all(limit); }
+
+  findLibraryByPathOrId(libraryIdOrFolderPath) {
+    const raw = String(libraryIdOrFolderPath || '').trim();
+    if (!raw || raw.startsWith('(')) return null;
+    const byId = this.db.prepare('SELECT * FROM media_libraries WHERE id=?').get(raw);
+    if (byId) return byId;
+    const norm = raw.replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
+    const allLibs = this.listLibraries();
+    return allLibs.find((l) => String(l.root_path || '').replace(/[\\/]+$/, '').toLocaleLowerCase('en-US') === norm) || null;
+  }
+
+  getStockFolderDetailedReport(libraryIdOrFolderPath, playbackRate = 0.75) {
+    const speed = Math.max(0.1, Number(playbackRate || 0.75));
+    const lib = this.findLibraryByPathOrId(libraryIdOrFolderPath);
+    if (!lib) {
+      return {
+        found: false,
+        folderPath: String(libraryIdOrFolderPath || ''),
+        playbackRate: speed,
+        stats: {
+          totalCount: 0,
+          availableCount: 0,
+          inProgressCount: 0,
+          usedCount: 0,
+          unusableCount: 0,
+          totalDurationMs: 0,
+          availableDurationMs: 0,
+          usedDurationMs: 0,
+          rawTotalDurationMs: 0,
+          rawAvailableDurationMs: 0,
+          rawUsedDurationMs: 0
+        },
+        files: [],
+        history: []
+      };
+    }
+
+    const stats = this.getMediaLibraryStats(lib.id, speed);
+    const assetRows = this.db.prepare(`
+      SELECT a.*,
+        COALESCE((SELECT MAX(m.source_end_ms) FROM matched_stock_usage m
+          WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'), 0) AS matched_consumed_ms,
+        COALESCE((SELECT COUNT(*) FROM matched_stock_usage m
+          WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'), 0) AS usage_count,
+        (SELECT m.voice_name FROM matched_stock_usage m
+          WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'
+          ORDER BY m.created_at DESC LIMIT 1) AS last_voice_name,
+        (SELECT m.output_path FROM matched_stock_usage m
+          WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'
+          ORDER BY m.created_at DESC LIMIT 1) AS last_output_path,
+        (SELECT m.created_at FROM matched_stock_usage m
+          WHERE m.normalized_source_path=a.normalized_path AND m.status='COMPLETED'
+          ORDER BY m.created_at DESC LIMIT 1) AS last_used_at
+      FROM media_assets a
+      WHERE a.library_id=?
+      ORDER BY a.file_name COLLATE NOCASE
+    `).all(lib.id);
+
+    const files = assetRows.map((row) => {
+      const durationMs = Math.max(0, Number(row.duration_ms || 0));
+      const rawConsumed = Math.min(durationMs, Math.max(0, Number(row.matched_consumed_ms || 0)));
+      const isFullyConsumed = row.status === 'USED' || (durationMs > 0 && rawConsumed >= Math.max(0, durationMs - 500));
+      const effectiveDurationMs = Math.round(durationMs / speed);
+      const effectiveConsumedMs = isFullyConsumed ? effectiveDurationMs : Math.min(effectiveDurationMs, Math.round(rawConsumed / speed));
+      const effectiveRemainingMs = Math.max(0, effectiveDurationMs - effectiveConsumedMs);
+      const rawRemainingMs = isFullyConsumed ? 0 : Math.max(0, durationMs - rawConsumed);
+      const percentUsed = durationMs > 0
+        ? (isFullyConsumed ? 100 : Math.min(99, Math.round((rawConsumed / durationMs) * 100)))
+        : 0;
+      let usageState = 'UNUSED';
+      let usageStatus = 'AVAILABLE';
+      if (row.status === 'MISSING' || row.status === 'INVALID') {
+        usageState = row.status;
+        usageStatus = 'UNUSABLE';
+      } else if (isFullyConsumed) {
+        usageState = 'USED';
+        usageStatus = 'USED';
+      } else if (rawConsumed > 0) {
+        usageState = 'PARTIAL';
+        usageStatus = 'IN_PROGRESS';
+      }
+      return {
+        id: row.id,
+        fileName: row.file_name,
+        filePath: row.file_path,
+        fileSizeBytes: Number(row.file_size_bytes || 0),
+        durationMs,
+        effectiveDurationMs,
+        effectiveTotalMs: effectiveDurationMs,
+        rawConsumedMs: isFullyConsumed ? durationMs : rawConsumed,
+        effectiveConsumedMs,
+        effectiveUsedMs: effectiveConsumedMs,
+        rawRemainingMs,
+        effectiveRemainingMs,
+        percentUsed,
+        consumedPercent: percentUsed,
+        status: isFullyConsumed ? 'USED' : row.status,
+        usageState,
+        usageStatus,
+        usageCount: Number(row.usage_count || 0),
+        segmentsUsedCount: Number(row.usage_count || 0),
+        lastVoiceName: row.last_voice_name || '',
+        lastUsedVoice: row.last_voice_name || '',
+        lastOutputPath: row.last_output_path || '',
+        lastUsedAt: row.last_used_at || row.used_at || null
+      };
+    });
+
+    const folderNormPrefix = String(lib.root_path || '').replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
+    const historyRows = this.db.prepare(`
+      SELECT m.*
+      FROM matched_stock_usage m
+      WHERE m.status='COMPLETED'
+        AND (
+          m.normalized_source_path LIKE ?
+          OR m.normalized_source_path IN (SELECT normalized_path FROM media_assets WHERE library_id=?)
+        )
+      ORDER BY m.created_at DESC
+      LIMIT 300
+    `).all(`${folderNormPrefix}%`, lib.id);
+
+    return {
+      found: true,
+      folderExists: fs.existsSync(lib.root_path),
+      library: lib,
+      libraryId: lib.id,
+      libraryName: lib.name,
+      folderPath: lib.root_path,
+      playbackRate: speed,
+      ...stats,
+      stats,
+      files,
+      assets: files,
+      history: historyRows,
+      usageHistory: historyRows
+    };
+  }
+
+  resetStockLibraryUsage(libraryIdOrFolderPath) {
+    const lib = this.findLibraryByPathOrId(libraryIdOrFolderPath);
+    if (!lib) return { ok: false, resetAssets: 0, deletedHistory: 0 };
+    const folderNormPrefix = String(lib.root_path || '').replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
+    return this.transaction(() => {
+      const deletedHistory = this.db.prepare(`
+        DELETE FROM matched_stock_usage
+        WHERE normalized_source_path LIKE ?
+          OR normalized_source_path IN (SELECT normalized_path FROM media_assets WHERE library_id=?)
+      `).run(`${folderNormPrefix}%`, lib.id).changes;
+      this.db.prepare(`
+        DELETE FROM stock_usage_history
+        WHERE media_asset_id IN (SELECT id FROM media_assets WHERE library_id=?)
+      `).run(lib.id);
+      const resetAssets = this.db.prepare(`
+        UPDATE media_assets
+        SET status='AVAILABLE', used_at=NULL
+        WHERE library_id=? AND status IN ('USED', 'RESERVED', 'MOVING')
+      `).run(lib.id).changes;
+      return { ok: true, libraryId: lib.id, resetAssets, deletedHistory };
+    });
+  }
 
   createRenderAttempt(jobId,attemptNumber,data) { const id=createId(); this.db.prepare(`INSERT INTO render_attempts(id,job_id,attempt_number,status,encoder,video_bitrate_kbps,target_size_bytes,command_text,log_path,temp_output_path,final_output_path,started_at) VALUES(?,?,?,'RUNNING',?,?,?,?,?,?,?,?)`).run(id,jobId,attemptNumber,data.encoder,data.videoBitrateKbps,data.targetSizeBytes,data.commandText||'',data.logPath,data.tempOutputPath,data.finalOutputPath,Date.now()); return id; }
   finishRenderAttempt(id,patch) { this.updateRow('render_attempts',id,{...patch,completed_at:Date.now()}); }

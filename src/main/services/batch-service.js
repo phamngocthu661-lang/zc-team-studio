@@ -1348,16 +1348,18 @@ function shouldMoveReservedAssets(config, folders) {
 }
 
 function stockDurationPoolEnabled(config) {
-  return config?.backgroundMode === BACKGROUND_MODE.STOCK_VIDEO &&
+  return [BACKGROUND_MODE.STOCK_VIDEO, 'STORY_PIP_STOCK'].includes(config?.backgroundMode) &&
     config?.singleMode !== true &&
     config?.stockAllocationMode === 'DURATION_POOL';
 }
 
 function matchedStockOptions(config = {}) {
+  const isPool = [BACKGROUND_MODE.STOCK_VIDEO, 'STORY_PIP_STOCK'].includes(config?.backgroundMode);
+  const defaultPasses = isPool ? 1 : 2;
   return {
     playbackRate: Number(config.stockPlaybackRate || DEFAULT_STOCK_PLAYBACK_RATE),
-    extendWithClone: config.extendShortStock !== false,
-    clonePasses: Number(config.stockClonePasses || 2),
+    extendWithClone: isPool ? false : (config.extendShortStock !== false),
+    clonePasses: isPool ? 1 : Number(config.stockClonePasses || defaultPasses),
     cloneFlip: config.stockCloneFlip !== false,
     cloneZoom: Number(config.stockCloneZoom || DEFAULT_STOCK_CLONE_ZOOM),
     transformAllStock: config.transformAllStock !== false,
@@ -1780,14 +1782,15 @@ class BatchService {
     if (!mediaPlan?.segments?.length) return;
     const groups = new Map();
     for (const segment of mediaPlan.segments) {
-      const sourcePath = segment.filePath || mediaPlan.sourcePath;
-      if (!sourcePath) continue;
+      const sourcePath = segment.originalFilePath || segment.filePath || mediaPlan.sourcePath;
+      if (!sourcePath || String(sourcePath).includes('-preslice-seg-')) continue;
       if (!groups.has(sourcePath)) groups.set(sourcePath, []);
       groups.get(sourcePath).push(segment);
     }
+    const isPool = [BACKGROUND_MODE.STOCK_VIDEO, 'STORY_PIP_STOCK'].includes(config?.backgroundMode || job?.background_mode);
     for (const [sourcePath, segments] of groups.entries()) {
       const sourceDurationMs = Number(segments[0].sourceTotalDurationMs || mediaPlan.sourceDurationMs || segments[0].sourceDurationTotalMs || 0) ||
-        Math.max(...segments.map((segment) => Number(segment.sourceRangeEndMs || 0)));
+        Math.max(...segments.map((segment) => Number(segment.originalRangeEndMs ?? segment.sourceRangeEndMs ?? 0)));
       this.database.recordMatchedStockUsage({
         batchId,
         jobId: job.id,
@@ -1805,24 +1808,28 @@ class BatchService {
             cloneConsumedMs: 0,
             consumedStartMs: this.database.getMatchedStockConsumedMs(sourcePath)
           };
-      const requiredPasses = config.extendShortStock === false
+      const requiredPasses = isPool || config.extendShortStock === false
         ? 1
-        : Math.max(1, Math.min(2, Math.round(Number(config.stockClonePasses || 2))));
+        : Math.max(1, Math.min(2, Math.round(Number(config.stockClonePasses || 1))));
       const consumedMs = progress.consumedStartMs;
       const fullyConsumedMs = requiredPasses > 1 ? progress.cloneConsumedMs : progress.normalConsumedMs;
-      const fullyConsumed = fullyConsumedMs >= Math.max(0, sourceDurationMs - Number(mediaPlan.toleranceMs || 500));
+      const fullyConsumed = Boolean(progress.fullyConsumed) ||
+        (sourceDurationMs > 0 && fullyConsumedMs >= Math.max(0, sourceDurationMs - Number(mediaPlan.toleranceMs || 500)));
       if (fullyConsumed && config.moveUsedStock === true && fs.existsSync(sourcePath)) {
         const usedDirectory = folders.usedBatchFolder || ensureDirectory(path.join(path.dirname(sourcePath), 'Used'));
         const usedPath = await moveFile(sourcePath, usedDirectory);
         if (typeof this.database.markMatchedStockMoved === 'function') this.database.markMatchedStockMoved(sourcePath);
         if (typeof this.database.markMediaAssetUsedByPath === 'function') this.database.markMediaAssetUsedByPath(sourcePath, usedPath);
-        callbacks.onLog?.(`${job.voice_name}: stock đã dùng hết, đã chuyển vào Used: ${path.basename(usedPath)}.`);
+        callbacks.onLog?.(`${job.voice_name}: stock đã dùng hết 100%, đã chuyển vào Used: ${path.basename(usedPath)}.`);
       } else {
         if (fullyConsumed) {
           if (typeof this.database.markMatchedStockMoved === 'function') this.database.markMatchedStockMoved(sourcePath);
           if (typeof this.database.markMediaAssetUsedByPath === 'function') this.database.markMediaAssetUsedByPath(sourcePath, sourcePath);
         }
-        const reason = fullyConsumed ? 'đã ghi nhận dùng hết (giữ nguyên file, không chuyển folder)' : 'còn đoạn chưa dùng';
+        const remainingRawMs = Math.max(0, sourceDurationMs - consumedMs);
+        const reason = fullyConsumed
+          ? 'đã dùng hết 100% (đã khóa không dùng lặp lại)'
+          : `còn lại ${formatDuration(remainingRawMs)} chưa dùng`;
         callbacks.onLog?.(`${job.voice_name}: stock ${path.basename(sourcePath)} đã ghi nhận dùng đến ${formatDuration(consumedMs)} / ${formatDuration(sourceDurationMs)}; ${reason}.`);
       }
     }
@@ -2485,9 +2492,8 @@ class BatchService {
       ...stockAllocatorOptions(config)
     });
     callbacks.onLog?.(
-      `Stock folder: dùng theo cursor đã lưu · speed ${config.stockPlaybackRate || DEFAULT_STOCK_PLAYBACK_RATE}x · voice ${formatDuration(config.totalVoiceDurationMs || 0)} / stock hiệu dụng ${formatDuration(pool.totalDurationMs)}.`
+      `Stock folder: dùng tiếp nối không lặp lại · speed ${config.stockPlaybackRate || DEFAULT_STOCK_PLAYBACK_RATE}x · cần ${formatDuration(config.totalVoiceDurationMs || 0)} / stock còn lại ${formatDuration(pool.totalDurationMs)}.`
     );
-    callbacks.onLog?.('Stock folder: dùng hết lượt thường theo cursor trước; sau đó mới lặp lại từ đầu với lật/zoom; chỉ chuyển file vào Used sau lượt 2.');
     return pool;
   }
 
@@ -2555,6 +2561,38 @@ class BatchService {
           : 'Không tìm thấy voice MP3/WAV.'
       );
     }
+
+    // Kiểm tra sớm thời lượng Stock ngay sau khi có kịch bản (trước khi tạo Voice/Render)
+    if (!onlyRenderVoice && library?.id && [BACKGROUND_MODE.STOCK_VIDEO, 'STORY_PIP_STOCK'].includes(config.backgroundMode)) {
+      let estimatedTotalVoiceMs = 0;
+      for (const j of jobs) {
+        if (j.voicePath && fs.existsSync(j.voicePath)) {
+          try {
+            const meta = await this.ffmpeg.probe(j.voicePath);
+            estimatedTotalVoiceMs += Number(meta?.durationMs || 0);
+            continue;
+          } catch {}
+        }
+        if (j.scriptPath && fs.existsSync(j.scriptPath)) {
+          try {
+            const text = fs.readFileSync(j.scriptPath, 'utf8');
+            const { VoiceValidatorService } = require('./voice/voice-validator-service');
+            const words = new VoiceValidatorService().estimateWordCount(text);
+            // Ước tính thời lượng tối thiểu của kịch bản (khoảng ~2.9 từ/giây)
+            estimatedTotalVoiceMs += Math.max(3000, Math.round((words / 2.9) * 1000));
+          } catch {}
+        }
+      }
+      if (estimatedTotalVoiceMs > 0) {
+        this.validateStockDuration({
+          ...config,
+          libraryId: library.id,
+          stockAllocationMode: config.stockAllocationMode || (config.singleMode ? 'PER_JOB' : 'DURATION_POOL'),
+          totalVoiceDurationMs: estimatedTotalVoiceMs
+        }, callbacks);
+      }
+    }
+
     await this.prepareMissingVoices({ jobs, config, folders, callbacks, signal });
     if (onlyRenderVoice) {
       await this.hydrateJobDurations(jobs);
@@ -2651,8 +2689,8 @@ class BatchService {
       cleanupTransientJobFiles: config.cleanupTransientJobFiles !== false,
       jobGreenCacheDurationMs: Number(config.jobGreenCacheDurationMs || 30_000),
       stockPlaybackRate: Number(config.stockPlaybackRate || DEFAULT_STOCK_PLAYBACK_RATE),
-      extendShortStock: config.extendShortStock !== false,
-      stockClonePasses: Number(config.stockClonePasses || 2),
+      extendShortStock: [BACKGROUND_MODE.STOCK_VIDEO, 'STORY_PIP_STOCK'].includes(config.backgroundMode) ? false : (config.extendShortStock !== false),
+      stockClonePasses: [BACKGROUND_MODE.STOCK_VIDEO, 'STORY_PIP_STOCK'].includes(config.backgroundMode) ? 1 : Number(config.stockClonePasses || 2),
       stockCloneFlip: config.stockCloneFlip !== false,
       stockCloneZoom: Number(config.stockCloneZoom || DEFAULT_STOCK_CLONE_ZOOM),
       transformAllStock: config.transformAllStock !== false,
@@ -3410,6 +3448,10 @@ class BatchService {
           const msg = `⚡ Đã tự động cắt trước stock [đoạn ${index + 1}/${segments.length}] khớp voice (${formatDuration(neededSourceMs)}) trong ${elapsed}ms.`;
           callbacks.onLog?.(msg);
           if (logPath) fs.appendFileSync(logPath, `Pre-sliced stock [seg ${index + 1}]: ${sourceFile} (offset ${startSec}s) -> ${tempSlicedPath} (${elapsed}ms)\n`, 'utf8');
+          seg.originalFilePath = seg.originalFilePath || sourceFile;
+          seg.originalTrimStartMs = seg.originalTrimStartMs ?? trimStartMs;
+          seg.originalRangeStartMs = seg.originalRangeStartMs ?? Number(seg.sourceRangeStartMs ?? trimStartMs);
+          seg.originalRangeEndMs = seg.originalRangeEndMs ?? Number(seg.sourceRangeEndMs ?? (trimStartMs + neededSourceMs));
           seg.filePath = tempSlicedPath;
           seg.trimStartMs = 0;
           seg.sourceRangeStartMs = 0;
@@ -4532,6 +4574,7 @@ class BatchService {
         failed_jobs: counters.failed,
         skipped_jobs: counters.skipped
       });
+      this.activeBatchId = null;
       callbacks.onBatch?.({ batchId, status: stop.status, report: stop.report });
       return {
         batchId,

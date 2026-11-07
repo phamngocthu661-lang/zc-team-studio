@@ -602,22 +602,185 @@ class ScriptVideoBridgeService {
 
   _resolveValidStockLibraryAndFolder(cfg = {}, libraries = []) {
     const linked = this.settings?.linkedFolders || {};
-    const stockLibraries = libraries.filter((l) => String(l.library_type || '').toUpperCase() === 'STOCK');
-    const preferredStockLib = stockLibraries.find((l) => /16-6|OBS-Recordings/i.test(l.name || l.root_path || '')) || stockLibraries[0] || libraries[0] || null;
-    const matchedLib = libraries.find((l) => l.id === cfg.libraryId) || preferredStockLib;
-
     let rawFolder = String(cfg.mediaFolder || linked.mediaFolder || '').trim();
-    const isScratchTest = /scratch[\\/]+e2e_test_project/i.test(rawFolder);
+    const isScratchTest = /scratch[\\/]+e2e_test_project/i.test(rawFolder) || rawFolder.startsWith('(');
     if (isScratchTest) {
       rawFolder = '';
     }
+
+    const stockLibraries = libraries.filter((l) => String(l.library_type || '').toUpperCase() === 'STOCK');
+    let matchedLib = null;
+
+    if (rawFolder) {
+      const normRaw = path.resolve(rawFolder).replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
+      matchedLib = libraries.find((l) => l.root_path && path.resolve(l.root_path).replace(/[\\/]+$/, '').toLocaleLowerCase('en-US') === normRaw) || null;
+      if (!matchedLib && fs.existsSync(rawFolder) && typeof this.database?.getOrCreateLibrary === 'function') {
+        try {
+          matchedLib = this.database.getOrCreateLibrary({
+            name: path.basename(path.resolve(rawFolder)) || 'Kho Stock Video',
+            rootPath: path.resolve(rawFolder),
+            libraryType: 'STOCK'
+          });
+        } catch {}
+      }
+    }
+
+    if (!matchedLib) {
+      const preferredStockLib = stockLibraries.find((l) => /16-6|OBS-Recordings/i.test(l.name || l.root_path || '')) || stockLibraries[0] || libraries[0] || null;
+      matchedLib = libraries.find((l) => l.id === cfg.libraryId) || preferredStockLib;
+    }
+
     const libPath = (matchedLib?.root_path && fs.existsSync(matchedLib.root_path)) ? matchedLib.root_path : '';
     const mediaFolder = rawFolder || libPath || matchedLib?.root_path || '';
-    const libraryId = (!isScratchTest && libraries.some((l) => l.id === cfg.libraryId))
-      ? cfg.libraryId
-      : (matchedLib?.id || null);
+    const libraryId = matchedLib?.id || ((!isScratchTest && libraries.some((l) => l.id === cfg.libraryId)) ? cfg.libraryId : null);
 
     return { matchedLib, libraryId, mediaFolder };
+  }
+
+  _formatDurationVi(ms = 0) {
+    const totalSec = Math.max(0, Math.round(Number(ms || 0) / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2, '0')}p ${String(s).padStart(2, '0')}s`;
+    return `${m}p ${String(s).padStart(2, '0')}s`;
+  }
+
+  getStockSummarySync(folderPath = '', playbackRate = 0.75) {
+    try {
+      const libraries = this.database?.listLibraries?.() || [];
+      const resolved = this._resolveValidStockLibraryAndFolder(
+        folderPath ? { ...(this.lockedVideoConfig || {}), mediaFolder: folderPath } : (this.lockedVideoConfig || {}),
+        libraries
+      );
+      const targetFolder = String(folderPath || resolved.mediaFolder || '').trim();
+      if (!targetFolder || targetFolder.startsWith('(')) {
+        return {
+          found: false,
+          folderPath: '',
+          playbackRate: Number(playbackRate || 0.75),
+          totalCount: 0,
+          availableCount: 0,
+          inProgressCount: 0,
+          usedCount: 0,
+          totalDurationMs: 0,
+          availableDurationMs: 0,
+          usedDurationMs: 0,
+          rawTotalDurationMs: 0,
+          rawAvailableDurationMs: 0,
+          rawUsedDurationMs: 0,
+          needsScan: false
+        };
+      }
+      const speed = Math.max(0.1, Number(playbackRate || this.lockedVideoConfig?.stockPlaybackRate || 0.75));
+      const report = this.database?.getStockFolderDetailedReport?.(resolved.libraryId || targetFolder, speed);
+      const stats = report?.stats || {};
+      const folderExists = fs.existsSync(targetFolder);
+      let diskVideoCount = 0;
+      if (folderExists) {
+        try {
+          const { listFiles } = require('./media-scanner');
+          const { VIDEO_EXTENSIONS } = require('../../shared/constants');
+          diskVideoCount = listFiles(targetFolder, VIDEO_EXTENSIONS).length;
+        } catch {}
+      }
+      const dbTotalCount = Number(stats.totalCount || 0);
+      const needsScan = folderExists && diskVideoCount > 0 && dbTotalCount !== diskVideoCount;
+      if (needsScan && !this._scanningStockFolders?.has(targetFolder)) {
+        this.scanStockFolderAndGetReport(targetFolder, { forceRescan: true }).catch(() => {});
+      }
+      return {
+        found: Boolean(report?.found || folderExists),
+        folderExists,
+        libraryId: report?.library?.id || resolved.libraryId || null,
+        folderPath: targetFolder,
+        playbackRate: speed,
+        diskVideoCount,
+        unscannedFileCount: diskVideoCount,
+        totalCount: dbTotalCount || diskVideoCount,
+        availableCount: Number(stats.availableCount || 0),
+        inProgressCount: Number(stats.inProgressCount || 0),
+        usedCount: Number(stats.usedCount || 0),
+        unusableCount: Number(stats.unusableCount || 0),
+        totalDurationMs: Math.round(Number(stats.totalDurationMs || 0)),
+        availableDurationMs: Math.round(Number(stats.availableDurationMs || 0)),
+        usedDurationMs: Math.round(Number(stats.usedDurationMs || 0)),
+        rawTotalDurationMs: Math.round(Number(stats.rawTotalDurationMs || 0)),
+        rawAvailableDurationMs: Math.round(Number(stats.rawAvailableDurationMs || 0)),
+        rawUsedDurationMs: Math.round(Number(stats.rawUsedDurationMs || 0)),
+        needsScan
+      };
+    } catch {
+      return {
+        found: false,
+        folderPath: String(folderPath || ''),
+        playbackRate: Number(playbackRate || 0.75),
+        totalCount: 0,
+        availableCount: 0,
+        inProgressCount: 0,
+        usedCount: 0,
+        totalDurationMs: 0,
+        availableDurationMs: 0,
+        usedDurationMs: 0,
+        needsScan: false
+      };
+    }
+  }
+
+  async scanStockFolderAndGetReport(folderPath = '', { forceRescan = true } = {}) {
+    if (!this._scanningStockFolders) this._scanningStockFolders = new Set();
+    const libraries = this.database?.listLibraries?.() || [];
+    const resolved = this._resolveValidStockLibraryAndFolder(
+      folderPath ? { ...(this.lockedVideoConfig || {}), mediaFolder: folderPath } : (this.lockedVideoConfig || {}),
+      libraries
+    );
+    const targetFolder = String(folderPath || resolved.mediaFolder || '').trim();
+    const speed = Math.max(0.1, Number(this.lockedVideoConfig?.stockPlaybackRate || 0.75));
+    if (!targetFolder || targetFolder.startsWith('(') || !fs.existsSync(targetFolder)) {
+      return this.database?.getStockFolderDetailedReport?.(targetFolder, speed) || { found: false, folderPath: targetFolder, files: [], history: [] };
+    }
+
+    const normFolder = path.resolve(targetFolder);
+    let lib = this.database?.findLibraryByPathOrId?.(normFolder);
+    if (!lib && typeof this.database?.getOrCreateLibrary === 'function') {
+      lib = this.database.getOrCreateLibrary({
+        name: path.basename(normFolder) || 'Kho Stock Video',
+        rootPath: normFolder,
+        libraryType: 'STOCK'
+      });
+    }
+
+    if (lib && (forceRescan || (this.database.listMediaAssets(lib.id) || []).length === 0) && !this._scanningStockFolders.has(targetFolder)) {
+      this._scanningStockFolders.add(targetFolder);
+      try {
+        const { scanFolder } = require('./media-scanner');
+        const scanned = await scanFolder(lib.root_path, this.batchService?.ffmpeg, 'STOCK');
+        this.database.markLibraryScanMissing(lib.id, scanned.map((item) => item.filePath));
+        for (const item of scanned) {
+          this.database.upsertMediaAsset(lib.id, item);
+        }
+        this._emitBridgeState();
+      } catch (err) {
+        console.warn('[ScriptVideoBridge] Lỗi quét thư mục Stock:', err.message);
+      } finally {
+        this._scanningStockFolders.delete(targetFolder);
+      }
+    }
+
+    return this.database?.getStockFolderDetailedReport?.(lib?.id || normFolder, speed);
+  }
+
+  async resetStockFolderUsage(folderPath = '') {
+    const libraries = this.database?.listLibraries?.() || [];
+    const resolved = this._resolveValidStockLibraryAndFolder(
+      folderPath ? { ...(this.lockedVideoConfig || {}), mediaFolder: folderPath } : (this.lockedVideoConfig || {}),
+      libraries
+    );
+    const targetFolder = String(folderPath || resolved.mediaFolder || '').trim();
+    const res = this.database?.resetStockLibraryUsage?.(resolved.libraryId || targetFolder) || { ok: false };
+    const report = await this.scanStockFolderAndGetReport(targetFolder, { forceRescan: true });
+    this._emitBridgeState();
+    return { ...res, report };
   }
 
   summarizeLockedConfig() {
@@ -738,7 +901,8 @@ class ScriptVideoBridgeService {
       subtitleEffectLabel: subEffect,
       resolutionLabel: `${cfg.width || 1920}×${cfg.height || 1080} · ${cfg.fps || 24} FPS`,
       codec: cfg.codec || 'auto (NVENC)',
-      stockSpeedLabel: `${Number(cfg.stockPlaybackRate || 0.75)}x · ${cfg.selectionMode === 'SEQUENTIAL' ? 'Theo thứ tự' : 'Random không lặp'} · Cắt/Xóa đoạn đã dùng`
+      stockSpeedLabel: `${Number(cfg.stockPlaybackRate || 0.75)}x · Tiếp nối không lặp lại · Khóa file đã dùng hết`,
+      stockSummary: this.getStockSummarySync(resolvedMediaFolder, Number(cfg.stockPlaybackRate || 0.75))
     };
   }
 
@@ -782,6 +946,8 @@ class ScriptVideoBridgeService {
       lockedConfigSummary: this.summarizeLockedConfig(),
       lockedVideoConfig: this.lockedVideoConfig,
       activeJob: this.activeJob,
+      pausedReason: this.pausedReason || null,
+      pausedStockAlert: this.pausedStockAlert || null,
       queue: normalizedQueue
     };
   }
@@ -989,8 +1155,8 @@ class ScriptVideoBridgeService {
       maxParallelJobs: 1,
       stockAllocationMode: ['STOCK_VIDEO', 'STORY_PIP_STOCK'].includes(backgroundMode) ? 'DURATION_POOL' : 'PER_JOB',
       stockPlaybackRate: Number(base.stockPlaybackRate || 0.75),
-      extendShortStock: base.extendShortStock !== false,
-      stockClonePasses: Number(base.stockClonePasses || 2),
+      extendShortStock: ['STOCK_VIDEO', 'STORY_PIP_STOCK'].includes(backgroundMode) ? false : (base.extendShortStock !== false),
+      stockClonePasses: ['STOCK_VIDEO', 'STORY_PIP_STOCK'].includes(backgroundMode) ? 1 : Number(base.stockClonePasses || 2),
       stockCloneFlip: base.stockCloneFlip !== false,
       stockCloneZoom: Number(base.stockCloneZoom || 1.1),
       transformAllStock: base.transformAllStock !== false,
@@ -1108,10 +1274,73 @@ class ScriptVideoBridgeService {
             this._logToBoth(
               `🎉 Hoàn tất 100% Bàn #7 cho [${nextJob.scriptName}]! Thành phẩm: ${nextJob.videoOutputPath || nextJob.voiceOutputPath}`
             );
+          } else if (result?.status === 'PAUSED_INSUFFICIENT_STOCK') {
+            const details = result?.report?.details || {};
+            const errObj = Object.assign(new Error('Không đủ stock chưa sử dụng để phủ hết thời lượng voice.'), {
+              code: 'INSUFFICIENT_STOCK',
+              requiredMs: Number(details.requiredMs || 0),
+              availableMs: Number(details.availableMs || 0),
+              missingMs: Number(details.missingMs || 0)
+            });
+            throw errObj;
           } else {
             throw new Error(result?.error || `Batch kết thúc với trạng thái ${result?.status || 'UNKNOWN'}`);
           }
         } catch (err) {
+          const isInsufficientStock = err?.code === 'INSUFFICIENT_STOCK' ||
+            err?.name === 'InsufficientStockError' ||
+            /Không đủ stock/i.test(String(err?.message || ''));
+          if (isInsufficientStock) {
+            const requiredMs = Number(err?.requiredMs || 0);
+            const availableMs = Number(err?.availableMs || 0);
+            const missingMs = Number(err?.missingMs || Math.max(0, requiredMs - availableMs));
+            const reqText = this._formatDurationVi(requiredMs);
+            const availText = this._formatDurationVi(availableMs);
+            const missText = this._formatDurationVi(missingMs);
+            const pauseMsg = `⚠️ KHO STOCK ĐÃ HẾT THỜI LƯỢNG: Kịch bản [${nextJob.scriptName}] cần ${reqText} nhưng Kho Stock [${runConfig.mediaFolder || 'Chưa chọn'}] chỉ còn ${availText} (Thiếu ${missText}). Chương trình đã tạm dừng để bạn bổ sung Stock rồi chạy tiếp!`;
+
+            nextJob.status = 'PAUSED_INSUFFICIENT_STOCK';
+            nextJob.error = pauseMsg;
+            nextJob.stage = `⚠️ TẠM DỪNG: HẾT STOCK (Còn ${availText} / Cần ${reqText} · Thiếu ${missText}) — Bổ sung Stock để chạy tiếp`;
+            this.pausedReason = 'INSUFFICIENT_STOCK';
+            this.pausedStockAlert = {
+              timestamp: Date.now(),
+              jobId: nextJob.id,
+              scriptName: nextJob.scriptName,
+              scriptPath: nextJob.scriptPath,
+              niche: nextJob.niche,
+              mediaFolder: runConfig.mediaFolder || '',
+              requiredMs,
+              availableMs,
+              missingMs,
+              requiredText: reqText,
+              availableText: availText,
+              missingText: missText,
+              message: pauseMsg
+            };
+            this._updateProjectStateJson(nextJob.projectDir, {
+              video_bridge_status: 'PAUSED_INSUFFICIENT_STOCK',
+              video_bridge_error: pauseMsg,
+              live_note: pauseMsg
+            });
+            this._logToBoth(pauseMsg);
+            try {
+              const stopReq = http.request({
+                hostname: '127.0.0.1',
+                port: SCRIPT_STUDIO_PORT,
+                path: '/api/stop_worker',
+                method: 'POST',
+                timeout: 1500,
+                headers: { 'Content-Type': 'application/json', 'Content-Length': 2 }
+              });
+              stopReq.on('error', () => {});
+              stopReq.write('{}');
+              stopReq.end();
+            } catch {}
+            this._sendToRenderer('scriptBridge:insufficientStock', this.pausedStockAlert);
+            break;
+          }
+
           nextJob.status = 'FAILED';
           nextJob.error = err?.message || String(err);
           nextJob.stage = `❌ Lỗi: ${nextJob.error}`;
@@ -1132,6 +1361,52 @@ class ScriptVideoBridgeService {
       this.isProcessingQueue = false;
       this._emitBridgeState();
     }
+  }
+
+  async resumeAfterStockReplenished({ newMediaFolder = '' } = {}) {
+    const cleanNewFolder = String(newMediaFolder || '').trim();
+    if (cleanNewFolder && !cleanNewFolder.startsWith('(') && fs.existsSync(cleanNewFolder)) {
+      this.saveSettings({
+        linkedFolders: {
+          ...(this.settings?.linkedFolders || {}),
+          mediaFolder: cleanNewFolder
+        }
+      });
+      if (this.lockedVideoConfig) {
+        this.lockedVideoConfig.mediaFolder = cleanNewFolder;
+      }
+      if (this.channelConfigs && typeof this.channelConfigs === 'object') {
+        for (const k of Object.keys(this.channelConfigs)) {
+          if (this.channelConfigs[k]) this.channelConfigs[k].mediaFolder = cleanNewFolder;
+        }
+      }
+    }
+
+    const report = await this.scanStockFolderAndGetReport(cleanNewFolder || '', { forceRescan: true });
+    let resumedCount = 0;
+    for (const item of this.queue) {
+      if (item.status === 'PAUSED_INSUFFICIENT_STOCK') {
+        item.status = 'WAITING_GPU';
+        item.error = '';
+        item.stage = '🔄 ĐÃ BỔ SUNG STOCK ➔ TIẾP TỤC CHẠY BÀN #7';
+        resumedCount += 1;
+      }
+    }
+    this.pausedReason = null;
+    this.pausedStockAlert = null;
+    this._logToBoth(
+      `✅ Đã quét lại Kho Stock (${this._formatDurationVi(report?.stats?.availableDurationMs || 0)} khả dụng) và tiếp tục chạy ${resumedCount} kịch bản đang tạm dừng!`
+    );
+    this._emitBridgeState();
+    this._processQueue().catch((err) => {
+      console.error('[ScriptVideoBridge] Lỗi khi chạy tiếp sau khi bổ sung Stock:', err);
+    });
+    return {
+      ok: true,
+      resumedCount,
+      report,
+      state: this.getPublicState()
+    };
   }
 
   enqueueFolderScripts(folderPath) {
@@ -1159,7 +1434,7 @@ class ScriptVideoBridgeService {
   }
 
   clearCompletedQueue() {
-    this.queue = this.queue.filter((item) => ['WAITING_GPU', 'WAITING_BATCH', 'RENDERING'].includes(item.status));
+    this.queue = this.queue.filter((item) => ['WAITING_GPU', 'WAITING_BATCH', 'RENDERING', 'PAUSED_INSUFFICIENT_STOCK'].includes(item.status));
     this._emitBridgeState();
     return this.getPublicState();
   }
@@ -1216,6 +1491,40 @@ class ScriptVideoBridgeService {
             bounds: win.getBounds()
           } : null;
           sendJson(res, 200, { ...this.getPublicState(), windowInfo });
+          return;
+        }
+
+        if (req.method === 'GET' && pathname === '/api/bridge/stock-report') {
+          const folder = urlObj.searchParams.get('folder') || '';
+          const rescan = urlObj.searchParams.get('rescan') === '1';
+          const report = await this.scanStockFolderAndGetReport(folder, { forceRescan: rescan });
+          sendJson(res, 200, { ok: true, report, state: this.getPublicState() });
+          return;
+        }
+
+        if (req.method === 'POST' && pathname === '/api/bridge/stock-report') {
+          const body = await readJsonBody(req);
+          const action = String(body.action || 'report').toLowerCase();
+          const folder = String(body.folder || body.mediaFolder || '').trim();
+          if (action === 'reset') {
+            const out = await this.resetStockFolderUsage(folder);
+            sendJson(res, 200, { ok: true, ...out, state: this.getPublicState() });
+            return;
+          }
+          if (action === 'resume') {
+            const out = await this.resumeAfterStockReplenished({ newMediaFolder: folder });
+            sendJson(res, 200, out);
+            return;
+          }
+          const report = await this.scanStockFolderAndGetReport(folder, { forceRescan: body.forceRescan !== false });
+          sendJson(res, 200, { ok: true, report, state: this.getPublicState() });
+          return;
+        }
+
+        if (req.method === 'POST' && pathname === '/api/bridge/resume-stock') {
+          const body = await readJsonBody(req);
+          const out = await this.resumeAfterStockReplenished({ newMediaFolder: body.mediaFolder || body.folder || '' });
+          sendJson(res, 200, out);
           return;
         }
 

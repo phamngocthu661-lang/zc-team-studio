@@ -1,10 +1,11 @@
 {
-  "version": "V1.0.16",
-  "build_number": 130,
-  "released_at": "2026-11-07 16:06:26",
+  "version": "V1.0.17",
+  "build_number": 131,
+  "released_at": "2026-11-07 16:54:55",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.17 (Build #131) - 2026-11-07 16:54:55] Bổ sung 06 video Phông Xanh sub-001..sub-006 vào Kho_Green & Nâng cấp Quản lý Kho Stock (Hiển thị thời lượng còn lại, Lịch sử dùng Stock, Khóa chống lặp 100% và Tự động tạm dừng khi hết Stock)",
     "[V1.0.16 (Build #130) - 2026-11-07 16:06:26] V1.0.16 (Build #130): Bổ sung trọn bộ 07 video Phông Xanh MC mới (MC-001.mp4 .. MC-007.mp4 chuẩn 1920x1080) vào Kho_Green, tự động tải về và đăng ký vào Kho Tài Nguyên Toàn Cục (Kho_Green) & Thiết kế Template khi máy khách cập nhật.",
     "[V1.0.15 (Build #129) - 2026-11-07 10:44:43] V1.0.15 (Build #129): Khắc phục triệt để lỗi không chọn Model ChatGPT trước khi viết: (1) Chờ nút Select ChatGPT model xuất hiện trên DOM khi vừa mở Tab mới trước khi dán chữ; (2) Mở menu Radix UI bằng chuỗi sự kiện chuột chuẩn PointerEvent('pointerdown') (triggerRadixClick); (3) Tự động chọn đúng cả 2 tầng trong menu ChatGPT: Tích chọn Model Radio (GPT-6 hoặc GPT-5.6 Sol) + Điều chỉnh thanh trượt 3 nấc Thinking Effort (0=Instant/Low, 1=Medium, 2=High) và tự động khóa chế độ ChatGPT (không nhảy sang Codex); (4) Nâng cấp thanh chọn Model & Effort trên giao diện Studio.",
     "[V1.0.14 (Build #128) - 2026-11-07 09:26:00] V1.0.14 (Build #128): Phát hành chính thức bản sửa triệt để 11 lỗi thực chiến Pipeline 15 Key trên ChatGPT Web (chống vòng lặp vô tận Bước 3, khóa 1 vòng sửa Bước 4, cô lập 100% nhãn Key ở Bàn #2-#5, nhúng Canon Lock & Continuity Anchor vào Lần viết 2/3 & 3/3, bảo vệ ngoặc thoại tiếng Nhật, khóa nguyên tử window.__zcTabOwner chống trùng Tab đa tiến trình, nâng ngưỡng Auto-Heal 95s tương thích chế độ Thinking) + Tự động chuẩn hóa thư mục & gom Skill khi máy khách cập nhật từ các bản cũ (V1.0.0..V1.0.7).",
@@ -18,8 +19,7 @@
     "[V1.0.6 (Build #120) - 2026-11-05 08:58:21] Nâng cấp V1.0.6: Gộp gọn thanh công cụ, loại bỏ hoàn toàn các ô chọn bị lặp 2 lần (CHỌN KEY vs GIAO VIỆC, Chế độ Tiêu đề, Tự động Bàn #7)",
     "[V1.0.5 (Build #119) - 2026-11-05 08:50:19] Nâng cấp V1.0.5: Mở rộng khung Bàn #7 toàn màn hình hiển thị 16-22 video cùng lúc, tách độc lập 100% dữ liệu & giao diện giữa các Tab/Kênh (Homeless/Mafia/Mexico)",
     "[V1.0.4 (Build #118) - 2026-11-05 01:49:57] V1.0.4: Sửa triệt để lỗi dính nhãn Pasted text(.txtDocument) và lỗi dính liền các đoạn văn <p> khi thu hoạch kịch bản Homeless/Mafia/Mexico",
-    "[V1.0.3 (Build #117) - 2026-11-04 22:17:48] Fix dynamic HTML loading in mafia_dashboard_server.py for V1.0.3 (Build #117)",
-    "[V1.0.3 (Build #117) - 2026-11-04 22:16:14] Tách giao diện Viết Kịch Bản & Render thành 4 Tab nhỏ độc lập: (1) Viết Kịch Bản & Tiêu Đề gọn gàng, (2) Render Video & Tiến Độ GPU đặt bảng tiến độ lên đầu, (3) Nhật Ký Log Hệ Thống riêng biệt (kèm bộ lọc & tìm kiếm), (4) 9 Bàn Agent & 3 Acc ChatGPT."
+    "[V1.0.3 (Build #117) - 2026-11-04 22:17:48] Fix dynamic HTML loading in mafia_dashboard_server.py for V1.0.3 (Build #117)"
   ],
-  "release_date": "2026-11-07 16:06:26"
+  "release_date": "2026-11-07 16:54:55"
 }

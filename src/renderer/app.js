@@ -496,12 +496,12 @@ async function saveTemplate(){pullTemplateControls();normalizeLayerOrder();if(st
 function libraryStatValue(stats,key,snake){return Number(stats?.[key]??stats?.[snake]??0);}
 function libraryAvailableDuration(stats){return libraryStatValue(stats,'availableDurationMs','available_duration_ms');}
 function librarySelectLabel(library){const available=formatDuration(libraryAvailableDuration(library));return String(library.library_type||'').toUpperCase()==='STOCK'?`${library.name} · STOCK · còn dùng ${available}`:`${library.name} · ${library.library_type}`;}
-function libraryStatsText(stats){if(!stats)return'Chưa quét thư viện.';const available=formatDuration(libraryAvailableDuration(stats));return`Stock còn sử dụng được: <strong>${available}</strong> · Đã dùng: <strong>${formatDuration(libraryStatValue(stats,'usedDurationMs','used_duration_ms'))}</strong> · Tổng khả dụng: ${formatDuration(libraryStatValue(stats,'totalDurationMs','total_duration_ms'))} · Không dùng được: ${libraryStatValue(stats,'unusableCount','unusable_count')}`;}
+function libraryStatsText(stats){if(!stats)return'Chưa quét thư viện.';const available=formatDuration(libraryAvailableDuration(stats));return`Stock còn sử dụng được (0.75x): <strong style="color:#34d399;">${available}</strong> · Đã dùng: <strong style="color:#fbbf24;">${formatDuration(libraryStatValue(stats,'usedDurationMs','used_duration_ms'))}</strong> · Tổng khả dụng: ${formatDuration(libraryStatValue(stats,'totalDurationMs','total_duration_ms'))} · Không dùng được: ${libraryStatValue(stats,'unusableCount','unusable_count')} &nbsp;<button type="button" onclick="window.openStockHistoryModal(state.selectedLibrary?.root_path||'')" style="padding:3px 9px;font-size:11px;font-weight:700;background:#312e81;color:#c7d2fe;border:1px solid #6366f1;border-radius:5px;cursor:pointer;">📜 Xem Lịch Sử & Chi Tiết Từng File</button>`;}
 function renderLibraryStats(stats){if($('libraryStats'))$('libraryStats').innerHTML=libraryStatsText(stats);}
 function libraryListStatsLabel(library){return String(library.library_type||'').toUpperCase()==='STOCK'?`<strong>Stock còn dùng ${formatDuration(libraryAvailableDuration(library))}</strong> · Đã dùng ${formatDuration(libraryStatValue(library,'usedDurationMs','used_duration_ms'))}`:`${library.asset_count||0} file trong thư viện`;}
 function renderLibraries(){const root=$('libraryList');root.innerHTML=state.libraries.map(l=>`<div class="list-item ${state.selectedLibrary?.id===l.id?'active':''}" data-library="${l.id}"><strong>${l.name}</strong><small>${l.library_type} · ${l.asset_count||0} files</small><small>${libraryListStatsLabel(l)}</small></div>`).join('')||'<div class="empty">Chưa có thư viện.</div>';root.querySelectorAll('[data-library]').forEach(el=>el.onclick=()=>selectLibrary(el.dataset.library));}
 async function selectLibrary(id){state.selectedLibrary=state.libraries.find(l=>l.id===id);renderLibraries();$('libraryTitle').textContent=state.selectedLibrary?.name||'Tài nguyên';const assets=await api.libraries.assets(id);renderAssets(assets);renderLibraryStats(state.selectedLibrary);}
-function renderAssets(assets){$('assetGrid').innerHTML=assets.map(a=>`<div class="asset"><strong title="${a.file_path}">${a.file_name}</strong><small>${a.asset_type} · ${formatDuration(a.duration_ms)} · ${formatBytes(a.file_size_bytes)}</small><span class="badge ${a.status}">${a.status}</span></div>`).join('')||'<div class="empty">Chưa quét file.</div>';}
+function renderAssets(assets){$('assetGrid').innerHTML=assets.map(a=>`<div class="asset"><strong title="${htmlEscape(a.file_path)}">${htmlEscape(a.file_name)}</strong><small>${a.asset_type} · Gốc: ${formatDuration(a.duration_ms)} (0.75x: ${formatDuration(Math.round(Number(a.duration_ms||0)/0.75))}) · ${formatBytes(a.file_size_bytes)}</small><span class="badge ${a.status}">${a.status==='USED'?'ĐÃ DÙNG HẾT (USED)':a.status}</span></div>`).join('')||'<div class="empty">Chưa quét file.</div>';}
 async function newLibrary(){const root=await api.chooseDirectory({title:'Chọn thư mục media'});if(!root)return;const type=(await requestText('Thêm thư viện','Loại thư viện: STOCK, IMAGE, LOGO, OVERLAY, GREENSCREEN','STOCK'))?.toUpperCase();if(!type)return;let usedPath=null;if(type==='STOCK')usedPath=await api.chooseDirectory({title:'Chọn thư mục Used'})||`${root}\\Used`;const name=await requestText('Thêm thư viện','Tên thư viện:',root.split(/[\\/]/).pop());await api.libraries.create({name:name||'Media Library',rootPath:root,usedPath,libraryType:type});state.libraries=await api.libraries.list();fillSelects();renderLibraries();toast('Đã thêm thư viện.');}
 async function deleteSelectedLibraryFiles(){const library=state.selectedLibrary;if(!library)return toast('Chọn thư viện cần xóa.',true);const paths=[library.root_path,library.used_path].filter(Boolean).join('\n');if(!confirm(`Xóa VĨNH VIỄN thư mục media khỏi ổ đĩa?\n\n${paths}\n\nThao tác này cũng xóa thư viện khỏi danh sách và không thể hoàn tác.`))return;const result=await api.libraries.deleteWithFiles(library.id);state.selectedLibrary=null;await loadAll();toast(`Đã xóa ${result.deletedDirs?.length||0} thư mục khỏi ổ đĩa.`);}
 
@@ -1265,7 +1265,7 @@ async function openJobGreenEditorV3(initialJob){
   },30);
 }
 
-function collectBatch(){const library=state.libraries.find(l=>l.id===$('batchLibrary').value),mode=$('backgroundMode').value,voiceFolder=$('voiceFolder').value,voiceSourceMode=$('batchVoiceSourceMode')?.value||'EXISTING_AUDIO',voiceProfileId=$('batchVoiceProfileSelect')?.value||'default',channelKey=$('topGlobalKeySelect')?.value||localStorage.getItem('zc_active_channel_key')||'03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';const isStockOrImage=['STOCK_VIDEO','IMAGE_SEQUENCE','STORY_PIP_STOCK'].includes(mode);return{channelKey,batchName:$('batchName').value,projectId:$('batchProject').value||null,templateId:$('batchTemplate').value||null,backgroundMode:mode,storyPipOverStock:mode==='STORY_PIP_STOCK',storyMode:$('farmStoryDivisionMode')?.value||'CUE',imageCount:Number($('farmStoryCountInput')?.value||30),characterDna:$('farmStoryCharacterDna')?.value||'',voiceSourceMode,voiceProfileId,voiceFolder,srtFolder:voiceFolder,autoGenerateSrt:$('batchAcceleration').value!=='FULL_GPU_ZERO_COPY',whisperModel:'small',whisperLanguage:$('batchSrtLanguage')?.value||'auto',srtMaxChars:42,srtMaxDur:4.2,jobIntroFolder:$('jobIntroFolder')?.value||'',batchJobIntroPath:$('batchJobIntro')?.value||'',jobIntroAudioMode:String($('batchJobIntroAudioMode')?.value||'MUTE'),jobIntroTransition:'NONE',jobIntroTransitionMs:0,jobIntroNoiseOverlay:false,enableJobGreenLayer:false,jobGreenFolder:'',jobGreenConfigs:state.jobGreenConfigs||{},defaultFolderImageTransform:loadDefaultFolderImageTransform(),requireJobGreenAsset:false,requireJobGreenEdit:false,cleanupJobGreenCache:true,jobGreenCacheDurationMs:30000,libraryId:isStockOrImage?library?.id||null:null,mediaFolder:isStockOrImage?($('mediaFolder').value||library?.root_path||''):'',usedFolder:'',manualMediaPath:mode==='MANUAL_MEDIA'?$('manualMediaPath').value:'',outputFolder:$('outputFolder').value||(voiceSourceMode==='ONLY_RENDER_VOICE'?voiceFolder:''),width:Number($('batchWidth').value),height:Number($('batchHeight').value),fps:Number($('batchFps').value),subtitle:renderSubtitleOverride('batch'),codec:$('batchCodec').value,accelerationMode:$('batchAcceleration').value,gpuIndex:Number($('batchGpuIndex').value??-1),performanceProfile:$('batchPerformance').value,maxParallelJobs:Number($('batchWorkers').value||1),stockAllocationMode:['STOCK_VIDEO','STORY_PIP_STOCK'].includes(mode)?'DURATION_POOL':'PER_JOB',stockPlaybackRate:.75,extendShortStock:true,stockClonePasses:2,stockCloneFlip:true,stockCloneZoom:1.1,transformAllStock:true,forceStockCover:true,deleteConsumedMatchedStock:true,moveUsedStock:false,filterComplexThreads:Math.max(2,Math.min(16,(navigator.hardwareConcurrency||6)-1)),gbPerHour:Number($('batchGbHour').value),imageDurationMs:Number($('imageSeconds').value)*1000,allowImageFlip:$('allowFlip').checked,maxRenderAttempts:Number($('batchAttempts').value),selectionMode:$('selectionMode').value,transitionItems:selectedTransitions('batch'),minTransitionMs:Number($('batchTransitionMin')?.value||600),maxTransitionMs:Number($('batchTransitionMax')?.value||900),avoidRepeatCount:Number($('batchAvoidRepeat')?.value??2),safetyPercent:95,audioBitrateKbps:256,cpuPreset:'veryfast',allowCpuFallback:true};}
+function collectBatch(){const library=state.libraries.find(l=>l.id===$('batchLibrary').value),mode=$('backgroundMode').value,voiceFolder=$('voiceFolder').value,voiceSourceMode=$('batchVoiceSourceMode')?.value||'EXISTING_AUDIO',voiceProfileId=$('batchVoiceProfileSelect')?.value||'default',channelKey=$('topGlobalKeySelect')?.value||localStorage.getItem('zc_active_channel_key')||'03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';const isStockOrImage=['STOCK_VIDEO','IMAGE_SEQUENCE','STORY_PIP_STOCK'].includes(mode);return{channelKey,batchName:$('batchName').value,projectId:$('batchProject').value||null,templateId:$('batchTemplate').value||null,backgroundMode:mode,storyPipOverStock:mode==='STORY_PIP_STOCK',storyMode:$('farmStoryDivisionMode')?.value||'CUE',imageCount:Number($('farmStoryCountInput')?.value||30),characterDna:$('farmStoryCharacterDna')?.value||'',voiceSourceMode,voiceProfileId,voiceFolder,srtFolder:voiceFolder,autoGenerateSrt:$('batchAcceleration').value!=='FULL_GPU_ZERO_COPY',whisperModel:'small',whisperLanguage:$('batchSrtLanguage')?.value||'auto',srtMaxChars:42,srtMaxDur:4.2,jobIntroFolder:$('jobIntroFolder')?.value||'',batchJobIntroPath:$('batchJobIntro')?.value||'',jobIntroAudioMode:String($('batchJobIntroAudioMode')?.value||'MUTE'),jobIntroTransition:'NONE',jobIntroTransitionMs:0,jobIntroNoiseOverlay:false,enableJobGreenLayer:false,jobGreenFolder:'',jobGreenConfigs:state.jobGreenConfigs||{},defaultFolderImageTransform:loadDefaultFolderImageTransform(),requireJobGreenAsset:false,requireJobGreenEdit:false,cleanupJobGreenCache:true,jobGreenCacheDurationMs:30000,libraryId:isStockOrImage?library?.id||null:null,mediaFolder:isStockOrImage?($('mediaFolder').value||library?.root_path||''):'',usedFolder:'',manualMediaPath:mode==='MANUAL_MEDIA'?$('manualMediaPath').value:'',outputFolder:$('outputFolder').value||(voiceSourceMode==='ONLY_RENDER_VOICE'?voiceFolder:''),width:Number($('batchWidth').value),height:Number($('batchHeight').value),fps:Number($('batchFps').value),subtitle:renderSubtitleOverride('batch'),codec:$('batchCodec').value,accelerationMode:$('batchAcceleration').value,gpuIndex:Number($('batchGpuIndex').value??-1),performanceProfile:$('batchPerformance').value,maxParallelJobs:Number($('batchWorkers').value||1),stockAllocationMode:['STOCK_VIDEO','STORY_PIP_STOCK'].includes(mode)?'DURATION_POOL':'PER_JOB',stockPlaybackRate:.75,extendShortStock:false,stockClonePasses:1,stockCloneFlip:true,stockCloneZoom:1.1,transformAllStock:true,forceStockCover:true,deleteConsumedMatchedStock:true,moveUsedStock:false,filterComplexThreads:Math.max(2,Math.min(16,(navigator.hardwareConcurrency||6)-1)),gbPerHour:Number($('batchGbHour').value),imageDurationMs:Number($('imageSeconds').value)*1000,allowImageFlip:$('allowFlip').checked,maxRenderAttempts:Number($('batchAttempts').value),selectionMode:$('selectionMode').value,transitionItems:selectedTransitions('batch'),minTransitionMs:Number($('batchTransitionMin')?.value||600),maxTransitionMs:Number($('batchTransitionMax')?.value||900),avoidRepeatCount:Number($('batchAvoidRepeat')?.value??2),safetyPercent:95,audioBitrateKbps:256,cpuPreset:'veryfast',allowCpuFallback:true};}
 async function preflight(){
   const imgDir=$('projectImageFolder')?.value?.trim()||'';
   if(imgDir&&typeof scanAndRenderProjectImageFolderList==='function'){
@@ -3002,6 +3002,58 @@ function renderScriptBridgeState(st) {
     copyCheck.checked = Boolean(st.settings.copyMp4ToTongHop);
   }
 
+function formatShortStockDuration(ms) {
+  const totalSec = Math.max(0, Math.round(Number(ms || 0) / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}p`;
+  if (m > 0) return `${m}p ${String(s).padStart(2, '0')}s`;
+  return `${s}s`;
+}
+
+let _stockAutoScanningFolder = '';
+let _lastShownInsufficientStockAlertAt = '';
+window._autoScanStockFolderIfNeeded = async function(folderPath) {
+  const fp = String(folderPath || '').trim();
+  if (!fp || fp.startsWith('(') || _stockAutoScanningFolder === fp) return;
+  _stockAutoScanningFolder = fp;
+  try {
+    await api.scriptBridge?.stockReport?.(fp, true);
+    const latest = await api.scriptBridge?.status?.();
+    if (latest) renderScriptBridgeState(latest);
+  } catch {}
+};
+
+function buildInlineStockBadgeHtml(stSum, mediaFolder) {
+  const cleanFolder = String(mediaFolder || '').trim();
+  if (!cleanFolder || cleanFolder.startsWith('(')) {
+    return `<span style="padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;background:#450a0a;color:#fca5a5;border:1px solid #ef4444;margin-left:4px;">⚠️ Chưa chọn kho</span>`;
+  }
+  if (!stSum || !stSum.folderExists) {
+    return `<span style="padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;background:#450a0a;color:#fca5a5;border:1px solid #ef4444;margin-left:4px;">⚠️ Không tìm thấy thư mục</span>`;
+  }
+  if (stSum.needsScan) {
+    setTimeout(() => window._autoScanStockFolderIfNeeded(cleanFolder), 80);
+    return `<span onclick="event.stopPropagation();window.openStockHistoryModal('${htmlEscape(cleanFolder.replace(/\\/g, '\\\\'))}', true);" style="padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;background:#1e293b;color:#38bdf8;border:1px solid #0284c7;cursor:pointer;margin-left:4px;" title="Đang quét thời lượng video trong kho Stock...">⏳ Đang tính thời lượng (${stSum.unscannedFileCount || 0} file)...</span>`;
+  }
+  if (Number(stSum.totalCount || 0) === 0) {
+    return `<span onclick="event.stopPropagation();window.openStockHistoryModal('${htmlEscape(cleanFolder.replace(/\\/g, '\\\\'))}', true);" style="padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;background:#450a0a;color:#fca5a5;border:1px solid #ef4444;cursor:pointer;margin-left:4px;">⚠️ Kho trống (0 video)</span>`;
+  }
+  const availMs = Number(stSum.availableDurationMs || 0);
+  const usedMs = Number(stSum.usedDurationMs || 0);
+  const availFiles = Number(stSum.availableCount || 0);
+  const totalFiles = Number(stSum.totalCount || 0);
+  if (availMs <= 1000) {
+    return `<span onclick="event.stopPropagation();window.openStockHistoryModal('${htmlEscape(cleanFolder.replace(/\\/g, '\\\\'))}', false);" style="padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:800;background:#7f1d1d;color:#fecaca;border:1px solid #ef4444;cursor:pointer;margin-left:4px;box-shadow:0 0 8px rgba(239,68,68,0.45);" title="Kho Stock đã dùng hết! Bấm để xem lịch sử dùng Stock hoặc bổ sung/reset Stock">🚨 HẾT STOCK (Còn 0p 00s · Đã dùng ${formatShortStockDuration(usedMs)} · 0/${totalFiles} file)</span>`;
+  }
+  const isLow = availMs < 25 * 60 * 1000;
+  const bg = isLow ? '#451a03' : '#064e3b';
+  const col = isLow ? '#fde047' : '#6ee7b7';
+  const bdr = isLow ? '#f59e0b' : '#10b981';
+  const icon = isLow ? '⚠️' : '⏱️';
+  return `<span onclick="event.stopPropagation();window.openStockHistoryModal('${htmlEscape(cleanFolder.replace(/\\/g, '\\\\'))}', false);" style="padding:1px 7px;border-radius:4px;font-size:10.5px;font-weight:700;background:${bg};color:${col};border:1px solid ${bdr};cursor:pointer;margin-left:4px;" title="Thời gian Stock còn sử dụng được (ở tốc độ 0.75x, mỗi Stock chỉ dùng 1 lần không lặp). Bấm để xem chi tiết từng file & lịch sử dùng Stock.">${icon} Còn: <strong>${formatShortStockDuration(availMs)}</strong> · Đã dùng: ${formatShortStockDuration(usedMs)} (${availFiles}/${totalFiles} file)</span>`;
+}
   const summaryEl = $('bridgeLockedConfigSummaryText');
   if ($('bridgeKeyProjectSelect') && $('batchProject') && $('bridgeKeyProjectSelect').value !== $('batchProject').value) {
     $('bridgeKeyProjectSelect').value = $('batchProject').value;
@@ -3014,6 +3066,7 @@ function renderScriptBridgeState(st) {
     const activeKey = $('topGlobalKeySelect')?.value || st.activeChannelKey || '03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';
     const tplCount = Number(s.templateLayersCount || 0);
     const disColor = s.disclaimerEnabled ? '#34d399' : '#94a3b8';
+    const stockBadgeHtml = buildInlineStockBadgeHtml(s.stockSummary, s.mediaFolder);
     summaryEl.style.cursor = 'pointer';
     summaryEl.title = 'Bấm để xem bảng chi tiết Cấu hình xuất ra, Template, Disclaimer và các Folder chứa dữ liệu';
     summaryEl.onclick = () => openLockedConfigInspectorModal();
@@ -3023,10 +3076,18 @@ function renderScriptBridgeState(st) {
       `<span>🎨 Template: <strong style="color:#38bdf8;">${htmlEscape(s.templateName)}${tplCount ? ` (${tplCount} layers)` : ''}</strong></span>`,
       `<span>⚠️ Disclaimer: <strong style="color:${disColor};">${htmlEscape(s.disclaimerLabel || '⚪ TẮT')}</strong></span>`,
       `<span>🎙️ Giọng AI: <strong style="color:#34d399;">${htmlEscape(s.voiceProfileName)}</strong></span>`,
-      `<span>🎞️ Kho Stock: <strong style="color:#e2e8f0;" title="${htmlEscape(s.mediaFolder)}">${htmlEscape(s.mediaFolder)}</strong> <button type="button" onclick="event.stopPropagation();window.browseLinkedFolder('mediaFolder','Chọn Folder Kho Stock Video nền');" style="padding:1px 6px;font-size:10px;background:#1e3a8a;color:#93c5fd;border:1px solid #3b82f6;border-radius:4px;cursor:pointer;margin-left:3px;">📁 Chọn</button></span>`,
+      `<span>🎞️ Kho Stock: <strong style="color:#e2e8f0;" title="${htmlEscape(s.mediaFolder)}">${htmlEscape(s.mediaFolder)}</strong>${stockBadgeHtml} <button type="button" onclick="event.stopPropagation();window.browseLinkedFolder('mediaFolder','Chọn Folder Kho Stock Video nền');" style="padding:1px 6px;font-size:10px;background:#1e3a8a;color:#93c5fd;border:1px solid #3b82f6;border-radius:4px;cursor:pointer;margin-left:3px;">📁 Chọn</button> <button type="button" onclick="event.stopPropagation();window.openStockHistoryModal();" style="padding:1px 6px;font-size:10px;background:#312e81;color:#c7d2fe;border:1px solid #6366f1;border-radius:4px;cursor:pointer;margin-left:2px;" title="Xem lịch sử dùng Stock, thời lượng còn lại từng file & Reset kho Stock">📜 Lịch sử</button></span>`,
       `<span>💬 Sub: <strong style="color:#c084fc;">${htmlEscape(s.subtitleEffectLabel)}</strong></span>`,
       `<span>📂 Output MP4: <strong style="color:#93c5fd;" title="${htmlEscape(s.outputFolder)}">${htmlEscape(s.outputFolder)}</strong> <button type="button" onclick="event.stopPropagation();window.browseLinkedFolder('outputFolder','Chọn Folder Xuất Video Thành Phẩm (.mp4)');" style="padding:1px 6px;font-size:10px;background:#064e3b;color:#6ee7b7;border:1px solid #10b981;border-radius:4px;cursor:pointer;margin-left:3px;">📁 Chọn</button></span>`
     ].join('<span style="color:#334155;">|</span>');
+  }
+
+  if (st.pausedReason === 'INSUFFICIENT_STOCK' && st.pausedStockAlert) {
+    const alertStamp = String(st.pausedStockAlert.pausedAt || st.pausedStockAlert.scriptName || '1');
+    if (_lastShownInsufficientStockAlertAt !== alertStamp) {
+      _lastShownInsufficientStockAlertAt = alertStamp;
+      setTimeout(() => window.openInsufficientStockModal(st.pausedStockAlert), 150);
+    }
   }
 
   const queueBox = $('bridgeQueueBox');
@@ -3131,21 +3192,44 @@ function renderScriptBridgeState(st) {
     } else {
       const activeCount = items.filter(x => ['RENDERING', 'WAITING_GPU', 'WAITING_BATCH'].includes(x.status)).length;
       const doneCount = items.filter(x => x.status === 'COMPLETED').length;
+      const pausedStockJob = allItems.find(x => x.status === 'PAUSED_INSUFFICIENT_STOCK');
       if (queueTitle) {
-        queueTitle.textContent = `🎬 Bàn #7 [${chanLabel}] — Tiến Độ Tự Động Tạo Voice & Render Video GPU (${doneCount}/${items.length} hoàn tất · ${activeCount} đang xử lý)`;
+        queueTitle.textContent = pausedStockJob
+          ? `⏸️ Bàn #7 [${chanLabel}] — TẠM DỪNG DO HẾT STOCK (${doneCount}/${items.length} hoàn tất · Đang chờ bổ sung Stock)`
+          : `🎬 Bàn #7 [${chanLabel}] — Tiến Độ Tự Động Tạo Voice & Render Video GPU (${doneCount}/${items.length} hoàn tất · ${activeCount} đang xử lý)`;
       }
+      const alertObj = st.pausedStockAlert || pausedStockJob?.stockAlert || null;
+      const pausedBannerHtml = (st.pausedReason === 'INSUFFICIENT_STOCK' || pausedStockJob)
+        ? `<div style="padding:12px 14px;background:rgba(127,29,29,0.35);border:1px solid #ef4444;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+            <div style="font-size:12.5px;color:#fecaca;">
+              <strong style="color:#f87171;font-size:13.5px;">🚨 ĐÃ TẠM DỪNG CHƯƠNG TRÌNH DO THIẾU VIDEO STOCK TRONG KHO!</strong><br/>
+              Kịch bản <strong>${htmlEscape(alertObj?.scriptName || pausedStockJob?.scriptName || '')}</strong> đã viết xong nhưng kho Stock (<code>${htmlEscape(alertObj?.mediaFolder || st.lockedConfigSummary?.mediaFolder || '')}</code>) không đủ thời lượng để ghép video${alertObj?.requiredText ? ` (Cần <strong>${htmlEscape(alertObj.requiredText)}</strong> · Còn lại <strong>${htmlEscape(alertObj.availableText || '0p')}</strong> · Thiếu <strong style="color:#fde047;">${htmlEscape(alertObj.missingText || '')}</strong>)` : ''}.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" onclick="window.resumeAfterStockReplenished('')" style="padding:6px 12px;font-size:11.5px;font-weight:800;background:#059669;color:#ffffff;border:1px solid #34d399;border-radius:6px;cursor:pointer;">🔄 Đã Thêm Stock Vào Kho ➔ Chạy Tiếp Ngay</button>
+              <button type="button" onclick="window.pickNewStockFolderAndResume()" style="padding:6px 12px;font-size:11.5px;font-weight:700;background:#1e3a8a;color:#e0f2fe;border:1px solid #3b82f6;border-radius:6px;cursor:pointer;">📁 Chọn Kho Stock Mới &amp; Chạy Tiếp</button>
+              <button type="button" onclick="window.openStockHistoryModal()" style="padding:6px 10px;font-size:11.5px;font-weight:700;background:#312e81;color:#c7d2fe;border:1px solid #6366f1;border-radius:6px;cursor:pointer;">📜 Lịch Sử Dùng Stock</button>
+            </div>
+          </div>`
+        : '';
       const reversed = items.slice().reverse();
-      queueList.innerHTML = reversed.map((job, idx) => {
+      queueList.innerHTML = pausedBannerHtml + reversed.map((job, idx) => {
         const pct = Math.max(0, Math.min(100, Number(job.percent || 0)));
+        const isPausedStock = job.status === 'PAUSED_INSUFFICIENT_STOCK';
         const statusColor = job.status === 'COMPLETED' ? '#10b981' :
           job.status === 'FAILED' ? '#ef4444' :
+          isPausedStock ? '#f97316' :
           job.status === 'RENDERING' ? '#38bdf8' : '#f59e0b';
-        const rowBorder = job.status === 'RENDERING' ? '#0284c7' :
+        const rowBorder = isPausedStock ? '#ef4444' :
+          job.status === 'RENDERING' ? '#0284c7' :
           job.status === 'COMPLETED' ? 'rgba(16,185,129,0.35)' :
           job.status === 'FAILED' ? 'rgba(239,68,68,0.45)' : '#1e293b';
         const jChan = detectJobChannel(job);
         const chanBadge = showAll
           ? `<span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#1e293b;color:#fde047;border:1px solid #334155;flex-shrink:0;">${htmlEscape(jChan.toUpperCase())}</span>`
+          : '';
+        const resumeStockBtn = isPausedStock
+          ? `<button type="button" onclick="window.openInsufficientStockModal()" style="padding:3px 9px;font-size:11px;font-weight:800;background:#9a3412;color:#ffedd5;border:1px solid #f97316;border-radius:5px;cursor:pointer;">➕ Bổ Sung Stock &amp; Chạy Tiếp</button>`
           : '';
         const openBtn = job.videoOutputPath
           ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(job.videoOutputPath.replace(/\\/g, '\\\\'))}')" style="padding:3px 9px;font-size:11px;font-weight:700;background:#065f46;color:#d1fae5;border:1px solid #10b981;border-radius:5px;cursor:pointer;">▶️ Mở MP4</button>`
@@ -3163,13 +3247,14 @@ function renderScriptBridgeState(st) {
               <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${statusColor};flex-shrink:0;box-shadow:0 0 6px ${statusColor};"></span>
               ${chanBadge}
               <strong style="color:#f8fafc;font-size:12.8px;white-space:nowrap;">${htmlEscape(job.scriptName || job.projectId)}</strong>
-              <span style="color:#94a3b8;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${htmlEscape(job.stage || job.status)}</span>
+              <span style="color:${isPausedStock ? '#fdba74' : '#94a3b8'};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${htmlEscape(job.stage || job.status)}</span>
             </div>
             <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
               <div style="width:110px;height:6px;background:#090d16;border-radius:999px;overflow:hidden;border:1px solid #1e293b;">
                 <div style="width:${pct}%;height:100%;background:${statusColor};transition:width 0.25s;"></div>
               </div>
               <span style="font-family:monospace;font-size:12px;color:${statusColor};font-weight:800;min-width:38px;text-align:right;">${pct}%</span>
+              ${resumeStockBtn}
               ${openBtn}
               ${folderBtn}
             </div>
@@ -3244,9 +3329,10 @@ window.applyLinkedFolderValue = async function(kind, rawValue) {
           if (matched?.id && $('batchLibrary')) {
             $('batchLibrary').value = matched.id;
           }
+          await api.scriptBridge?.stockReport?.(val, true);
         } catch {}
       }
-      toast(val ? `🎞️ Đã chọn Folder Kho Stock Video: ${val}` : 'Đã xóa đường dẫn Kho Stock Video.');
+      toast(val ? `🎞️ Đã chọn & quét thời lượng Folder Kho Stock Video: ${val}` : 'Đã xóa đường dẫn Kho Stock Video.');
     } else if (kind === 'outputFolder') {
       if ($('outputFolder')) $('outputFolder').value = val;
       try { localStorage.setItem('vbs.outputFolder', val); } catch {}
@@ -3524,7 +3610,10 @@ function openLockedConfigInspectorModal() {
             kind: 'mediaFolder',
             label: '🎞️ Folder Kho Stock Video nền (Dùng để cắt ghép nền):',
             folderPath: s.mediaFolder,
-            note: 'Bấm [📁 Chọn Folder] để chọn thư mục chứa các video Stock nền trên máy của bạn.',
+            note: s.stockSummary
+              ? `⏱️ Thời gian Stock còn sử dụng được (0.75x): <strong style="color:#34d399;">${formatDuration(s.stockSummary.availableDurationMs)}</strong> · Đã dùng: <strong style="color:#fbbf24;">${formatDuration(s.stockSummary.usedDurationMs)}</strong> · Tổng kho: ${formatDuration(s.stockSummary.totalDurationMs)} (${s.stockSummary.availableCount}/${s.stockSummary.totalCount} file khả dụng). Mỗi file Stock chỉ cắt dùng 1 lần duy nhất, không lặp lại.`
+              : 'Bấm [📁 Chọn Folder] để chọn thư mục chứa các video Stock nền trên máy của bạn.',
+            extraControlHtml: `<button type="button" onclick="window.openStockHistoryModal()" style="padding:4px 10px;font-size:11px;font-weight:700;background:#312e81;color:#c7d2fe;border:1px solid #6366f1;border-radius:5px;cursor:pointer;white-space:nowrap;">📜 Xem Lịch Sử &amp; Chi Tiết Stock</button>`,
             highlightColor: '#3b82f6'
           })}
           ${editableFolderRow({
@@ -3604,6 +3693,295 @@ function openLockedConfigInspectorModal() {
     };
   }
 }
+
+window.openStockHistoryModal = async function(folderPath = '', forceScan = false) {
+  const targetFolder = String(
+    folderPath ||
+    _lastBridgeState?.lockedConfigSummary?.mediaFolder ||
+    $('mediaFolder')?.value ||
+    ''
+  ).trim();
+  const cleanFolder = targetFolder.startsWith('(') ? '' : targetFolder;
+
+  showModal(
+    '🎞️ Quản Lý Kho Stock Video · Thời Lượng Còn Lại & Lịch Sử Sử Dụng Chi Tiết',
+    `<div style="padding:24px;text-align:center;color:#38bdf8;font-size:13px;">⏳ Đang kiểm tra kho Stock và tải lịch sử sử dụng...</div>`
+  );
+
+  try {
+    const report = await api.scriptBridge?.stockReport?.(cleanFolder, Boolean(forceScan));
+    const fp = String(report?.folderPath || cleanFolder || '').trim();
+    const escapedFp = fp ? htmlEscape(fp.replace(/\\/g, '\\\\')) : '';
+    const assets = Array.isArray(report?.assets) ? report.assets : [];
+    const history = Array.isArray(report?.usageHistory) ? report.usageHistory : [];
+    const availMs = Number(report?.availableDurationMs || 0);
+    const usedMs = Number(report?.usedDurationMs || 0);
+    const totalMs = Number(report?.totalDurationMs || 0);
+    const rawAvailMs = Number(report?.rawAvailableDurationMs || 0);
+    const rawUsedMs = Number(report?.rawUsedDurationMs || 0);
+    const hasPausedJob = Boolean(
+      _lastBridgeState?.pausedReason === 'INSUFFICIENT_STOCK' ||
+      (_lastBridgeState?.queue || []).some((j) => j.status === 'PAUSED_INSUFFICIENT_STOCK')
+    );
+
+    const assetsRowsHtml = assets.length
+      ? assets.map((a, idx) => {
+          const pct = Math.max(0, Math.min(100, Number(a.consumedPercent || 0)));
+          const stLabel = a.usageStatus === 'USED'
+            ? `<span style="padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;background:#7f1d1d;color:#fecaca;border:1px solid #ef4444;">🔴 Đã dùng hết (Khóa)</span>`
+            : a.usageStatus === 'IN_PROGRESS'
+              ? `<span style="padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;background:#78350f;color:#fde047;border:1px solid #f59e0b;">🟡 Đang dùng dở (${pct}%)</span>`
+              : a.usageStatus === 'UNUSABLE'
+                ? `<span style="padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;background:#334155;color:#cbd5e1;">⚪ Lỗi / Mất file</span>`
+                : `<span style="padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:700;background:#064e3b;color:#6ee7b7;border:1px solid #10b981;">🟢 Sẵn sàng (100%)</span>`;
+          const barCol = a.usageStatus === 'USED' ? '#ef4444' : a.usageStatus === 'IN_PROGRESS' ? '#f59e0b' : '#10b981';
+          const lastVoice = a.lastUsedVoice ? htmlEscape(a.lastUsedVoice) : '—';
+          return `<tr style="border-bottom:1px solid #1e293b;background:${idx % 2 === 0 ? '#090d16' : '#0d1322'};">
+            <td style="padding:6px 8px;color:#64748b;">${idx + 1}</td>
+            <td style="padding:6px 8px;"><strong style="color:#f1f5f9;" title="${htmlEscape(a.filePath)}">${htmlEscape(a.fileName)}</strong></td>
+            <td style="padding:6px 8px;font-family:monospace;color:#cbd5e1;">${formatDuration(a.effectiveTotalMs)} <span style="color:#64748b;font-size:10.5px;">(Gốc: ${formatDuration(a.durationMs)})</span></td>
+            <td style="padding:6px 8px;font-family:monospace;color:#fbbf24;font-weight:700;">${formatDuration(a.effectiveUsedMs)}</td>
+            <td style="padding:6px 8px;font-family:monospace;color:${a.effectiveRemainingMs > 1000 ? '#34d399' : '#f87171'};font-weight:800;">${formatDuration(a.effectiveRemainingMs)}</td>
+            <td style="padding:6px 8px;min-width:110px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="flex:1;height:6px;background:#0f172a;border-radius:999px;overflow:hidden;border:1px solid #1e293b;">
+                  <div style="width:${pct}%;height:100%;background:${barCol};"></div>
+                </div>
+                <span style="font-family:monospace;font-size:10.5px;color:#94a3b8;min-width:30px;text-align:right;">${pct}%</span>
+              </div>
+            </td>
+            <td style="padding:6px 8px;">${stLabel}</td>
+            <td style="padding:6px 8px;color:#93c5fd;font-size:11px;">${lastVoice}${a.segmentsUsedCount ? ` <span style="color:#64748b;">(${a.segmentsUsedCount} đoạn)</span>` : ''}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="8" style="padding:14px;text-align:center;color:#94a3b8;">Kho Stock hiện chưa có video hoặc chưa được quét. Hãy bấm <strong>"🔄 Quét Lại Kho Stock"</strong> hoặc <strong>"📁 Đổi Folder Kho Stock"</strong>.</td></tr>`;
+
+    const historyRowsHtml = history.length
+      ? history.map((h, idx) => {
+          const fileName = String(h.source_path || '').split(/[\\/]/).pop() || h.source_path || '—';
+          const rangeText = `${formatDuration(h.source_start_ms)} ➔ ${formatDuration(h.source_end_ms)}`;
+          const timeStr = h.created_at ? new Date(h.created_at).toLocaleString() : '—';
+          return `<tr style="border-bottom:1px solid #1e293b;background:${idx % 2 === 0 ? '#090d16' : '#0d1322'};">
+            <td style="padding:6px 8px;color:#64748b;">${idx + 1}</td>
+            <td style="padding:6px 8px;color:#94a3b8;font-size:11px;">${htmlEscape(timeStr)}</td>
+            <td style="padding:6px 8px;"><strong style="color:#fde047;">${htmlEscape(h.voice_name || h.job_id || 'Video')}</strong></td>
+            <td style="padding:6px 8px;color:#38bdf8;" title="${htmlEscape(h.source_path || '')}">${htmlEscape(fileName)}</td>
+            <td style="padding:6px 8px;font-family:monospace;color:#cbd5e1;">${rangeText}</td>
+            <td style="padding:6px 8px;font-family:monospace;color:#34d399;font-weight:700;">${formatDuration(h.render_duration_ms)}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="6" style="padding:14px;text-align:center;color:#94a3b8;">Chưa có lịch sử cắt ghép Stock nào trong kho này.</td></tr>`;
+
+    showModal('🎞️ Quản Lý Kho Stock Video · Thời Lượng Còn Lại & Lịch Sử Sử Dụng Chi Tiết', `
+      <div style="display:flex;flex-direction:column;gap:14px;max-height:78vh;overflow-y:auto;padding-right:4px;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+          <div style="padding:10px 12px;background:#090d16;border:1px solid ${availMs > 1000 ? '#10b981' : '#ef4444'};border-radius:8px;">
+            <div style="font-size:11px;color:#94a3b8;">⏱️ THỜI GIAN CÒN DÙNG ĐƯỢC (0.75x)</div>
+            <div style="font-size:20px;font-weight:800;color:${availMs > 1000 ? '#34d399' : '#f87171'};font-family:monospace;margin-top:3px;">${formatDuration(availMs)}</div>
+            <div style="font-size:10.5px;color:#64748b;margin-top:2px;">Thời lượng gốc (1.0x): ${formatDuration(rawAvailMs)}</div>
+          </div>
+          <div style="padding:10px 12px;background:#090d16;border:1px solid #f59e0b;border-radius:8px;">
+            <div style="font-size:11px;color:#94a3b8;">✂️ THỜI GIAN ĐÃ SỬ DỤNG (0.75x)</div>
+            <div style="font-size:20px;font-weight:800;color:#fbbf24;font-family:monospace;margin-top:3px;">${formatDuration(usedMs)}</div>
+            <div style="font-size:10.5px;color:#64748b;margin-top:2px;">Gốc đã cắt: ${formatDuration(rawUsedMs)} · ${history.length} đoạn</div>
+          </div>
+          <div style="padding:10px 12px;background:#090d16;border:1px solid #38bdf8;border-radius:8px;">
+            <div style="font-size:11px;color:#94a3b8;">📦 TỔNG THỜI LƯỢNG KHO (0.75x)</div>
+            <div style="font-size:20px;font-weight:800;color:#38bdf8;font-family:monospace;margin-top:3px;">${formatDuration(totalMs)}</div>
+            <div style="font-size:10.5px;color:#64748b;margin-top:2px;">Mỗi Stock chỉ dùng 1 lần (Không lặp)</div>
+          </div>
+          <div style="padding:10px 12px;background:#090d16;border:1px solid #6366f1;border-radius:8px;">
+            <div style="font-size:11px;color:#94a3b8;">🎞️ SỐ FILE VIDEO STOCK</div>
+            <div style="font-size:20px;font-weight:800;color:#a5b4fc;font-family:monospace;margin-top:3px;">${report?.availableCount || 0} / ${report?.totalCount || 0} file</div>
+            <div style="font-size:10.5px;color:#64748b;margin-top:2px;">Đang cắt dở: ${report?.inProgressCount || 0} · Đã hết: ${report?.usedCount || 0}</div>
+          </div>
+        </div>
+
+        <div style="padding:10px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div style="font-size:12px;color:#e2e8f0;">
+            📂 <strong>Kho Stock đang chọn:</strong> <code style="color:#38bdf8;background:#090d16;padding:3px 7px;border-radius:4px;">${htmlEscape(fp || '(Chưa chọn)')}</code>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;">
+            ${hasPausedJob ? `<button type="button" onclick="window.resumeAfterStockReplenished('${escapedFp}')" style="padding:5px 11px;font-size:11.5px;font-weight:800;background:#059669;color:#ffffff;border:1px solid #34d399;border-radius:5px;cursor:pointer;">▶️ Quét Lại &amp; Chạy Tiếp Kịch Bản Đang Chờ</button>` : ''}
+            <button type="button" onclick="window.openStockHistoryModal('${escapedFp}', true)" style="padding:5px 10px;font-size:11.5px;font-weight:700;background:#0284c7;color:#ffffff;border:1px solid #38bdf8;border-radius:5px;cursor:pointer;">🔄 Quét Lại Kho Stock</button>
+            <button type="button" onclick="window.pickNewStockFolderFromHistoryModal()" style="padding:5px 10px;font-size:11.5px;font-weight:700;background:#4f46e5;color:#ffffff;border:1px solid #6366f1;border-radius:5px;cursor:pointer;">📁 Đổi Folder Kho Stock</button>
+            ${fp ? `<button type="button" onclick="window.openBridgePath('${escapedFp}')" style="padding:5px 10px;font-size:11.5px;background:#1e293b;color:#38bdf8;border:1px solid #334155;border-radius:5px;cursor:pointer;">📂 Mở Folder Trên Máy</button>` : ''}
+            ${(usedMs > 0 || (report?.usedCount || 0) > 0 || history.length > 0) ? `<button type="button" onclick="window.resetStockFolderHistory('${escapedFp}')" style="padding:5px 10px;font-size:11.5px;font-weight:700;background:#7c2d12;color:#fed7aa;border:1px solid #f97316;border-radius:5px;cursor:pointer;" title="Xóa lịch sử đã dùng để cho phép dùng lại các file Stock trong thư mục này từ đầu">♻️ Reset Lịch Sử (Dùng Lại Từ Đầu)</button>` : ''}
+          </div>
+        </div>
+
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;">
+          <strong style="color:#38bdf8;font-size:12.5px;display:block;margin-bottom:8px;">1. 📊 Trạng Thái Chi Tiết Từng File Video Trong Kho (${assets.length} file — Cắt nối tiếp không trùng lặp giữa các video)</strong>
+          <div style="max-height:220px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px;">
+            <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+              <thead>
+                <tr style="background:#1e293b;color:#cbd5e1;text-align:left;position:sticky;top:0;z-index:2;">
+                  <th style="padding:6px 8px;width:34px;">#</th>
+                  <th style="padding:6px 8px;">Tên File Stock</th>
+                  <th style="padding:6px 8px;">Tổng Thời Lượng (0.75x)</th>
+                  <th style="padding:6px 8px;">Đã Dùng</th>
+                  <th style="padding:6px 8px;">Còn Lại</th>
+                  <th style="padding:6px 8px;">Tiến Độ</th>
+                  <th style="padding:6px 8px;">Trạng Thái</th>
+                  <th style="padding:6px 8px;">Video Dùng Gần Nhất</th>
+                </tr>
+              </thead>
+              <tbody>${assetsRowsHtml}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;">
+          <strong style="color:#fde047;font-size:12.5px;display:block;margin-bottom:8px;">2. 📜 Lịch Sử Chi Tiết Các Đoạn Stock Đã Cắt Cho Từng Video (${history.length} lần cắt gần nhất)</strong>
+          <div style="max-height:210px;overflow-y:auto;border:1px solid #1e293b;border-radius:6px;">
+            <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+              <thead>
+                <tr style="background:#1e293b;color:#cbd5e1;text-align:left;position:sticky;top:0;z-index:2;">
+                  <th style="padding:6px 8px;width:34px;">#</th>
+                  <th style="padding:6px 8px;">Thời Gian</th>
+                  <th style="padding:6px 8px;">Video / Kịch Bản</th>
+                  <th style="padding:6px 8px;">File Stock Gốc</th>
+                  <th style="padding:6px 8px;">Đoạn Đã Cắt (Từ ➔ Đến)</th>
+                  <th style="padding:6px 8px;">Thời Lượng Lên Hình</th>
+                </tr>
+              </thead>
+              <tbody>${historyRowsHtml}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `);
+
+    const latestSt = await api.scriptBridge?.status?.();
+    if (latestSt) renderScriptBridgeState(latestSt);
+  } catch (err) {
+    showModal('Lỗi kiểm tra Kho Stock', `<div style="padding:16px;color:#f87171;">Không thể tải lịch sử Kho Stock: ${htmlEscape(err.message)}</div>`);
+  }
+};
+
+window.pickNewStockFolderFromHistoryModal = async function() {
+  const picked = await api.chooseDirectory({ title: 'Chọn Folder Kho Stock Video nền mới' });
+  if (!picked) return;
+  await window.applyLinkedFolderValue('mediaFolder', picked);
+  await window.openStockHistoryModal(picked, true);
+};
+
+window.resetStockFolderHistory = async function(folderPath = '') {
+  const target = String(folderPath || _lastBridgeState?.lockedConfigSummary?.mediaFolder || $('mediaFolder')?.value || '').trim();
+  if (!target) return;
+  if (!confirm(`Bạn có chắc chắn muốn RESET lịch sử sử dụng Stock của thư mục:\n\n${target}\n\nSau khi Reset, toàn bộ các file video trong thư mục này sẽ được đưa về trạng thái CHƯA DÙNG (100% thời lượng) để chương trình cắt ghép lại từ đầu.`)) {
+    return;
+  }
+  try {
+    await api.scriptBridge?.resetStockUsage?.(target);
+    toast('♻️ Đã Reset lịch sử dùng Stock! Toàn bộ file trong kho đã sẵn sàng dùng lại từ đầu.');
+    const st = await api.scriptBridge?.status?.();
+    if (st) renderScriptBridgeState(st);
+    await window.openStockHistoryModal(target, false);
+  } catch (err) {
+    toast('Lỗi Reset lịch sử Stock: ' + err.message, true);
+  }
+};
+
+window.openInsufficientStockModal = function(customAlert = null) {
+  const pausedJob = (_lastBridgeState?.queue || []).find((j) => j.status === 'PAUSED_INSUFFICIENT_STOCK');
+  const alertData = customAlert || _lastBridgeState?.pausedStockAlert || pausedJob?.stockAlert || {};
+  const scriptName = alertData.scriptName || pausedJob?.scriptName || 'Kịch bản vừa viết xong';
+  const mediaFolder = alertData.mediaFolder || _lastBridgeState?.lockedConfigSummary?.mediaFolder || $('mediaFolder')?.value || '(Chưa chọn)';
+  const escapedFp = String(mediaFolder || '').startsWith('(') ? '' : htmlEscape(String(mediaFolder).replace(/\\/g, '\\\\'));
+  const reqText = alertData.requiredText || (alertData.requiredDurationMs ? formatShortStockDuration(alertData.requiredDurationMs) : '—');
+  const availText = alertData.availableText || (alertData.availableDurationMs != null ? formatShortStockDuration(alertData.availableDurationMs) : '0p 00s');
+  const missText = alertData.missingText || (alertData.missingDurationMs ? formatShortStockDuration(alertData.missingDurationMs) : '—');
+
+  showModal('🚨 CẢNH BÁO HẾT STOCK · CHƯƠNG TRÌNH ĐÃ TẠM DỪNG ĐỂ BỔ SUNG STOCK', `
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="padding:14px 16px;background:rgba(127,29,29,0.35);border:2px solid #ef4444;border-radius:10px;color:#fecaca;line-height:1.55;">
+        <div style="font-size:15px;font-weight:800;color:#f87171;margin-bottom:6px;">
+          ⏸️ Đã tạm dừng tự động sau khi viết xong kịch bản: <span style="color:#fde047;">${htmlEscape(scriptName)}</span>
+        </div>
+        <div style="font-size:12.5px;">
+          Kho Stock hiện tại không còn đủ thời lượng video chưa dùng để ghép cho kịch bản này (mỗi file Stock chỉ dùng 1 lần duy nhất, không lặp lại).<br/>
+          Chương trình đã <strong>tạm dừng an toàn</strong> để bạn copy thêm video vào Kho Stock hoặc chọn Folder Kho Stock mới rồi bấm <strong>Chạy Tiếp</strong>.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+        <div style="padding:10px 12px;background:#090d16;border:1px solid #38bdf8;border-radius:8px;">
+          <div style="font-size:11px;color:#94a3b8;">🎙️ THỜI LƯỢNG VIDEO CẦN GHÉP</div>
+          <div style="font-size:19px;font-weight:800;color:#38bdf8;font-family:monospace;margin-top:3px;">${htmlEscape(reqText)}</div>
+        </div>
+        <div style="padding:10px 12px;background:#090d16;border:1px solid #ef4444;border-radius:8px;">
+          <div style="font-size:11px;color:#94a3b8;">🎞️ THỜI LƯỢNG STOCK CÒN LẠI (0.75x)</div>
+          <div style="font-size:19px;font-weight:800;color:#f87171;font-family:monospace;margin-top:3px;">${htmlEscape(availText)}</div>
+        </div>
+        <div style="padding:10px 12px;background:#090d16;border:1px solid #f59e0b;border-radius:8px;">
+          <div style="font-size:11px;color:#94a3b8;">⚠️ THỜI LƯỢNG ĐANG THIẾU</div>
+          <div style="font-size:19px;font-weight:800;color:#fde047;font-family:monospace;margin-top:3px;">${htmlEscape(missText)}</div>
+        </div>
+      </div>
+
+      <div style="padding:10px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="font-size:12px;color:#e2e8f0;">
+          📂 <strong>Folder Kho Stock hiện tại:</strong> <code style="color:#93c5fd;">${htmlEscape(mediaFolder)}</code>
+        </div>
+        <div style="display:flex;gap:6px;">
+          ${escapedFp ? `<button type="button" onclick="window.openBridgePath('${escapedFp}')" style="padding:5px 10px;font-size:11.5px;background:#1e293b;color:#38bdf8;border:1px solid #334155;border-radius:5px;cursor:pointer;">📂 Mở Folder Để Copy Thêm Video</button>` : ''}
+          <button type="button" onclick="window.openStockHistoryModal('${escapedFp}', false)" style="padding:5px 10px;font-size:11.5px;background:#312e81;color:#c7d2fe;border:1px solid #6366f1;border-radius:5px;cursor:pointer;">📜 Xem Lịch Sử Dùng Stock</button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;">
+        <button type="button" onclick="window.resumeAfterStockReplenished('')" style="padding:11px 16px;font-size:13px;font-weight:800;background:#059669;color:#ffffff;border:1px solid #34d399;border-radius:8px;cursor:pointer;text-align:center;">
+          ▶️ ĐÃ COPY THÊM VIDEO VÀO KHO HIỆN TẠI ➔ QUÉT LẠI &amp; CHẠY TIẾP NGAY
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <button type="button" onclick="window.pickNewStockFolderAndResume()" style="padding:9px 14px;font-size:12px;font-weight:700;background:#1e3a8a;color:#e0f2fe;border:1px solid #3b82f6;border-radius:7px;cursor:pointer;">
+            📁 Chọn Folder Kho Stock Mới &amp; Chạy Tiếp Ngay
+          </button>
+          <button type="button" onclick="window.resetStockAndResume('${escapedFp}')" style="padding:9px 14px;font-size:12px;font-weight:700;background:#7c2d12;color:#fed7aa;border:1px solid #f97316;border-radius:7px;cursor:pointer;">
+            ♻️ Reset Kho Stock Cũ (Dùng Lại Từ Đầu) &amp; Chạy Tiếp
+          </button>
+        </div>
+      </div>
+    </div>
+  `);
+};
+
+window.resumeAfterStockReplenished = async function(newMediaFolder = '') {
+  try {
+    const cleanNew = String(newMediaFolder || '').trim();
+    if (cleanNew && !cleanNew.startsWith('(')) {
+      await window.applyLinkedFolderValue('mediaFolder', cleanNew);
+    }
+    toast('⏳ Đang quét lại thời lượng Kho Stock và kiểm tra điều kiện chạy tiếp...');
+    const res = await api.scriptBridge?.resumeAfterStock?.(cleanNew);
+    const report = res?.report;
+    const st = res?.state || (await api.scriptBridge?.status?.());
+    if (st) renderScriptBridgeState(st);
+    if (report && Number(report.availableDurationMs || 0) <= 1000) {
+      toast('⚠️ Kho Stock vẫn chưa có thêm thời lượng khả dụng! Vui lòng copy thêm video hoặc chọn folder khác.', true);
+      return;
+    }
+    closeModal();
+    toast(`🚀 Đã quét Kho Stock (Còn dùng được: ${formatShortStockDuration(report?.availableDurationMs || 0)}) và tiếp tục chạy chương trình!`);
+  } catch (err) {
+    toast('Lỗi khi tiếp tục chạy sau khi bổ sung Stock: ' + err.message, true);
+  }
+};
+
+window.pickNewStockFolderAndResume = async function() {
+  const picked = await api.chooseDirectory({ title: 'Chọn Folder Kho Stock Mới để chạy tiếp' });
+  if (!picked) return;
+  await window.resumeAfterStockReplenished(picked);
+};
+
+window.resetStockAndResume = async function(folderPath = '') {
+  const target = String(folderPath || _lastBridgeState?.lockedConfigSummary?.mediaFolder || $('mediaFolder')?.value || '').trim();
+  if (!target) return;
+  if (!confirm(`Reset lịch sử dùng Stock của thư mục [${target}] để dùng lại từ đầu và chạy tiếp ngay?`)) return;
+  await api.scriptBridge?.resetStockUsage?.(target);
+  await window.resumeAfterStockReplenished(target);
+};
 
 async function loadScriptStudioPage() {
   await syncBatchConfigToBridge({ silent: true });
@@ -3933,6 +4311,11 @@ window.triggerAllReadyScriptsToBridge = function() {
 
   api.scriptBridge?.onState?.((st) => {
     renderScriptBridgeState(st);
+  });
+
+  api.scriptBridge?.onInsufficientStock?.((alertPayload) => {
+    toast(`🚨 HẾT STOCK: ${alertPayload?.message || 'Kho Stock không đủ thời lượng, chương trình đã tạm dừng!'}`, true);
+    window.openInsufficientStockModal(alertPayload);
   });
 
   api.scriptBridge?.onRequestSyncBatchConfig?.(() => {

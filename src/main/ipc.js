@@ -705,5 +705,29 @@ function registerIpc(ctx){const {mainWindow,database,licenseService,ffmpegServic
     if (!scriptBridgeService) return { online: false };
     return scriptBridgeService.clearCompletedQueue();
   });
+
+  ipcMain.handle('scriptBridge:stockReport', async (_e, { folderPath = '', forceRescan = false } = {}) => {
+    if (!scriptBridgeService) return { found: false, files: [], history: [] };
+    return await scriptBridgeService.scanStockFolderAndGetReport(folderPath, { forceRescan });
+  });
+
+  ipcMain.handle('scriptBridge:resetStockUsage', async (_e, folderPath = '') => {
+    if (!scriptBridgeService) return { ok: false };
+    return await scriptBridgeService.resetStockFolderUsage(folderPath);
+  });
+
+  ipcMain.handle('scriptBridge:resumeAfterStock', async (_e, { newMediaFolder = '' } = {}) => {
+    guardLicense();
+    if (!scriptBridgeService) return { ok: false };
+    return await scriptBridgeService.resumeAfterStockReplenished({ newMediaFolder });
+  });
+
+  ipcMain.handle('libraries:detailedReport', (_e, idOrPath, playbackRate = 0.75) => {
+    return database.getStockFolderDetailedReport(idOrPath, playbackRate);
+  });
+
+  ipcMain.handle('libraries:resetUsage', (_e, idOrPath) => {
+    return database.resetStockLibraryUsage(idOrPath);
+  });
 }
 module.exports={registerIpc};

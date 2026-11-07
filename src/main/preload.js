@@ -1676,6 +1676,8 @@ contextBridge.exposeInMainWorld('vbs', {
     deleteWithFiles: (id) => ipcRenderer.invoke('libraries:deleteWithFiles', id),
     assets: (id, status) => ipcRenderer.invoke('libraries:assets', id, status),
     stats: (id) => ipcRenderer.invoke('libraries:stats', id),
+    detailedReport: (idOrPath, playbackRate) => ipcRenderer.invoke('libraries:detailedReport', idOrPath, playbackRate),
+    resetUsage: (idOrPath) => ipcRenderer.invoke('libraries:resetUsage', idOrPath),
     purge: (id) => ipcRenderer.invoke('libraries:purge', id),
     scan: (id) => ipcRenderer.invoke('libraries:scan', id)
   },
@@ -1792,6 +1794,10 @@ contextBridge.exposeInMainWorld('vbs', {
     enqueueScript: (payload) => ipcRenderer.invoke('scriptBridge:enqueueScript', payload),
     enqueueFolder: (folderPath) => ipcRenderer.invoke('scriptBridge:enqueueFolder', folderPath),
     clearQueue: () => ipcRenderer.invoke('scriptBridge:clearQueue'),
+    stockReport: (folderPath = '', forceRescan = false) => ipcRenderer.invoke('scriptBridge:stockReport', { folderPath, forceRescan }),
+    resetStockUsage: (folderPath = '') => ipcRenderer.invoke('scriptBridge:resetStockUsage', folderPath),
+    resumeAfterStock: (newMediaFolder = '') => ipcRenderer.invoke('scriptBridge:resumeAfterStock', { newMediaFolder }),
+    onInsufficientStock: (fn) => sub('scriptBridge:insufficientStock', fn),
     onState: (fn) => sub('scriptBridge:state', async (st) => {
       if (st) {
         if (!_realPythonOnline) {

@@ -37,7 +37,7 @@ function createDurationStockAllocator({
   seed = 1,
   selectionMode = 'SEQUENTIAL',
   playbackRate = 0.75,
-  clonePasses = 2,
+  clonePasses = 1,
   cloneFlip = true,
   cloneZoom = 1.1,
   transformAllStock = true,
@@ -117,6 +117,7 @@ function createDurationStockAllocator({
         segments.push({
           assetId: asset.id,
           filePath: asset.file_path || asset.filePath,
+          originalFilePath: asset.file_path || asset.filePath,
           fileName: asset.file_name || asset.fileName,
           mediaType: 'VIDEO',
           sourceDurationMs: clipSourceMs,
@@ -125,6 +126,7 @@ function createDurationStockAllocator({
           sourceHeight: Number(asset.height || 0),
           sourceFps: fps,
           trimStartMs: sourceStartMs,
+          originalTrimStartMs: sourceStartMs,
           durationMs: clipOutputMs,
           startMs: timelineMs,
           transitionIn: segments.length ? { type: 'none', durationMs: 0 } : null,
@@ -135,6 +137,8 @@ function createDurationStockAllocator({
           forceCover,
           sourceRangeStartMs: sourceStartMs,
           sourceRangeEndMs: sourceStartMs + clipSourceMs,
+          originalRangeStartMs: sourceStartMs,
+          originalRangeEndMs: sourceStartMs + clipSourceMs,
           stockPassIndex: currentPhase,
           stockPhase: currentPhase,
           pooledStock: true

@@ -71,7 +71,10 @@ class UpdaterService {
   async ensureBundledGreenAssetsOnDisk() {
     const targetGreenDir = path.join(this.exeDir || this.studioRoot || this.appDir, 'Kho_Green');
     try { fs.mkdirSync(targetGreenDir, { recursive: true }); } catch {}
-    const mcFiles = ['MC-001.mp4', 'MC-002.mp4', 'MC-003.mp4', 'MC-004.mp4', 'MC-005.mp4', 'MC-006.mp4', 'MC-007.mp4'];
+    const mcFiles = [
+      'MC-001.mp4', 'MC-002.mp4', 'MC-003.mp4', 'MC-004.mp4', 'MC-005.mp4', 'MC-006.mp4', 'MC-007.mp4',
+      'sub-001.mp4', 'sub-002.mp4', 'sub-003.mp4', 'sub-004.mp4', 'sub-005.mp4', 'sub-006.mp4'
+    ];
     const localInfo = this.getLocalVersionInfo();
     const repo = localInfo.repo || DEFAULT_GITHUB_REPO;
     const branch = localInfo.branch || DEFAULT_GITHUB_BRANCH;
