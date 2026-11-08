@@ -1,16 +1,16 @@
 ---
 name: padre-mx-script-writer
-version: 1.1.0
-description: "Step3 3-stage persistent 70k–80k es-MX seven-Part script writing; Step5 EXACTLY ONE authorized minimal logic/spelling repair with byte preservation. Writer never issues final QA verdict."
+version: 1.2.0
+description: "Step3 3-stage FULL 70k–80k with mandatory per-stage count gates es-MX seven-Part script writing; Step5 EXACTLY ONE authorized minimal logic/spelling repair with byte preservation. Writer never issues final QA verdict."
 ---
 # PADRE MX — SCRIPT WRITER (STEP3 DRAFT / STEP5 ONE REPAIR)
 
 Always read `references/CROSS_SKILL_QUALITY_CONTRACT.md`, `references/MEXICO_CHANNEL_DNA.md`, `references/WRITING_AND_ONE_REPAIR.md`. Mode determined solely by explicit requested step; do not run both. Required input: exact locked title, persisted 7-Part outline SHA, canon. Voice: first-person older Mexican father; es-MX conversational but polished literary TTS-ready prose; not a screenplay, not Mexican slang salad. Emotion rooted in actions, not abstract moral slogans.
 
 ## Step3 DRAFT — 3 explicit user turns, 7 Parts
-**Stage A:** write `[PART 1]` and `[PART 2]`; aim enough body for total target (e.g. ~21–24k Unicode chars for A); verify opening is a real scene with non-stock humiliation and a hard choice. Save actual LF file `PMX_<sha12>_SCRIPT_A.txt`.
-**Stage B:** reopen actual A and canon, draft `[PART 3]` `[PART 4]` `[PART 5]` (~30–34k chars); no accidental repeated sentence/exposition, evidence availability according to canon. Save B.
-**Stage C:** reopen actual A/B and canon; draft `[PART 6]` `[PART 7]` to bring total 70k–80k, preferred 74k–78k; payoff must be earned and end with meaningful act. Save C, stage and assemble exact A+B+C; verify read-back body count SHA.
+**Stage A:** write `[PART 1]` and `[PART 2]`; aim enough body for total target (e.g. 20–24k Unicode chars for A, hard gate); verify opening is a real scene with non-stock humiliation and a hard choice. Save actual LF file `PMX_<sha12>_SCRIPT_A.txt`.
+**Stage B:** reopen actual A and canon, draft `[PART 3]` `[PART 4]` `[PART 5]` (30–35k chars, hard gate); no accidental repeated sentence/exposition, evidence availability according to canon. Save B.
+**Stage C:** reopen actual A/B and canon; draft `[PART 6]` `[PART 7]` (20–25k chars for C) to bring total 70k–80k, preferred 74k–78k; payoff must be earned and end with meaningful act. Save C, stage and assemble exact A+B+C; verify read-back body count SHA.
 
 Stage tool commands (run in `scripts/` or direct path):
 ```
@@ -40,3 +40,11 @@ If patch fails or resulting text incomplete, report BLOCK; never auto-rewrite ne
 
 ## V1.1 Writer prevent-before-repair gate
 Before drafting each A/B/C, read and calculate each family member birth-year range from the locked canon and scene year. When writing flashbacks explicitly disambiguate years, particularly conception/birth before a business founded later. After each stage, scan chronology and canonical character names across the actual persisted text, and do not pad to 70–80k with duplicate reflection paragraphs. At least one consequence observable in action must occur per Part, not only an explanation of the old paperwork. The one-repair rule remains ABSOLUTE, with no grammar pass after Step5.
+
+## V1.2 MANDATORY anti-half-length completion protocol
+The user-reported defect was a manuscript produced at roughly half the requested length. NEVER solve this by silently changing the requirement from 70–80k to 35–40k.
+1. Plan unique scenes and real action for each of seven Parts, aiming for 10.5–11.5k per Part with natural scene-dependent variance; avoid looping internal monologues to reach count.
+2. Stage A MUST total 20,000–24,000 body characters for Parts 1–2, Stage B MUST total 30,000–35,000 for Parts 3–5, Stage C MUST total 20,000–25,000 for Parts 6–7. Each Part MUST be at least 8,500. Stage and QA scripts enforce this on actual files.
+3. Build long segments progressively inside the same authorized Step3 stage using contiguous source paragraphs. After each internal chunk, re-open and count actual persisted bytes, read back last paragraphs to ensure no duplication/truncation. Finalize once only when the stage passes. Do not invent a stage file if an environment cannot persist one.
+4. If response limits stop the stage early, report `DRAFT_INCOMPLETE: stage X, actual measured chars, remaining chars` and ask for another invocation of the SAME stage; do not call it completed or advance to the next stage. Reopen actual source and continue from last complete paragraph instead of repeating it.
+5. On Stage C assemble exact A+B+C. Only a 70,000–80,000 Unicode-body-character verified manuscript with all seven parts, none under 8,500, may advance to Step4. No false PASS; never count outline, headings or meta instructions as body prose.

@@ -908,6 +908,19 @@ async function openJobGreenEditorV3(initialJob){
   let key=jobGreenKey(job);
   let savedCfg=state.jobGreenConfigs[key]||job.greenConfig||null;
   let cfg={...tplDef,...(savedCfg?.edited?savedCfg:{})};
+  const isBridgeKey04=Boolean(job?._isBridgeKey04Check||job?.bridgeJobId);
+  const bridgeVerifyBannerHtml=isBridgeKey04?`
+    <div style="padding:10px 14px;background:rgba(6,95,70,0.35);border:1px solid #10b981;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="font-size:12px;color:#d1fae5;line-height:1.45;">
+        <strong style="color:#34d399;font-size:13px;">🔍 [KEY 04 PADRE MX] KIỂM TRA KỸ VỊ TRÍ ẢNH NỀN XANH ĐÃ QUÉT & CẮT GỌN (GÓC TRÁI BÊN DƯỚI)</strong><br/>
+        Kịch bản: <strong>${htmlEscape(job.scriptName||key)}</strong> · Ảnh gắn riêng: <code>${htmlEscape(assetPath.split(/[\\/]/).pop()||'')}</code> · Hãy kiểm tra kỹ vị trí ông cụ ở <strong>Góc Trái Bên Dưới</strong> trên khung Template trước khi bấm Duyệt tạo video!
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${job.thumbnailPath?`<button type="button" onclick="window.openBridgePath('${htmlEscape(String(job.thumbnailPath).replace(/\\/g,'\\\\'))}')" style="padding:5px 10px;font-size:11px;font-weight:700;background:#1e293b;color:#38bdf8;border:1px solid #0284c7;border-radius:6px;cursor:pointer;">🖼️ Xem THUMBNAIL.png</button>`:''}
+        ${job.greenFullPath?`<button type="button" onclick="window.openBridgePath('${htmlEscape(String(job.greenFullPath).replace(/\\/g,'\\\\'))}')" style="padding:5px 10px;font-size:11px;font-weight:700;background:#1e293b;color:#4ade80;border:1px solid #16a34a;border-radius:6px;cursor:pointer;">🟢 Xem THUMBNAIL-NENXANH.png</button>`:''}
+      </div>
+    </div>
+  `:'';
   const folderItems=state.scannedFolderImages||[];
   const tplName=state.selectedTemplate?.name||state.editor?.name||'Default 16:9';
   const switcherHtml=folderItems.length?`
@@ -922,6 +935,7 @@ async function openJobGreenEditorV3(initialJob){
   `:'';
   showModal(`Căn Vị Trí Riêng Cho Ảnh (Trên Khung 1920×1080 Của "${tplName}") · ${job.fileName||job.voiceName||job.voice_name||key}`,`
     <div class="green-editor">
+      ${bridgeVerifyBannerHtml}
       ${switcherHtml}
       <div style="font-size:11px;color:#94a3b8;text-align:center;">🖱️ <strong>Kéo trực tiếp ảnh</strong> để đặt vị trí riêng (X, Y) · <strong>Kéo 4 góc / 4 cạnh</strong> hoặc <strong>Cuộn con lăn chuột</strong> để chỉnh kích thước riêng cho ảnh này (Tự động lưu riêng từng ảnh, không chèn vào Template chung)</div>
       <div class="green-stage green-template-stage canvas-stage" id="greenStage" style="position:relative;overflow:hidden;background:#0a0f1d;user-select:none;">
@@ -962,6 +976,7 @@ async function openJobGreenEditorV3(initialJob){
       <div class="actions" style="flex-wrap:wrap;gap:6px;">
         <button type="button" id="greenZoomIn" style="background:#1e293b;border-color:#38bdf8;color:#38bdf8;font-weight:700;">🔍 Phóng to (+10%)</button>
         <button type="button" id="greenZoomOut" style="background:#1e293b;border-color:#38bdf8;color:#38bdf8;font-weight:700;">🔉 Thu nhỏ (-10%)</button>
+        <button type="button" id="greenSnapBottomLeft" style="background:#065f46;border:1px solid #10b981;color:#ecfdf5;font-weight:800;" title="Đặt ảnh nền xanh đã cắt gọn vào đúng Góc Trái Bên Dưới (Sát đáy Y=1080-Height, X=16)">📐 Đặt Chuẩn Góc Trái Bên Dưới (Sát Đáy)</button>
         <button type="button" id="greenMatchAspect">📐 Khớp tỷ lệ gốc</button>
         <button type="button" id="greenCenter">🎯 Căn giữa</button>
         <button type="button" id="greenFitWidth">↔️ Fit ngang</button>
@@ -970,6 +985,10 @@ async function openJobGreenEditorV3(initialJob){
         <button type="button" id="greenReset">↺ Đưa về tọa độ mặc định</button>
         <button type="button" id="greenSyncToTemplate" style="background:#0f766e;color:#fff;border:1px solid #14b8a6;font-weight:700;" title="Chỉ sao chép tọa độ (X, Y, Rộng, Cao) này làm tọa độ mặc định cho các ảnh chưa chỉnh (Không thêm ảnh vào Template chung)">📐 Lấy tọa độ (X,Y,W,H) này cho các ảnh chưa chỉnh</button>
         <button type="button" id="greenSave" class="primary" style="font-weight:700;">💾 Lưu vị trí riêng cho "${htmlEscape(key)}" & Đóng</button>
+        ${isBridgeKey04?`
+          <button type="button" id="greenApproveBridgeJob" style="background:#059669;color:#ffffff;border:1px solid #34d399;font-weight:800;padding:8px 14px;box-shadow:0 0 12px rgba(16,185,129,0.45);">✅ Đã Kiểm Tra Kỹ Vị Trí ➔ Duyệt & Bắt Đầu Tạo Video Theo Template</button>
+          <button type="button" id="greenApproveBridgeAllKey04" style="background:#1d4ed8;color:#ffffff;border:1px solid #60a5fa;font-weight:800;padding:8px 12px;" title="Áp dụng tọa độ góc trái dưới này cho tất cả kịch bản Key 04 trong hàng đợi (mỗi kịch bản vẫn dùng ảnh nền xanh riêng của kịch bản đó)">✅ Duyệt Tọa Độ Góc Trái Dưới Này Cho Cả Lô Key 04 & Tạo Video</button>
+        `:''}
       </div>
       <div id="greenPickHint" class="source-preview-info" hidden>👉 Hãy bấm chuột vào vùng nền xanh của ảnh trên màn hình Preview để tự động hút màu tách nền.</div>
       <div id="greenActiveFileInfo" class="source-preview-info">📎 File đang chỉnh riêng: <strong>${htmlEscape(assetPath)}</strong> · Mã khớp kịch bản: <code>${htmlEscape(key)}</code></div>
@@ -1174,6 +1193,14 @@ async function openJobGreenEditorV3(initialJob){
     applyBox();syncInputs();autoPersistCurrentImagePosition();
     toast(`Đã khớp đúng tỷ lệ gốc của ảnh (${naturalW}×${naturalH}).`);
   };
+  if($('greenSnapBottomLeft'))$('greenSnapBottomLeft').onclick=()=>{
+    const h=740,w=Math.max(460,Math.min(680,Math.round(h*naturalAspect)));
+    cfg={...cfg,assetMode:'GREEN',keyColor:'#00FF00',width:w,height:h,x:0,y:ch-h};
+    if($('greenAssetMode'))$('greenAssetMode').value='GREEN';
+    if($('greenKeyColor'))$('greenKeyColor').value='#00ff00';
+    applyBox();syncInputs();autoPersistCurrentImagePosition();scheduleChroma();
+    toast(`Đã đặt chuẩn Góc Trái Bên Dưới (X=0, Y=${ch-h}, ${w}×${h}) sát đáy khung hình!`);
+  };
   $('greenCenter').onclick=()=>{cfg={...cfg,x:Math.round((cw-cfg.width)/2),y:Math.round((ch-cfg.height)/2)};applyBox();syncInputs();autoPersistCurrentImagePosition();};
   $('greenFitWidth').onclick=()=>{const w=Math.round(cw*.8),h=Math.round(w/naturalAspect);cfg={...cfg,width:w,height:h,x:Math.round(cw*.1),y:Math.round((ch-h)/2)};applyBox();syncInputs();autoPersistCurrentImagePosition();};
   if($('greenFitHeight'))$('greenFitHeight').onclick=()=>{const h=Math.round(ch*.82),w=Math.round(h*naturalAspect);cfg={...cfg,width:w,height:h,x:Math.round((cw-w)/2),y:Math.round((ch-h)/2)};applyBox();syncInputs();autoPersistCurrentImagePosition();};
@@ -1208,6 +1235,18 @@ async function openJobGreenEditorV3(initialJob){
     }
   };
   $('greenSave').onclick=()=>saveCurrentImageConfig(true);
+  if($('greenApproveBridgeJob'))$('greenApproveBridgeJob').onclick=async()=>{
+    saveCurrentImageConfig(false);
+    const currentCfg=readGreenEditorConfigV3();
+    closeModal();
+    await window.approveBridgeGreenPositionQuick(job.bridgeJobId||job.id,false,currentCfg);
+  };
+  if($('greenApproveBridgeAllKey04'))$('greenApproveBridgeAllKey04').onclick=async()=>{
+    saveCurrentImageConfig(false);
+    const currentCfg=readGreenEditorConfigV3();
+    closeModal();
+    await window.approveBridgeGreenPositionQuick(job.bridgeJobId||job.id,true,currentCfg);
+  };
 
   // 2. Hàm nạp riêng 1 ảnh đang chọn (0ms hiển thị tức thì)
   async function loadSelectedImageOnly(targetJob){
@@ -1265,7 +1304,7 @@ async function openJobGreenEditorV3(initialJob){
   },30);
 }
 
-function collectBatch(){const library=state.libraries.find(l=>l.id===$('batchLibrary').value),mode=$('backgroundMode').value,voiceFolder=$('voiceFolder').value,voiceSourceMode=$('batchVoiceSourceMode')?.value||'EXISTING_AUDIO',voiceProfileId=$('batchVoiceProfileSelect')?.value||'default',channelKey=$('topGlobalKeySelect')?.value||localStorage.getItem('zc_active_channel_key')||'03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';const isStockOrImage=['STOCK_VIDEO','IMAGE_SEQUENCE','STORY_PIP_STOCK'].includes(mode);return{channelKey,batchName:$('batchName').value,projectId:$('batchProject').value||null,templateId:$('batchTemplate').value||null,backgroundMode:mode,storyPipOverStock:mode==='STORY_PIP_STOCK',storyMode:$('farmStoryDivisionMode')?.value||'CUE',imageCount:Number($('farmStoryCountInput')?.value||30),characterDna:$('farmStoryCharacterDna')?.value||'',voiceSourceMode,voiceProfileId,voiceFolder,srtFolder:voiceFolder,autoGenerateSrt:$('batchAcceleration').value!=='FULL_GPU_ZERO_COPY',whisperModel:'small',whisperLanguage:$('batchSrtLanguage')?.value||'auto',srtMaxChars:42,srtMaxDur:4.2,jobIntroFolder:$('jobIntroFolder')?.value||'',batchJobIntroPath:$('batchJobIntro')?.value||'',jobIntroAudioMode:String($('batchJobIntroAudioMode')?.value||'MUTE'),jobIntroTransition:'NONE',jobIntroTransitionMs:0,jobIntroNoiseOverlay:false,enableJobGreenLayer:false,jobGreenFolder:'',jobGreenConfigs:state.jobGreenConfigs||{},defaultFolderImageTransform:loadDefaultFolderImageTransform(),requireJobGreenAsset:false,requireJobGreenEdit:false,cleanupJobGreenCache:true,jobGreenCacheDurationMs:30000,libraryId:isStockOrImage?library?.id||null:null,mediaFolder:isStockOrImage?($('mediaFolder').value||library?.root_path||''):'',usedFolder:'',manualMediaPath:mode==='MANUAL_MEDIA'?$('manualMediaPath').value:'',outputFolder:$('outputFolder').value||(voiceSourceMode==='ONLY_RENDER_VOICE'?voiceFolder:''),width:Number($('batchWidth').value),height:Number($('batchHeight').value),fps:Number($('batchFps').value),subtitle:renderSubtitleOverride('batch'),codec:$('batchCodec').value,accelerationMode:$('batchAcceleration').value,gpuIndex:Number($('batchGpuIndex').value??-1),performanceProfile:$('batchPerformance').value,maxParallelJobs:Number($('batchWorkers').value||1),stockAllocationMode:['STOCK_VIDEO','STORY_PIP_STOCK'].includes(mode)?'DURATION_POOL':'PER_JOB',stockPlaybackRate:.75,extendShortStock:false,stockClonePasses:1,stockCloneFlip:true,stockCloneZoom:1.1,transformAllStock:true,forceStockCover:true,deleteConsumedMatchedStock:true,moveUsedStock:false,filterComplexThreads:Math.max(2,Math.min(16,(navigator.hardwareConcurrency||6)-1)),gbPerHour:Number($('batchGbHour').value),imageDurationMs:Number($('imageSeconds').value)*1000,allowImageFlip:$('allowFlip').checked,maxRenderAttempts:Number($('batchAttempts').value),selectionMode:$('selectionMode').value,transitionItems:selectedTransitions('batch'),minTransitionMs:Number($('batchTransitionMin')?.value||600),maxTransitionMs:Number($('batchTransitionMax')?.value||900),avoidRepeatCount:Number($('batchAvoidRepeat')?.value??2),safetyPercent:95,audioBitrateKbps:256,cpuPreset:'veryfast',allowCpuFallback:true};}
+function collectBatch(){const library=state.libraries.find(l=>l.id===$('batchLibrary').value),mode=$('backgroundMode').value,voiceFolder=$('voiceFolder').value,voiceSourceMode=$('batchVoiceSourceMode')?.value||'EXISTING_AUDIO',voiceProfileId=$('batchVoiceProfileSelect')?.value||'default',channelKey=$('topGlobalKeySelect')?.value||localStorage.getItem('zc_active_channel_key')||'03_Nhom_Ba_Gia_Drama_Gia_Dinh_Mexico';const isStockOrImage=['STOCK_VIDEO','IMAGE_SEQUENCE','STORY_PIP_STOCK'].includes(mode);return{channelKey,batchName:$('batchName').value,projectId:$('batchProject').value||null,templateId:$('batchTemplate').value||null,backgroundMode:mode,storyPipOverStock:mode==='STORY_PIP_STOCK',storyMode:$('farmStoryDivisionMode')?.value||'CUE',imageCount:Number($('farmStoryCountInput')?.value||30),characterDna:$('farmStoryCharacterDna')?.value||'',voiceSourceMode,voiceProfileId,voiceFolder,srtFolder:voiceFolder,autoGenerateSrt:$('batchAcceleration').value!=='FULL_GPU_ZERO_COPY',whisperModel:'small',whisperLanguage:$('batchSrtLanguage')?.value||'auto',srtMaxChars:42,srtMaxDur:4.2,jobIntroFolder:$('jobIntroFolder')?.value||'',batchJobIntroPath:$('batchJobIntro')?.value||'',jobIntroAudioMode:String($('batchJobIntroAudioMode')?.value||'MUTE'),jobIntroTransition:'NONE',jobIntroTransitionMs:0,jobIntroNoiseOverlay:false,enableJobGreenLayer:false,jobGreenFolder:'',jobGreenConfigs:state.jobGreenConfigs||{},defaultFolderImageTransform:loadDefaultFolderImageTransform(),requireJobGreenAsset:false,requireJobGreenEdit:false,cleanupJobGreenCache:true,jobGreenCacheDurationMs:30000,libraryId:isStockOrImage?library?.id||null:null,mediaFolder:isStockOrImage?($('mediaFolder').value||library?.root_path||''):'',usedFolder:'',manualMediaPath:mode==='MANUAL_MEDIA'?$('manualMediaPath').value:'',outputFolder:$('outputFolder').value||(voiceSourceMode==='ONLY_RENDER_VOICE'?voiceFolder:''),width:Number($('batchWidth').value),height:Number($('batchHeight').value),fps:Number($('batchFps').value),subtitle:renderSubtitleOverride('batch'),codec:$('batchCodec').value,accelerationMode:$('batchAcceleration').value,gpuIndex:Number($('batchGpuIndex').value??-1),performanceProfile:$('batchPerformance').value,maxParallelJobs:Number($('batchWorkers').value||3),stockAllocationMode:['STOCK_VIDEO','STORY_PIP_STOCK'].includes(mode)?'DURATION_POOL':'PER_JOB',stockPlaybackRate:.75,extendShortStock:false,stockClonePasses:1,stockCloneFlip:true,stockCloneZoom:1.1,transformAllStock:true,forceStockCover:true,deleteConsumedMatchedStock:true,moveUsedStock:false,filterComplexThreads:Math.max(2,Math.min(16,(navigator.hardwareConcurrency||6)-1)),gbPerHour:Number($('batchGbHour').value),imageDurationMs:Number($('imageSeconds').value)*1000,allowImageFlip:$('allowFlip').checked,maxRenderAttempts:Number($('batchAttempts').value),selectionMode:$('selectionMode').value,transitionItems:selectedTransitions('batch'),minTransitionMs:Number($('batchTransitionMin')?.value||600),maxTransitionMs:Number($('batchTransitionMax')?.value||900),avoidRepeatCount:Number($('batchAvoidRepeat')?.value??2),safetyPercent:95,audioBitrateKbps:256,cpuPreset:'veryfast',allowCpuFallback:true};}
 async function preflight(){
   const imgDir=$('projectImageFolder')?.value?.trim()||'';
   if(imgDir&&typeof scanAndRenderProjectImageFolderList==='function'){
@@ -3198,23 +3237,41 @@ function buildInlineStockBadgeHtml(stSum, mediaFolder) {
         $('zcBadgeSubTab_render').textContent = '0 MP4';
       }
     }
+    const abInfo = st.autoBalanceInfo || { activeWorkers: 0, maxWorkers: 3 };
+    const abText = `⚡ Auto Cân Bằng: ${abInfo.activeWorkers || 0}/${abInfo.maxWorkers || 3} luồng GPU song song`;
     if (!items.length) {
       if (queueTitle) {
-        queueTitle.textContent = `🎬 Bàn #7 [${chanLabel}] — Tiến Độ Tự Động Tạo Voice (.wav), Phụ Đề (.srt) & Render Video GPU (.mp4)`;
+        queueTitle.textContent = `🎬 Bàn #7 [${chanLabel}] — Tiến Độ Tự Động Tạo Voice (.wav), Phụ Đề (.srt) & Render Video GPU (.mp4) · [${abText}]`;
       }
       queueList.innerHTML = `<div style="padding:18px 16px;background:#0d1320;border:1px dashed #334155;border-radius:8px;color:#94a3b8;font-size:12.5px;">
-        ⏳ Hàng đợi Bàn #7 của kênh <strong style="color:#fde047;">${htmlEscape(chanLabel)}</strong> hiện chưa có video nào.${hiddenOtherCount > 0 ? `<br/><span style="color:#38bdf8;">💡 Đang có ${hiddenOtherCount} video thuộc kênh khác (đã được tách riêng). Bạn có thể đổi Kênh hoặc bấm nút <strong>"🔍 Đang lọc riêng..."</strong> ở góc phải nếu muốn xem tất cả.</span>` : `<br/>Khi kịch bản ở Tab 1 viết xong (hoặc khi bạn bấm <strong>"🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render"</strong>), tiến độ tạo Voice &amp; Render Video sẽ hiển thị toàn màn hình tại đây.`}
+        ⏳ Hàng đợi Bàn #7 của kênh <strong style="color:#fde047;">${htmlEscape(chanLabel)}</strong> hiện chưa có video nào (${htmlEscape(abText)}).${hiddenOtherCount > 0 ? `<br/><span style="color:#38bdf8;">💡 Đang có ${hiddenOtherCount} video thuộc kênh khác (đã được tách riêng). Bạn có thể đổi Kênh hoặc bấm nút <strong>"🔍 Đang lọc riêng..."</strong> ở góc phải nếu muốn xem tất cả.</span>` : `<br/>Khi kịch bản ở Tab 1 viết xong (hoặc khi bạn bấm <strong>"🚀 Đẩy Tất Cả Kịch Bản Đã Có KB.txt Sang Render"</strong>), tiến độ tạo Voice &amp; Render Video sẽ hiển thị toàn màn hình tại đây.`}
       </div>`;
     } else {
-      const activeCount = items.filter(x => ['RENDERING', 'WAITING_GPU', 'WAITING_BATCH'].includes(x.status)).length;
+      const activeCount = items.filter(x => ['RENDERING', 'WAITING_GPU', 'WAITING_BATCH', 'WAITING_GREEN_CHECK'].includes(x.status)).length;
+      const renderingNowCount = items.filter(x => x.status === 'RENDERING').length;
       const doneCount = items.filter(x => x.status === 'COMPLETED').length;
       const pausedStockJob = allItems.find(x => x.status === 'PAUSED_INSUFFICIENT_STOCK');
+      const waitingGreenCheckJobs = items.filter(x => x.status === 'WAITING_GREEN_CHECK');
       if (queueTitle) {
         queueTitle.textContent = pausedStockJob
           ? `⏸️ Bàn #7 [${chanLabel}] — TẠM DỪNG DO HẾT STOCK (${doneCount}/${items.length} hoàn tất · Đang chờ bổ sung Stock)`
-          : `🎬 Bàn #7 [${chanLabel}] — Tiến Độ Tự Động Tạo Voice & Render Video GPU (${doneCount}/${items.length} hoàn tất · ${activeCount} đang xử lý)`;
+          : waitingGreenCheckJobs.length > 0
+            ? `🔍 Bàn #7 [${chanLabel}] — CHỜ KIỂM TRA VỊ TRÍ ẢNH NỀN XANH GÓC TRÁI DƯỚI (${waitingGreenCheckJobs.length} kịch bản chờ duyệt · ${doneCount}/${items.length} hoàn tất)`
+            : `🎬 Bàn #7 [${chanLabel}] — Tiến Độ Tạo Voice & Render Video GPU (${doneCount}/${items.length} hoàn tất · ${renderingNowCount}/${abInfo.maxWorkers || 3} luồng đang chạy · ${activeCount} trong hàng đợi)`;
       }
       const alertObj = st.pausedStockAlert || pausedStockJob?.stockAlert || null;
+      const greenCheckBannerHtml = waitingGreenCheckJobs.length > 0
+        ? `<div style="padding:12px 14px;background:rgba(6,95,70,0.32);border:1px solid #10b981;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+            <div style="font-size:12.5px;color:#d1fae5;line-height:1.5;">
+              <strong style="color:#34d399;font-size:13.5px;">🔍 [KEY 04 PADRE MX] ĐÃ QUÉT & CẮT GỌN ẢNH NỀN XANH ĐẶT Ở GÓC TRÁI BÊN DƯỚI (${waitingGreenCheckJobs.length} KỊCH BẢN)</strong><br/>
+              Mỗi kịch bản đã được gắn riêng 1 ảnh nền xanh đã cắt gọn (<code>${htmlEscape(waitingGreenCheckJobs[0]?.scriptName?.replace(/\.txt$/i, '.png') || '')}</code>) ở <strong>Góc Trái Bên Dưới (X=${waitingGreenCheckJobs[0]?.greenPlacement?.x ?? 16}, Y=${waitingGreenCheckJobs[0]?.greenPlacement?.y ?? 400})</strong>. Vui lòng kiểm tra kỹ vị trí ảnh trên khung Template trước khi tạo video!
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" onclick="window.openBridgeGreenPositionCheckModal('${htmlEscape(waitingGreenCheckJobs[0].id)}')" style="padding:7px 13px;font-size:12px;font-weight:800;background:#0284c7;color:#ffffff;border:1px solid #38bdf8;border-radius:6px;cursor:pointer;box-shadow:0 0 10px rgba(2,132,199,0.45);">🎯 Mở Khung Kiểm Tra Kỹ Vị Trí Ảnh Nền Xanh & Duyệt</button>
+              <button type="button" onclick="window.approveBridgeGreenPositionQuick('${htmlEscape(waitingGreenCheckJobs[0].id)}', true)" style="padding:7px 12px;font-size:11.5px;font-weight:800;background:#059669;color:#ffffff;border:1px solid #34d399;border-radius:6px;cursor:pointer;">✅ Đã Kiểm Tra ➔ Duyệt Góc Trái Dưới & Bắt Đầu Tạo Video Theo Template</button>
+            </div>
+          </div>`
+        : '';
       const pausedBannerHtml = (st.pausedReason === 'INSUFFICIENT_STOCK' || pausedStockJob)
         ? `<div style="padding:12px 14px;background:rgba(127,29,29,0.35);border:1px solid #ef4444;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
             <div style="font-size:12.5px;color:#fecaca;">
@@ -3229,23 +3286,41 @@ function buildInlineStockBadgeHtml(stSum, mediaFolder) {
           </div>`
         : '';
       const reversed = items.slice().reverse();
-      queueList.innerHTML = pausedBannerHtml + reversed.map((job, idx) => {
+      queueList.innerHTML = greenCheckBannerHtml + pausedBannerHtml + reversed.map((job, idx) => {
         const pct = Math.max(0, Math.min(100, Number(job.percent || 0)));
         const isPausedStock = job.status === 'PAUSED_INSUFFICIENT_STOCK';
+        const isWaitingGreenCheck = job.status === 'WAITING_GREEN_CHECK';
+        const jChan = detectJobChannel(job);
+        const isKey04Job = jChan === '04_Nhom_Ong_Gia_Trung_Tri_Mexico';
         const statusColor = job.status === 'COMPLETED' ? '#10b981' :
           job.status === 'FAILED' ? '#ef4444' :
           isPausedStock ? '#f97316' :
+          isWaitingGreenCheck ? '#34d399' :
           job.status === 'RENDERING' ? '#38bdf8' : '#f59e0b';
         const rowBorder = isPausedStock ? '#ef4444' :
+          isWaitingGreenCheck ? '#10b981' :
           job.status === 'RENDERING' ? '#0284c7' :
           job.status === 'COMPLETED' ? 'rgba(16,185,129,0.35)' :
           job.status === 'FAILED' ? 'rgba(239,68,68,0.45)' : '#1e293b';
-        const jChan = detectJobChannel(job);
         const chanBadge = showAll
           ? `<span style="padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#1e293b;color:#fde047;border:1px solid #334155;flex-shrink:0;">${htmlEscape(jChan.toUpperCase())}</span>`
           : '';
         const resumeStockBtn = isPausedStock
           ? `<button type="button" onclick="window.openInsufficientStockModal()" style="padding:3px 9px;font-size:11px;font-weight:800;background:#9a3412;color:#ffedd5;border:1px solid #f97316;border-radius:5px;cursor:pointer;">➕ Bổ Sung Stock &amp; Chạy Tiếp</button>`
+          : '';
+        const key04Btns = (isKey04Job || isWaitingGreenCheck || job.greenCutoutPath)
+          ? [
+              `<button type="button" onclick="window.openBridgeGreenPositionCheckModal('${htmlEscape(job.id)}')" style="padding:3px 9px;font-size:11px;font-weight:800;background:${isWaitingGreenCheck ? '#0284c7' : '#1e293b'};color:#ffffff;border:1px solid #38bdf8;border-radius:5px;cursor:pointer;" title="Kiểm tra kỹ vị trí ảnh nền xanh đã cắt gọn đặt ở góc trái bên dưới cho kịch bản này">🎯 ${isWaitingGreenCheck ? 'Kiểm Tra Vị Trí Ảnh Xanh' : 'Vị Trí Ảnh Xanh'}</button>`,
+              isWaitingGreenCheck
+                ? `<button type="button" onclick="window.approveBridgeGreenPositionQuick('${htmlEscape(job.id)}', false)" style="padding:3px 9px;font-size:11px;font-weight:800;background:#059669;color:#ffffff;border:1px solid #34d399;border-radius:5px;cursor:pointer;" title="Xác nhận vị trí góc trái dưới và bắt đầu tạo video theo Template">✅ Duyệt & Render</button>`
+                : '',
+              job.thumbnailPath
+                ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(job.thumbnailPath.replace(/\\/g, '\\\\'))}')" style="padding:3px 7px;font-size:10.5px;font-weight:700;background:#1e293b;color:#38bdf8;border:1px solid #334155;border-radius:5px;cursor:pointer;" title="Mở ảnh THUMBNAIL.png (80/20)">🖼️ Thumb</button>`
+                : '',
+              job.greenFullPath
+                ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(job.greenFullPath.replace(/\\/g, '\\\\'))}')" style="padding:3px 7px;font-size:10.5px;font-weight:700;background:#064e3b;color:#6ee7b7;border:1px solid #10b981;border-radius:5px;cursor:pointer;" title="Mở ảnh THUMBNAIL-NENXANH.png (#00FF00)">🟢 Nền Xanh</button>`
+                : ''
+            ].filter(Boolean).join('')
           : '';
         const openBtn = job.videoOutputPath
           ? `<button type="button" onclick="window.openBridgePath('${htmlEscape(job.videoOutputPath.replace(/\\/g, '\\\\'))}')" style="padding:3px 9px;font-size:11px;font-weight:700;background:#065f46;color:#d1fae5;border:1px solid #10b981;border-radius:5px;cursor:pointer;">▶️ Mở MP4</button>`
@@ -3263,13 +3338,14 @@ function buildInlineStockBadgeHtml(stSum, mediaFolder) {
               <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${statusColor};flex-shrink:0;box-shadow:0 0 6px ${statusColor};"></span>
               ${chanBadge}
               <strong style="color:#f8fafc;font-size:12.8px;white-space:nowrap;">${htmlEscape(job.scriptName || job.projectId)}</strong>
-              <span style="color:${isPausedStock ? '#fdba74' : '#94a3b8'};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${htmlEscape(job.stage || job.status)}</span>
+              <span style="color:${isPausedStock ? '#fdba74' : (isWaitingGreenCheck ? '#6ee7b7' : '#94a3b8')};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${htmlEscape(job.stage || job.status)}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-              <div style="width:110px;height:6px;background:#090d16;border-radius:999px;overflow:hidden;border:1px solid #1e293b;">
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <div style="width:95px;height:6px;background:#090d16;border-radius:999px;overflow:hidden;border:1px solid #1e293b;">
                 <div style="width:${pct}%;height:100%;background:${statusColor};transition:width 0.25s;"></div>
               </div>
-              <span style="font-family:monospace;font-size:12px;color:${statusColor};font-weight:800;min-width:38px;text-align:right;">${pct}%</span>
+              <span style="font-family:monospace;font-size:12px;color:${statusColor};font-weight:800;min-width:36px;text-align:right;">${pct}%</span>
+              ${key04Btns}
               ${resumeStockBtn}
               ${openBtn}
               ${folderBtn}
@@ -3290,6 +3366,79 @@ window.toggleBridgeChannelFilter = function() {
 
 window.openBridgePath = function(p) {
   if (p && !String(p).startsWith('(')) api.openPath(p);
+};
+
+window.openBridgeGreenPositionCheckModal = async function(jobId) {
+  try {
+    let st = _lastBridgeState || (await api.scriptBridge?.status?.());
+    let targetJob = (st?.queue || []).find((x) => x.id === jobId) || (st?.queue || []).find((x) => x.status === 'WAITING_GREEN_CHECK');
+    if (!targetJob) {
+      toast('Không tìm thấy kịch bản cần kiểm tra ảnh nền xanh.', true);
+      return;
+    }
+    if (!targetJob.greenCutoutPath) {
+      const rescan = await api.scriptBridge?.rescanGreenCrop?.({ jobId: targetJob.id, forceRegenerate: true });
+      if (rescan?.job) targetJob = rescan.job;
+      if (rescan?.state) renderScriptBridgeState(rescan.state);
+    }
+    const baseKey = String(targetJob.scriptName || targetJob.projectId || '001_KB').replace(/\.[^.]+$/, '');
+    const gp = targetJob.greenPlacement || { x: 0, y: 340, width: 570, height: 740, keyColor: '#00FF00', similarity: 0.24, softness: 0.07 };
+    const editorJob = {
+      id: targetJob.id,
+      bridgeJobId: targetJob.id,
+      _isBridgeKey04Check: true,
+      scriptName: targetJob.scriptName,
+      voiceName: targetJob.scriptName,
+      fileName: targetJob.greenCutoutPath ? targetJob.greenCutoutPath.split(/[\\/]/).pop() : `${baseKey}.png`,
+      filePath: targetJob.greenCutoutPath,
+      projectImagePath: targetJob.greenCutoutPath,
+      thumbnailPath: targetJob.thumbnailPath || '',
+      greenFullPath: targetJob.greenFullPath || '',
+      baseKey,
+      greenConfig: {
+        x: Number(gp.x ?? 0),
+        y: Number(gp.y ?? 340),
+        width: Number(gp.width || 570),
+        height: Number(gp.height || 740),
+        assetMode: 'GREEN',
+        keyColor: gp.keyColor || '#00FF00',
+        similarity: Number(gp.similarity ?? 0.24),
+        softness: Number(gp.softness ?? 0.07),
+        despillMix: 0.45,
+        despillExpand: 0.02,
+        opacity: 1,
+        rotation: 0,
+        edited: true
+      }
+    };
+    state.jobGreenConfigs[baseKey] = editorJob.greenConfig;
+    await openJobGreenEditorV3(editorJob);
+  } catch (err) {
+    toast(`Lỗi mở khung kiểm tra ảnh nền xanh: ${err?.message || err}`, true);
+  }
+};
+
+window.approveBridgeGreenPositionQuick = async function(jobId, applyToAllKey04 = false, customCfg = null) {
+  try {
+    const st = _lastBridgeState || (await api.scriptBridge?.status?.());
+    const targetJob = (st?.queue || []).find((x) => x.id === jobId) || (st?.queue || []).find((x) => x.status === 'WAITING_GREEN_CHECK');
+    const baseKey = String(targetJob?.scriptName || targetJob?.projectId || '').replace(/\.[^.]+$/, '');
+    const gp = customCfg || state.jobGreenConfigs?.[baseKey] || targetJob?.greenPlacement || { x: 0, y: 340, width: 570, height: 740, keyColor: '#00FF00' };
+    const res = await api.scriptBridge?.approveGreenPosition?.({
+      jobId: targetJob?.id || jobId,
+      scriptPath: targetJob?.scriptPath || '',
+      greenPlacement: gp,
+      applyToAllKey04: Boolean(applyToAllKey04)
+    });
+    if (res?.state) renderScriptBridgeState(res.state);
+    toast(
+      applyToAllKey04
+        ? `✅ Đã kiểm tra & duyệt vị trí ảnh nền xanh góc trái dưới (X=${Math.round(gp.x ?? 0)}, Y=${Math.round(gp.y ?? 340)}) cho toàn bộ lô Key 04 ➔ Bắt đầu tạo video theo Template!`
+        : `✅ Đã kiểm tra & duyệt vị trí ảnh nền xanh góc trái dưới (X=${Math.round(gp.x ?? 0)}, Y=${Math.round(gp.y ?? 340)}) ➔ Bắt đầu tạo video theo Template!`
+    );
+  } catch (err) {
+    toast(`Lỗi duyệt vị trí ảnh nền xanh: ${err?.message || err}`, true);
+  }
 };
 
 const ALL_15_CHANNEL_KEYS = [
@@ -4338,6 +4487,16 @@ window.triggerAllReadyScriptsToBridge = function() {
   api.scriptBridge?.onInsufficientStock?.((alertPayload) => {
     toast(`🚨 HẾT STOCK: ${alertPayload?.message || 'Kho Stock không đủ thời lượng, chương trình đã tạm dừng!'}`, true);
     window.openInsufficientStockModal(alertPayload);
+  });
+
+  api.scriptBridge?.onRequireGreenCheck?.((jobPayload) => {
+    toast(`🔍 [Key 04 Padre MX] Đã quét & cắt gọn ảnh nền xanh đặt ở góc trái dưới cho [${jobPayload?.scriptName || ''}]. Vui lòng kiểm tra kỹ vị trí ảnh trước khi tạo video!`);
+    const modalBackdrop = $('modalBackdrop');
+    if (jobPayload?.id && (!modalBackdrop || modalBackdrop.hidden)) {
+      setTimeout(() => {
+        window.openBridgeGreenPositionCheckModal(jobPayload.id);
+      }, 250);
+    }
   });
 
   api.scriptBridge?.onRequestSyncBatchConfig?.(() => {

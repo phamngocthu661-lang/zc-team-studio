@@ -1,6 +1,6 @@
 ---
 name: padre-mx-independent-qa
-version: 1.1.0
+version: 1.2.0
 description: "Step4 read-only independent exhaustive QA for Mexican Spanish elder-father stories, logic/continuity/legal reality and orthography only; freeze one-time repair scope; postrepair audit never permits second rewrite."
 ---
 # PADRE MX — QA AUDIT ONLY (STEP4 BEFORE/AFTER ONE REPAIR)
@@ -33,3 +33,6 @@ Catch: wrongly spelled character names; incompatible parent ages; hospital disch
 
 ## V1.1 QA required before freeze
 Use `references/QA_REVIEW_V11_SCHEMA.json`. For every Part cite an exact >=18-character text anchor from that Part, independently inspect it for chronology, money, character knowledge, document provenance, motivation, es-MX and TTS. The full seven-category rubric values MUST add to `score`. Provide structured `chronology` with ages and dated birth/pregnancy/flashback events; `narrative_consistency.py` will flag risky later-year pregnancy references. Run the actual `freeze_qa.py`; do not assert READY from a reported score, old QA JSON, or partial read. When risk is not rectifiable within a narrow one-time repair, BLOCK the current version. Creative quality review is distinct; avoid approving merely because no mechanical error was found.
+
+## V1.2 QA length regression
+Explicitly reject scripts that are roughly half-length (e.g., 35,000–40,000) even if they have 7 headings and convincing prose. Verify full script body 70,000–80,000 Unicode codepoints and every Part >=8,500. The stage gate must have been satisfied at A/B/C. Length failure is a HARD BLOCK, not eligible for a narrow Step5 typo/logic repair. Never award READY based on a high score to short scripts.

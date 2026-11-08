@@ -493,77 +493,100 @@ function resolveProjectImageLayers({ job, config = {}, renderConfig }) {
   const globalGreenMode = String(config.projectImageMode || '').toUpperCase() === 'GREEN';
   const perJobCfg = findPerJobImageConfig(voiceRef, config, assetPath);
 
+  let hasBottomLeftDynamicGreen = false;
+  const mappedLayers = layers.map((layer) => {
+    if (!isProjectVoiceImageLayer(layer)) return layer;
+    const perJobMode = perJobCfg?.assetMode ? String(perJobCfg.assetMode).toUpperCase() : '';
+    const layerGreenMode = perJobMode === 'GREEN'
+      ? true
+      : perJobMode === 'IMAGE'
+        ? false
+        : (globalGreenMode ||
+           String(layer.effect?.projectImageMode || '').toUpperCase() === 'GREEN' ||
+           layer.effect?.greenScreen === true);
+    const resolvedType = layerGreenMode
+      ? (isVideoAsset ? 'GREENSCREEN_VIDEO' : 'GREENSCREEN_IMAGE')
+      : (isVideoAsset ? 'VIDEO' : 'IMAGE');
+    const prevTransform = layer.transform || fallbackTransform;
+    const hasPerJobTransform = Boolean(perJobCfg && (perJobCfg.edited || Number.isFinite(Number(perJobCfg.x)) || Number.isFinite(Number(perJobCfg.width))));
+    const resolvedTransform = hasPerJobTransform
+      ? {
+          ...prevTransform,
+          x: Number.isFinite(Number(perJobCfg.x)) ? Math.round(Number(perJobCfg.x)) : Number(prevTransform.x || 0),
+          y: Number.isFinite(Number(perJobCfg.y)) ? Math.round(Number(perJobCfg.y)) : Number(prevTransform.y || 0),
+          width: Number.isFinite(Number(perJobCfg.width)) && Number(perJobCfg.width) > 0
+            ? Math.round(Number(perJobCfg.width))
+            : Number(prevTransform.width || 460),
+          height: Number.isFinite(Number(perJobCfg.height)) && Number(perJobCfg.height) > 0
+            ? Math.round(Number(perJobCfg.height))
+            : Number(prevTransform.height || 460),
+          rotation: Number.isFinite(Number(perJobCfg.rotation))
+            ? Number(perJobCfg.rotation)
+            : Number(prevTransform.rotation || 0),
+          opacity: Number.isFinite(Number(perJobCfg.opacity))
+            ? Number(perJobCfg.opacity)
+            : Number(prevTransform.opacity ?? 1)
+        }
+      : prevTransform;
+    if (layerGreenMode && Number(resolvedTransform.x || 0) < 350 && Number(resolvedTransform.y || 0) >= 150) {
+      hasBottomLeftDynamicGreen = true;
+    }
+    const prevEffect = layer.effect || {};
+    const customKeyColor = perJobCfg?.keyColor || prevEffect.keyColor || DEFAULT_GREEN_KEY_COLORS[0];
+    const customKeyColors = Array.isArray(perJobCfg?.keyColors) && perJobCfg.keyColors.length
+      ? perJobCfg.keyColors
+      : (Array.isArray(prevEffect.keyColors) && prevEffect.keyColors.length
+        ? prevEffect.keyColors
+        : [customKeyColor, ...DEFAULT_GREEN_KEY_COLORS].filter((v, idx, arr) => arr.indexOf(v) === idx));
+    const resolvedEffect = layerGreenMode
+      ? {
+          ...prevEffect,
+          keyColor: customKeyColor,
+          keyColors: customKeyColors,
+          similarity: Number(perJobCfg?.similarity ?? prevEffect.similarity ?? 0.22),
+          softness: Number(perJobCfg?.softness ?? prevEffect.softness ?? 0.07),
+          despillMix: Number(perJobCfg?.despillMix ?? prevEffect.despillMix ?? 0.45),
+          despillExpand: Number(perJobCfg?.despillExpand ?? prevEffect.despillExpand ?? 0.02),
+          blendMode: prevEffect.blendMode || 'normal'
+        }
+      : prevEffect;
+    return {
+      ...layer,
+      type: resolvedType,
+      sourceMode: 'VOICE_IMAGE',
+      dynamicVoiceImage: true,
+      renderAboveTemplate: layerGreenMode,
+      transform: resolvedTransform,
+      startMs: perJobCfg?.edited && Number.isFinite(Number(perJobCfg.startMs)) ? Number(perJobCfg.startMs) : (layer.startMs ?? 0),
+      endMs: perJobCfg?.edited && perJobCfg.endMs !== undefined ? perJobCfg.endMs : (layer.endMs ?? null),
+      loop: isVideoAsset
+        ? (perJobCfg?.loop !== undefined ? Boolean(perJobCfg.loop) : layer.loop !== false)
+        : Boolean(layer.loop),
+      sourceReference: assetPath,
+      effect: resolvedEffect,
+      name: layer.name || `${layerGreenMode ? 'Green Project' : 'Ảnh Project'} · ${path.basename(assetPath)}`
+    };
+  });
+
+  const finalLayers = hasBottomLeftDynamicGreen
+    ? mappedLayers.filter((layer) => {
+        if (layer.dynamicVoiceImage === true) return true;
+        const lType = String(layer.type || layer.layerType || '').toUpperCase();
+        if (!['GREENSCREEN_VIDEO', 'GREENSCREEN_IMAGE'].includes(lType)) return true;
+        const tx = Number(layer.transform?.x || 0);
+        const ty = Number(layer.transform?.y || 0);
+        const tw = Number(layer.transform?.width || 0);
+        // Nếu template có sẵn avatar tĩnh ở góc dưới bên trái (như kenh2.mp4), tự động ẩn để nhường chỗ cho ảnh Green riêng của kịch bản
+        if (tx < 250 && ty > 550 && tw > 0 && tw < 800) {
+          return false;
+        }
+        return true;
+      })
+    : mappedLayers;
+
   return {
     ...renderConfig,
-    layers: layers.map((layer) => {
-      if (!isProjectVoiceImageLayer(layer)) return layer;
-      const perJobMode = perJobCfg?.assetMode ? String(perJobCfg.assetMode).toUpperCase() : '';
-      const layerGreenMode = perJobMode === 'GREEN'
-        ? true
-        : perJobMode === 'IMAGE'
-          ? false
-          : (globalGreenMode ||
-             String(layer.effect?.projectImageMode || '').toUpperCase() === 'GREEN' ||
-             layer.effect?.greenScreen === true);
-      const resolvedType = layerGreenMode
-        ? (isVideoAsset ? 'GREENSCREEN_VIDEO' : 'GREENSCREEN_IMAGE')
-        : (isVideoAsset ? 'VIDEO' : 'IMAGE');
-      const prevTransform = layer.transform || fallbackTransform;
-      const hasPerJobTransform = Boolean(perJobCfg && (perJobCfg.edited || Number.isFinite(Number(perJobCfg.x)) || Number.isFinite(Number(perJobCfg.width))));
-      const resolvedTransform = hasPerJobTransform
-        ? {
-            ...prevTransform,
-            x: Number.isFinite(Number(perJobCfg.x)) ? Math.round(Number(perJobCfg.x)) : Number(prevTransform.x || 0),
-            y: Number.isFinite(Number(perJobCfg.y)) ? Math.round(Number(perJobCfg.y)) : Number(prevTransform.y || 0),
-            width: Number.isFinite(Number(perJobCfg.width)) && Number(perJobCfg.width) > 0
-              ? Math.round(Number(perJobCfg.width))
-              : Number(prevTransform.width || 460),
-            height: Number.isFinite(Number(perJobCfg.height)) && Number(perJobCfg.height) > 0
-              ? Math.round(Number(perJobCfg.height))
-              : Number(prevTransform.height || 460),
-            rotation: Number.isFinite(Number(perJobCfg.rotation))
-              ? Number(perJobCfg.rotation)
-              : Number(prevTransform.rotation || 0),
-            opacity: Number.isFinite(Number(perJobCfg.opacity))
-              ? Number(perJobCfg.opacity)
-              : Number(prevTransform.opacity ?? 1)
-          }
-        : prevTransform;
-      const prevEffect = layer.effect || {};
-      const customKeyColor = perJobCfg?.keyColor || prevEffect.keyColor || DEFAULT_GREEN_KEY_COLORS[0];
-      const customKeyColors = Array.isArray(perJobCfg?.keyColors) && perJobCfg.keyColors.length
-        ? perJobCfg.keyColors
-        : (Array.isArray(prevEffect.keyColors) && prevEffect.keyColors.length
-          ? prevEffect.keyColors
-          : [customKeyColor, ...DEFAULT_GREEN_KEY_COLORS].filter((v, idx, arr) => arr.indexOf(v) === idx));
-      const resolvedEffect = layerGreenMode
-        ? {
-            ...prevEffect,
-            keyColor: customKeyColor,
-            keyColors: customKeyColors,
-            similarity: Number(perJobCfg?.similarity ?? prevEffect.similarity ?? 0.22),
-            softness: Number(perJobCfg?.softness ?? prevEffect.softness ?? 0.07),
-            despillMix: Number(perJobCfg?.despillMix ?? prevEffect.despillMix ?? 0.45),
-            despillExpand: Number(perJobCfg?.despillExpand ?? prevEffect.despillExpand ?? 0.02),
-            blendMode: prevEffect.blendMode || 'normal'
-          }
-        : prevEffect;
-      return {
-        ...layer,
-        type: resolvedType,
-        sourceMode: 'VOICE_IMAGE',
-        dynamicVoiceImage: true,
-        transform: resolvedTransform,
-        startMs: perJobCfg?.edited && Number.isFinite(Number(perJobCfg.startMs)) ? Number(perJobCfg.startMs) : (layer.startMs ?? 0),
-        endMs: perJobCfg?.edited && perJobCfg.endMs !== undefined ? perJobCfg.endMs : (layer.endMs ?? null),
-        loop: isVideoAsset
-          ? (perJobCfg?.loop !== undefined ? Boolean(perJobCfg.loop) : layer.loop !== false)
-          : Boolean(layer.loop),
-        sourceReference: assetPath,
-        effect: resolvedEffect,
-        name: layer.name || `${layerGreenMode ? 'Green Project' : 'Ảnh Project'} · ${path.basename(assetPath)}`
-      };
-    })
+    layers: finalLayers
   };
 }
 
@@ -1483,10 +1506,78 @@ class BatchService {
     this.voiceProfileManager = voiceProfileManager || null;
     this.pauseRequested = false;
     this.activeBatchId = null;
+    this.manualBatchRunning = false;
     this.layerCachePromises = new Map();
     this.stockSourceLocks = new Set();
     this.disclaimerInfoPromises = new Map();
     this.jobIntroInfoPromises = new Map();
+    this._libraryScanPromises = new Map();
+    this._libraryLastScannedAt = new Map();
+    this._voiceGenMutexPromise = Promise.resolve();
+    this._activeVoiceGenWaiters = 0;
+    this._inFlightStockReservations = new Map();
+    this._inFlightPendingVoiceMs = new Map();
+  }
+
+  _normStockKey(filePath) {
+    if (!filePath) return '';
+    try {
+      return path.resolve(String(filePath)).replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
+    } catch {
+      return String(filePath).toLocaleLowerCase('en-US');
+    }
+  }
+
+  _getInFlightReservedEndMs(filePath) {
+    const key = this._normStockKey(filePath);
+    if (!key || !this._inFlightStockReservations.has(key)) return 0;
+    const jobMap = this._inFlightStockReservations.get(key);
+    let maxEnd = 0;
+    for (const endMs of jobMap.values()) {
+      if (Number(endMs) > maxEnd) maxEnd = Number(endMs);
+    }
+    return maxEnd;
+  }
+
+  _recordInFlightStockSegments(jobId, segments = []) {
+    if (!jobId || !Array.isArray(segments)) return;
+    for (const seg of segments) {
+      const src = seg.originalFilePath || seg.filePath;
+      const key = this._normStockKey(src);
+      if (!key) continue;
+      const rangeEnd = Number(seg.originalRangeEndMs ?? seg.sourceRangeEndMs ?? 0);
+      if (rangeEnd <= 0) continue;
+      if (!this._inFlightStockReservations.has(key)) {
+        this._inFlightStockReservations.set(key, new Map());
+      }
+      const jobMap = this._inFlightStockReservations.get(key);
+      const prev = Number(jobMap.get(jobId) || 0);
+      if (rangeEnd > prev) {
+        jobMap.set(jobId, rangeEnd);
+      }
+    }
+  }
+
+  _releaseInFlightStockSegments(jobId) {
+    if (!jobId) return;
+    for (const [key, jobMap] of this._inFlightStockReservations.entries()) {
+      jobMap.delete(jobId);
+      if (jobMap.size === 0) {
+        this._inFlightStockReservations.delete(key);
+      }
+    }
+  }
+
+  _getInFlightPendingVoiceMsForLibrary(libraryId, excludeToken = null) {
+    if (!libraryId) return 0;
+    let sum = 0;
+    for (const [token, entry] of this._inFlightPendingVoiceMs.entries()) {
+      if (excludeToken && token === excludeToken) continue;
+      if (entry && entry.libraryId === libraryId) {
+        sum += Math.max(0, Number(entry.voiceMs || 0));
+      }
+    }
+    return sum;
   }
 
   _ensureVoiceServices() {
@@ -1564,6 +1655,15 @@ class BatchService {
     const selectedProfileId = config.voiceProfileId || 'omnivoice';
     const profile = voiceProfileManager.getProfile(selectedProfileId);
 
+    this._activeVoiceGenWaiters = Math.max(0, Number(this._activeVoiceGenWaiters || 0)) + 1;
+    let releaseVoiceMutex;
+    const prevVoiceMutex = this._voiceGenMutexPromise || Promise.resolve();
+    this._voiceGenMutexPromise = new Promise((resolve) => {
+      releaseVoiceMutex = resolve;
+    });
+
+    await prevVoiceMutex.catch(() => {});
+
     callbacks.onLog?.(`🎙️ [VOICESTUDIO AI] Bắt đầu tạo ${candidates.length} file voice (.wav) từ kịch bản (.txt) bằng giọng [${profile?.name || selectedProfileId}]...`);
 
     let generated = 0;
@@ -1573,12 +1673,15 @@ class BatchService {
           throw Object.assign(new Error('Đã hủy tạo voice theo yêu cầu.'), { code: 'ABORTED' });
         }
         const job = candidates[i];
+        if (!job.needsVoiceGeneration && hasValidVoiceFile(job)) {
+          continue;
+        }
         const scriptText = fs.readFileSync(job.scriptPath, 'utf8').trim();
         if (!scriptText) {
           throw new Error(`File kịch bản rỗng: ${path.basename(job.scriptPath)}`);
         }
 
-        const isLastCandidate = i === candidates.length - 1;
+        const isLastCandidate = i === candidates.length - 1 && this._activeVoiceGenWaiters <= 1;
         callbacks.onLog?.(`🎙️ [${i + 1}/${candidates.length}] Đang tạo voice (.wav) cho kịch bản: ${path.basename(job.scriptPath)}...`);
         await voiceValidator.generateFullScript({
           scriptText,
@@ -1609,22 +1712,24 @@ class BatchService {
         generated += 1;
       }
     } finally {
-      // Sau khi hoàn tất tạo voice, xóa sạch toàn bộ cache tạm và giải phóng bộ nhớ GPU/RAM
+      this._activeVoiceGenWaiters = Math.max(0, Number(this._activeVoiceGenWaiters || 1) - 1);
+      const shouldUnloadModel = this._activeVoiceGenWaiters === 0;
       if (voiceStudio && typeof voiceStudio.cleanupVoiceCaches === 'function') {
         try {
           const cleanStat = await voiceStudio.cleanupVoiceCaches({
             scriptDir: config.voiceFolder || (config.singleVoicePath ? path.dirname(config.singleVoicePath) : null),
-            unloadModel: true
+            unloadModel: shouldUnloadModel
           });
           if (cleanStat?.removedFiles > 0) {
             callbacks.onLog?.(
-              `🧹 [VOICESTUDIO AI] Đã xóa sạch ${cleanStat.removedFiles} file tạm/cache (${(cleanStat.freedBytes / 1024 / 1024).toFixed(2)} MB) và giải phóng bộ nhớ đệm GPU/RAM. Chỉ giữ lại đúng file .wav kết quả!`
+              `🧹 [VOICESTUDIO AI] Đã xóa sạch ${cleanStat.removedFiles} file tạm/cache (${(cleanStat.freedBytes / 1024 / 1024).toFixed(2)} MB)${shouldUnloadModel ? ' và giải phóng bộ nhớ đệm GPU/RAM. Chỉ giữ lại đúng file .wav kết quả!' : '.'}`
             );
-          } else {
+          } else if (shouldUnloadModel) {
             callbacks.onLog?.(`🧹 [VOICESTUDIO AI] Đã dọn sạch bộ nhớ đệm cache & giải phóng VRAM GPU. Chỉ giữ lại đúng file .wav kết quả!`);
           }
         } catch {}
       }
+      if (typeof releaseVoiceMutex === 'function') releaseVoiceMutex();
     }
 
     callbacks.onLog?.(`✅ [VOICESTUDIO AI] Đã hoàn tất tạo ${generated}/${candidates.length} file voice (.wav)!`);
@@ -2084,19 +2189,38 @@ class BatchService {
         });
     if (!library) throw new Error('Không tìm thấy media library.');
 
-    const scanned = await scanFolder(
-      library.root_path,
-      this.ffmpeg,
-      library.library_type,
-      ({ index, total, item }) => callbacks.onProgress?.({
-        stage: 'SCAN_MEDIA',
-        percent: total ? index / total * 100 : 100,
-        message: item.fileName
-      })
-    );
-    const missing = this.database.markLibraryScanMissing(library.id, scanned.map((item) => item.filePath));
-    if (missing) callbacks.onLog?.(`Media library: bỏ qua ${missing} file không còn tồn tại trên ổ đĩa.`);
-    for (const item of scanned) this.database.upsertMediaAsset(library.id, item);
+    const scanKey = `${library.id}:${library.root_path}`;
+    const lastScannedAt = Number(this._libraryLastScannedAt?.get(scanKey) || 0);
+    if (Date.now() - lastScannedAt < 12000 && (this.database.listMediaAssets?.(library.id) || []).length > 0) {
+      return library;
+    }
+    if (this._libraryScanPromises?.has(scanKey)) {
+      await this._libraryScanPromises.get(scanKey).catch(() => {});
+      return library;
+    }
+
+    const scanPromise = (async () => {
+      const scanned = await scanFolder(
+        library.root_path,
+        this.ffmpeg,
+        library.library_type,
+        ({ index, total, item }) => callbacks.onProgress?.({
+          stage: 'SCAN_MEDIA',
+          percent: total ? index / total * 100 : 100,
+          message: item.fileName
+        })
+      );
+      const missing = this.database.markLibraryScanMissing(library.id, scanned.map((item) => item.filePath));
+      if (missing) callbacks.onLog?.(`Media library: bỏ qua ${missing} file không còn tồn tại trên ổ đĩa.`);
+      for (const item of scanned) this.database.upsertMediaAsset(library.id, item);
+      this._libraryLastScannedAt?.set(scanKey, Date.now());
+    })();
+    this._libraryScanPromises?.set(scanKey, scanPromise);
+    try {
+      await scanPromise;
+    } finally {
+      this._libraryScanPromises?.delete(scanKey);
+    }
     return library;
   }
 
@@ -2470,7 +2594,8 @@ class BatchService {
       selectionMode: config.selectionMode || 'SEQUENTIAL',
       ...stockAllocatorOptions(config)
     });
-    const totalStockMs = checker.remainingDurationMs;
+    const inFlightPendingMs = this._getInFlightPendingVoiceMsForLibrary(config.libraryId, config._inFlightRunToken || null);
+    const totalStockMs = Math.max(0, checker.remainingDurationMs - inFlightPendingMs);
     const totalVoiceMs = Number(config.totalVoiceDurationMs || 0);
     if (totalStockMs + 20 < totalVoiceMs) {
       throw new InsufficientStockError({
@@ -2540,6 +2665,23 @@ class BatchService {
 
   async run(config, callbacks = {}, signal) {
     this.clearPause();
+    const isBridgeJob = Boolean(config?._fromScriptBridge);
+    if (!isBridgeJob) {
+      this.manualBatchRunning = true;
+    }
+    const inFlightToken = crypto.randomUUID();
+    try {
+      return await this._runInternal({ ...config, _inFlightRunToken: inFlightToken }, callbacks, signal);
+    } finally {
+      this._inFlightPendingVoiceMs?.delete(inFlightToken);
+      if (!isBridgeJob) {
+        this.manualBatchRunning = false;
+      }
+    }
+  }
+
+  async _runInternal(config, callbacks = {}, signal) {
+    const inFlightToken = config._inFlightRunToken || crypto.randomUUID();
     const batchName = sanitizeFileName(
       config.batchName || `Batch_${new Date().toISOString().replace(/[:.]/g, '-')}`
     );
@@ -2586,10 +2728,15 @@ class BatchService {
       if (estimatedTotalVoiceMs > 0) {
         this.validateStockDuration({
           ...config,
+          _inFlightRunToken: inFlightToken,
           libraryId: library.id,
           stockAllocationMode: config.stockAllocationMode || (config.singleMode ? 'PER_JOB' : 'DURATION_POOL'),
           totalVoiceDurationMs: estimatedTotalVoiceMs
         }, callbacks);
+        this._inFlightPendingVoiceMs?.set(inFlightToken, {
+          libraryId: library.id,
+          voiceMs: estimatedTotalVoiceMs
+        });
       }
     }
 
@@ -2701,7 +2848,13 @@ class BatchService {
       transitionItems: (config.transitionItems?.length ? config.transitionItems : GENTLE_TRANSITIONS)
         .map((item) => ({ ...item, enabled: item.enabled !== false }))
     };
-    const stockCheck = this.validateStockDuration(normalized, callbacks);
+    const stockCheck = this.validateStockDuration({ ...normalized, _inFlightRunToken: inFlightToken }, callbacks);
+    if (library?.id && totalVoiceDurationMs > 0) {
+      this._inFlightPendingVoiceMs?.set(inFlightToken, {
+        libraryId: library.id,
+        voiceMs: totalVoiceDurationMs
+      });
+    }
     if (stockCheck) {
       callbacks.onLog?.(
         `Preflight stock: ${formatDuration(stockCheck.totalVoiceMs)} voice / ${formatDuration(stockCheck.totalStockMs)} stock khả dụng.`
@@ -2891,10 +3044,12 @@ class BatchService {
                 ? this.database.getMatchedStockConsumedMs(asset.file_path)
                 : 0
             };
+        const inFlightEndMs = this._getInFlightReservedEndMs(asset.file_path);
+        const effectiveConsumedStartMs = Math.max(Number(progress.consumedStartMs || 0), Number(inFlightEndMs || 0));
         return {
           ...asset,
-          consumedStartMs: progress.consumedStartMs,
-          consumed_start_ms: progress.consumedStartMs,
+          consumedStartMs: effectiveConsumedStartMs,
+          consumed_start_ms: effectiveConsumedStartMs,
           stockPhase: progress.phase,
           stock_phase: progress.phase
         };
@@ -2903,14 +3058,25 @@ class BatchService {
   }
 
   createMediaPlan(job, config, renderConfig, voiceDurationMs, callbacks = {}, stockPool = null) {
+    if (config?._inFlightRunToken) {
+      this._inFlightPendingVoiceMs?.delete(config._inFlightRunToken);
+    }
     if (job.background_mode === BACKGROUND_MODE.STOCK_VIDEO) {
-      if (stockPool) {
-        const plan = stockPool.allocate({ voiceDurationMs });
+      if (stockPool || stockDurationPoolEnabled(config)) {
+        const liveAssets = this.listRenderableAssets(config.libraryId, callbacks);
+        const livePool = createDurationStockAllocator({
+          assets: liveAssets,
+          seed: Number(config.stockPoolSeed || 1),
+          selectionMode: config.selectionMode || 'SEQUENTIAL',
+          ...stockAllocatorOptions(config)
+        });
+        const plan = livePool.allocate({ voiceDurationMs });
+        this._recordInFlightStockSegments(job.id, plan.segments);
         plan.toleranceMs = Number(config.stockDurationToleranceMs ?? 500);
         plan.deleteWhenFullyConsumed = config.deleteConsumedMatchedStock !== false;
         this.database.saveJobAssets(job.id, 'STOCK_POOL', plan.segments);
         callbacks.onLog?.(
-          `${job.voice_name}: stock folder cấp ${formatDuration(voiceDurationMs)} từ ${plan.segments.length} đoạn stock.`
+          `${job.voice_name}: stock folder cấp ${formatDuration(voiceDurationMs)} từ ${plan.segments.length} đoạn stock (đã khóa chống trùng luồng song song).`
         );
         return { plan, reserved: false };
       }
@@ -4413,6 +4579,7 @@ class BatchService {
       });
       return { kind: error.code === 'ABORTED' ? 'CANCELLED' : 'FAILED', error };
     } finally {
+      this._releaseInFlightStockSegments(job.id);
       releaseStockSource?.();
       if (config.cleanupTransientJobFiles !== false) {
         this.cleanupJobTransientFiles(job, batchId, callbacks);
@@ -4447,8 +4614,8 @@ class BatchService {
         }))
       : null;
     if (resourcePlan) {
-      resourcePlan.warmUpGraceMs = 60000;
-      resourcePlan.minLowPressureSamples = 6;
+      resourcePlan.warmUpGraceMs = 15000;
+      resourcePlan.minLowPressureSamples = 2;
     }
     const initialWorkers = config.singleMode
       ? 1

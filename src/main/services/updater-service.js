@@ -80,7 +80,11 @@ class UpdaterService {
       'Sóng 1.mp4', 'Sóng 2.mp4', 'Sóng 3.mp4', 'Sóng 4.mp4', 'Sóng 5.mp4',
       'SUB 1.mp4', 'SUB 2.mp4', 'SUB 3.mp4', 'SUB 4.mp4', 'SUB 5.mp4',
       'Thỏ 1.mp4', 'Thỏ 2.mp4',
-      'Vịt 1.mp4', 'Vịt 2.mp4'
+      'Vịt 1.mp4', 'Vịt 2.mp4',
+      'Động Vật 001.mp4', 'Động Vật 002.mp4', 'Động Vật 003.mp4', 'Động Vật 004.mp4', 'Động Vật 005.mp4',
+      'Động Vật 006.mp4', 'Động Vật 007.mp4', 'Động Vật 008.mp4', 'Động Vật 009.mp4', 'Động Vật 010.mp4',
+      'Động Vật 011.mp4', 'Động Vật 012.mp4', 'Động Vật 013.mp4', 'Động Vật 014.mp4', 'Động Vật 015.mp4',
+      'Động Vật 016.mp4', 'Động Vật 017.mp4', 'Động Vật 018.mp4', 'Động Vật 019.mp4', 'Động Vật 020.mp4'
     ];
     const localInfo = this.getLocalVersionInfo();
     const repo = localInfo.repo || DEFAULT_GITHUB_REPO;

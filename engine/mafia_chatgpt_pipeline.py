@@ -3382,6 +3382,27 @@ def export_to_tong_hop_folder(project_id: str, project_dir: str, niche: str = No
             if not os.path.exists(seo_dst) or os.path.getsize(seo_dst) != os.path.getsize(src_seo) or os.path.getmtime(src_seo) > os.path.getmtime(seo_dst):
                 shutil.copy2(src_seo, seo_dst)
 
+        # Riêng Key 04_Nhom_Ong_Gia_Trung_Tri_Mexico (PADRE MX V1.2.1):
+        # Tự động tạo cặp THUMBNAIL.png + THUMBNAIL-NENXANH.png (80/20) và quét cắt gọn ảnh nền xanh
+        # ({TenKichBan}_KB.png / {TenKichBan}.png) để gắn vào góc trái bên dưới video cho từng kịch bản.
+        active_cfg_key = get_niche_config(resolved_niche or ACTIVE_KEY_ID or ACTIVE_NICHE).get("key_id", "")
+        if active_cfg_key == "04_Nhom_Ong_Gia_Trung_Tri_Mexico" and os.path.exists(src_kb):
+            try:
+                from padre_mx_thumbnail_generator import generate_padre_mx_thumbnail_pair_and_cropped_green
+                seo_txt_content = read_text_file(src_seo) if os.path.exists(src_seo) else ""
+                locked_title_p = os.path.join(project_dir, "LOCKED_TITLE.txt")
+                w_title = read_text_file(locked_title_p).strip() if os.path.exists(locked_title_p) else ""
+                generate_padre_mx_thumbnail_pair_and_cropped_green(
+                    project_id=project_id,
+                    project_dir=project_dir,
+                    winner_title=w_title,
+                    seo_text=seo_txt_content,
+                    tong_hop_base_name=prefix,
+                    tong_hop_dir=th_dir,
+                )
+            except Exception as e_thumb:
+                print(f"[PADRE_MX_THUMBNAIL_WARN] {project_id}: {e_thumb}")
+
         return kb_dst, seo_dst
     except Exception:
         return "", ""
@@ -6384,7 +6405,43 @@ Hãy kích hoạt ngay **`MODE B — CONTROLLED REWRITE`** theo đúng quy tắc
         else:
             seo_script_excerpt = seo_script_ref or ""
 
-        if kspec.get("is_12_key"):
+        if kspec.get("key_id") == "04_Nhom_Ong_Gia_Trung_Tri_Mexico":
+            prompt_step5 = f"""================================================================================
+BƯỚC 5: TẠO GÓI SEO + CẶP THUMBNAIL 80/20 & NỀN XANH #00FF00 (`padre-mx-seo-packaging` V1.2.1 — KEY 04 MEXICO PADRE)
+================================================================================
+QUAN TRỌNG:
+- KHÔNG gọi bất kỳ công cụ (tool), terminal hay lệnh đọc file nào. Toàn bộ nội dung Skill `padre-mx-seo-packaging` (V1.2.1), Giàn ý và văn bản FULL SCRIPT đã được đính kèm bên dưới.
+- Hệ thống Kiểm định Python bên ngoài ĐÃ XÁC NHẬN CHÍNH THỨC **`FINAL_QA_SCORE = {seo_score_display}/100`** VÀ **`SCRIPT_READY = TRUE`** (`QA_READY = TRUE`). **TUYỆT ĐỐI KHÔNG TỪ CHỐI HAY BÁO BLOCKED!**
+
+Tiêu đề chính thức đã khóa (`CURRENT_FINAL_TITLE` — `es-MX`, <= 100 ký tự):
+**{state['winner_title']}**
+
+Dưới đây là toàn bộ nội dung Skill `padre-mx-seo-packaging` (V1.2.1) và các file Reference bắt buộc:
+
+{skill_5_content}
+
+=== VĂN BẢN KỊCH BẢN HOÀN CHỈNH ĐÃ KHÓA (`LOCKED FULL SCRIPT` — ĐỂ ĐỐI CHIẾU SỰ KIỆN THẬT 100%) ===
+{seo_script_excerpt}
+=== KẾT THÚC VĂN BẢN KỊCH BẢN ĐÃ KHÓA ===
+
+================================================================================
+YÊU CẦU THỰC HIỆN NGAY (ĐÚNG CHUẨN `STEP6_SEO_PACKAGE.md` V1.2.1):
+Hãy dựa trên **CURRENT_FINAL_TITLE** (`{state['winner_title']}`), Giàn ý 7 Phần và **LOCKED FULL SCRIPT** ở trên để xuất trọn vẹn gói SEO tiếng Tây Ban Nha Mexico (`es-MX`) gồm đầy đủ các phần sau:
+1. `## 1. CURRENT_FINAL_TITLE + 2 TÍTULOS DE APOYO (A / B <= 100 CARACTERES)`
+2. `## 2. DESCRIPCIÓN SEO EN ESPAÑOL MEXICANO Y HOOK VERÍDICO`
+3. `## 3. PALABRAS CLAVE, ETIQUETAS (450–500 CARACTERES) Y HASHTAGS`
+4. `## 4. PROMISE_TO_SCENE_MAP (>=3 CITAS TEXTUALES + PART) Y TABLA FACT_LOCK`
+5. `## 5. GUION DE TRAILER (8–15 SEGUNDOS)`
+6. `## TEXTO MINIATURA 80/20 (IZQUIERDA)` (Xuất đúng 5 dòng chữ IN HOA tiếng Tây Ban Nha có dấu đầy đủ, 2–4 từ mỗi dòng, cô đọng cao trào để in lên vùng 80% nền trắng bên trái của `THUMBNAIL.png`)
+7. `## TEXTO BANNER ROJO INFERIOR` (Xuất đúng 1 dòng Kicker IN HOA có dấu `¡...!` <= 38 ký tự để in chữ Vàng lên thanh Banner Đỏ dưới đáy `THUMBNAIL.png`)
+8. `## Imagen THUMBNAIL`
+**Archivo:** THUMBNAIL.png
+**Prompt THUMBNAIL 16:9:** (Mô tả chi tiết bố cục 80/20: 80% bên trái nền trắng chữ IN HOA Đen/Xanh Cyan/Cam + thanh đỏ dưới đáy chữ vàng; 20% bên phải là chân dung ông già Mexico khắc khổ khớp kịch bản)
+9. `## Imagen THUMBNAIL-NENXANH`
+**Archivo:** THUMBNAIL-NENXANH.png
+**Prompt THUMBNAIL-NENXANH 16:9:** (Cùng 100% nhân vật ông già Mexico ở đúng vị trí 20% bên phải như THUMBNAIL.png, toàn bộ 80% bên trái và phông nền phủ màu xanh lá thuần `#00FF00` / `RGB(0,255,0)`, tuyệt đối không có chữ)
+"""
+        elif kspec.get("is_12_key"):
             prompt_step5 = f"""================================================================================
 BƯỚC 5: TẠO GÓI SEO, THUMBNAIL & TRAILER HOÀN CHỈNH ({kspec['label']} — `{kspec['key_id']}__05_seo`)
 ================================================================================
@@ -6550,6 +6607,7 @@ Hãy dựa trên **LOCKED / PRIMARY TITLE** (`{state['winner_title']}`), Giàn �
             )
 
         write_text_file(os.path.join(ckpt_dir, "05_SEO_PACKAGE.md"), seo_resp)
+        write_text_file(os.path.join(project_dir, "STEP6_SEO_PACKAGE.md"), seo_resp)
         write_text_file(os.path.join(project_dir, "FULL_SEO.txt"), seo_resp)
 
         final_script_path = os.path.join(project_dir, "FULL_SCRIPT.txt")
@@ -6608,6 +6666,18 @@ Hãy dựa trên **LOCKED / PRIMARY TITLE** (`{state['winner_title']}`), Giàn �
         )
 
         kb_tonghop_path, seo_tonghop_path = export_to_tong_hop_folder(project_id, project_dir, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
+        if kspec.get("key_id") == "04_Nhom_Ong_Gia_Trung_Tri_Mexico":
+            thumb_p = os.path.join(project_dir, "THUMBNAIL.png")
+            green_p = os.path.join(project_dir, "THUMBNAIL-NENXANH.png")
+            cutout_p = os.path.join(project_dir, "GREEN_CUTOUT_BOTTOM_LEFT.png")
+            if os.path.exists(thumb_p) and os.path.exists(green_p) and os.path.exists(cutout_p):
+                log_msg(
+                    project_id,
+                    f"🖼️ [KEY 04 PADRE MX V1.2.1] Đã tạo tự động bộ Thumbnail 80/20 + Ảnh nền xanh #00FF00 & Cắt gọn góc trái dưới:\n"
+                    f"   • THUMBNAIL 80/20: {thumb_p}\n"
+                    f"   • THUMBNAIL-NENXANH (#00FF00): {green_p}\n"
+                    f"   • Ảnh nền xanh đã cắt gọn (Góc trái dưới riêng cho kịch bản): {cutout_p}",
+                )
         try:
             record_project_to_channel_memory(
                 studio_root=STUDIO_ROOT,
@@ -6722,17 +6792,34 @@ def notify_video_batch_studio_script_completed(
     """Bắn thông báo ngay khi Bàn #6 hoàn tất file `{TenKichBan}_KB.txt` để Bàn #7 tự động Tạo Voice & Render Video."""
     try:
         cfg = get_niche_config(niche)
+        prefix = resolve_project_export_prefix(project_id, project_dir) if project_dir else ""
+        th_dir = cfg["tong_hop_dir"]
+        green_cutout_kb = os.path.join(th_dir, f"{prefix}_KB.png") if prefix else ""
+        thumb_path = os.path.join(th_dir, f"{prefix}_THUMBNAIL.png") if prefix else ""
+        green_full_path = os.path.join(th_dir, f"{prefix}_NENXANH.png") if prefix else ""
+        meta_path = os.path.join(project_dir, "GREEN_PLACEMENT_META.json") if project_dir else ""
+        green_placement = None
+        if meta_path and os.path.exists(meta_path):
+            try:
+                green_placement = json.load(open(meta_path, encoding="utf-8")).get("recommended_placement")
+            except Exception:
+                green_placement = None
         return _post_video_bridge_json(
             "/api/bridge/script-completed",
             {
                 "project_id": project_id,
                 "project_dir": project_dir,
                 "niche": cfg["niche"],
+                "key_id": cfg.get("key_id", ""),
                 "script_path": script_path,
                 "seo_path": seo_path,
-                "tong_hop_dir": cfg["tong_hop_dir"],
+                "tong_hop_dir": th_dir,
                 "winner_title": winner_title,
                 "force_immediate": force_immediate,
+                "thumbnail_path": thumb_path if (thumb_path and os.path.exists(thumb_path)) else "",
+                "green_full_path": green_full_path if (green_full_path and os.path.exists(green_full_path)) else "",
+                "green_cutout_path": green_cutout_kb if (green_cutout_kb and os.path.exists(green_cutout_kb)) else "",
+                "green_placement": green_placement,
             },
             timeout_sec=4.0,
         )
@@ -7517,45 +7604,6 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
         log_msg("QUEUE-EMPTY", f"⚠️ Chưa có file hàng đợi {os.path.basename(b_path)} cho kênh [{cfg['label']}]. Hãy dán tiêu đề vào ô Giao Việc và bấm Lưu & Chạy Ngay!")
         return
 
-    backlog = json.load(open(b_path, encoding="utf-8"))
-    pending_items = []
-    for it in backlog.get("items", []):
-        pid = it.get("project_id", "")
-        pdir = os.path.join(cfg["projects_root"], pid) if pid else it["project_dir"]
-        it["project_dir"] = pdir
-        os.makedirs(pdir, exist_ok=True)
-        st_path = os.path.join(pdir, "STATE.json")
-        if os.path.exists(st_path):
-            try:
-                st = json.load(open(st_path, encoding="utf-8"))
-                if st.get("completed"):
-                    it["status"] = "COMPLETED"
-                    continue
-            except Exception:
-                pass
-        else:
-            # Tự động khôi phục STATE.json nếu chỉ mới có trong QUEUE_BACKLOG.json
-            skip_s1 = bool(it.get("skip_title_rewrite"))
-            init_st = {
-                "project_id": pid,
-                "project_dir": pdir,
-                "source_title": it.get("source_title", ""),
-                "custom_name": it.get("custom_name", ""),
-                "skip_title_rewrite": skip_s1,
-                "winner_title": it.get("source_title", "") if skip_s1 else it.get("winner_title", ""),
-                "winner_title_score": 100 if skip_s1 else it.get("winner_title_score", 0),
-                "thinking_effort": thinking,
-                "thread_id": "",
-                "host_id": "chatgpt_web",
-                "completed_steps": ["STEP_1_DONE"] if skip_s1 else [],
-                "current_step_status": "QUEUED_SKIP_STEP_1" if skip_s1 else "QUEUED",
-                "live_note": "🚀 Đang chuẩn bị khởi chạy...",
-                "completed": False,
-                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            write_json_file(st_path, init_st)
-        pending_items.append(it)
-
     def _step_priority_key(item_obj: dict) -> tuple[int, str]:
         pdir_i = item_obj.get("project_dir", "")
         st_p = os.path.join(pdir_i, "STATE.json")
@@ -7577,13 +7625,62 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
                 pass
         return (-step_rank, item_obj.get("project_id", ""))
 
-    pending_items.sort(key=_step_priority_key)
+    def _collect_pending_backlog_items(attempted_pids: set[str]) -> list[dict]:
+        if not os.path.exists(b_path):
+            return []
+        try:
+            b_obj = json.load(open(b_path, encoding="utf-8"))
+        except Exception:
+            return []
+        collected = []
+        for it in b_obj.get("items", []):
+            pid = it.get("project_id", "")
+            if pid and pid in attempted_pids:
+                continue
+            pdir = os.path.join(cfg["projects_root"], pid) if pid else it["project_dir"]
+            it["project_dir"] = pdir
+            os.makedirs(pdir, exist_ok=True)
+            st_path = os.path.join(pdir, "STATE.json")
+            if os.path.exists(st_path):
+                try:
+                    st = json.load(open(st_path, encoding="utf-8"))
+                    if st.get("completed"):
+                        it["status"] = "COMPLETED"
+                        continue
+                except Exception:
+                    pass
+            else:
+                skip_s1 = bool(it.get("skip_title_rewrite"))
+                init_st = {
+                    "project_id": pid,
+                    "project_dir": pdir,
+                    "source_title": it.get("source_title", ""),
+                    "custom_name": it.get("custom_name", ""),
+                    "skip_title_rewrite": skip_s1,
+                    "winner_title": it.get("source_title", "") if skip_s1 else it.get("winner_title", ""),
+                    "winner_title_score": 100 if skip_s1 else it.get("winner_title_score", 0),
+                    "thinking_effort": thinking,
+                    "thread_id": "",
+                    "host_id": "chatgpt_web",
+                    "completed_steps": ["STEP_1_DONE"] if skip_s1 else [],
+                    "current_step_status": "QUEUED_SKIP_STEP_1" if skip_s1 else "QUEUED",
+                    "live_note": "🚀 Đang chuẩn bị khởi chạy...",
+                    "completed": False,
+                    "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                write_json_file(st_path, init_st)
+            collected.append(it)
+        collected.sort(key=_step_priority_key)
+        return collected
+
+    attempted_in_session: set[str] = set()
+    pending_items = _collect_pending_backlog_items(attempted_in_session)
 
     if limit_projects > 0:
         pending_items = pending_items[:limit_projects]
 
     if not pending_items:
-        log_msg("QUEUE-DONE", f"✅ Tất cả kịch bản trong hàng đợi kênh [{cfg['label']}] đều đã hoàn thành 100% (hoặc danh sách đang trống)!")
+        log_msg("QUEUE-DONE", f"✅ Tất cả kịch bản trong hàng đợi kênh [{cfg['label']}] đều đã hoàn thành 100% (hoặc danh sách đang trống) — Tự động dừng!")
         update_progress_markdown(cfg["niche"])
         return
 
@@ -7616,7 +7713,7 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
     log_msg(
         "PIPELINE-START",
         f"🔥 BẮT ĐẦU CHẠY ĐA LUỒNG [{cfg['label']}]: {len(pending_items)} DỰ ÁN | "
-        f"{logged_in_count} ACC ĐÃ ĐĂNG NHẬP | TỐI ĐA {max_workers} LUỒNG SONG SONG (CHIA ĐỀU TỐI ĐA {MAX_THREADS_PER_ACCOUNT} LUỒNG/ACC)",
+        f"{logged_in_count} ACC ĐÃ ĐĂNG NHẬP | TỐI ĐA {max_workers} LUỒNG SONG SONG (VIẾT ĐẾN HẾT HÀNG ĐỢI RỒI TỰ DỪNG)",
     )
 
     # Tự động khóa cấu hình Tạo Video hiện tại trên Video Batch Studio trước khi bắt đầu chạy (chạy bất đồng bộ không gây trễ)
@@ -7624,44 +7721,57 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
 
     from engine.chatgpt_web_client import ChatGPTWebMultiTabClient
     client = ChatGPTWebMultiTabClient()
+    total_processed_count = 0
     try:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_map = {
-                executor.submit(
-                    run_single_project_pipeline,
-                    client,
-                    item["project_dir"],
-                    item["source_title"],
-                    thinking,
-                    0,
-                ): item
-                for item in pending_items
-            }
-            for fut in as_completed(future_map):
-                item = future_map[fut]
-                pid = item["project_id"]
-                try:
-                    final_st = fut.result()
-                    with BACKLOG_LOCK:
-                        bdata = json.load(open(b_path, encoding="utf-8"))
-                        for bit in bdata.get("items", []):
-                            if bit["project_id"] == pid:
-                                bit["status"] = "COMPLETED" if final_st.get("completed") else final_st.get("current_step_status", "PAUSED")
-                        write_json_file(b_path, bdata)
-                    update_progress_markdown(cfg["niche"])
-                except Exception as e:
-                    log_msg(pid, f"❌ Lỗi khi xử lý dự án {pid}: {e}")
-                    if os.path.exists(item.get("project_dir", "")):
+        while pending_items:
+            for it in pending_items:
+                if it.get("project_id"):
+                    attempted_in_session.add(it["project_id"])
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_map = {
+                    executor.submit(
+                        run_single_project_pipeline,
+                        client,
+                        item["project_dir"],
+                        item["source_title"],
+                        thinking,
+                        0,
+                    ): item
+                    for item in pending_items
+                }
+                for fut in as_completed(future_map):
+                    item = future_map[fut]
+                    pid = item["project_id"]
+                    total_processed_count += 1
+                    try:
+                        final_st = fut.result()
                         with BACKLOG_LOCK:
                             bdata = json.load(open(b_path, encoding="utf-8"))
                             for bit in bdata.get("items", []):
                                 if bit["project_id"] == pid:
-                                    bit["status"] = f"ERROR_PAUSED_AT_CHECKPOINT: {str(e)[:80]}"
+                                    bit["status"] = "COMPLETED" if final_st.get("completed") else final_st.get("current_step_status", "PAUSED")
                             write_json_file(b_path, bdata)
-                    update_progress_markdown(cfg["niche"])
+                        update_progress_markdown(cfg["niche"])
+                    except Exception as e:
+                        log_msg(pid, f"❌ Lỗi khi xử lý dự án {pid}: {e}")
+                        if os.path.exists(item.get("project_dir", "")):
+                            with BACKLOG_LOCK:
+                                bdata = json.load(open(b_path, encoding="utf-8"))
+                                for bit in bdata.get("items", []):
+                                    if bit["project_id"] == pid:
+                                        bit["status"] = f"ERROR_PAUSED_AT_CHECKPOINT: {str(e)[:80]}"
+                                write_json_file(b_path, bdata)
+                        update_progress_markdown(cfg["niche"])
+            if limit_projects > 0:
+                break
+            # Quét lại QUEUE_BACKLOG.json xem có kịch bản nào mới thêm vào hoặc còn sót chưa chạy không
+            pending_items = _collect_pending_backlog_items(attempted_in_session)
+            if pending_items:
+                log_msg("QUEUE-CONTINUE", f"🔄 Phát hiện thêm {len(pending_items)} kịch bản trong hàng đợi [{cfg['label']}], tiếp tục viết cho đến hết...")
+        log_msg("QUEUE-DONE", f"✅ ĐÃ VIẾT XONG TOÀN BỘ KỊCH BẢN TRONG HÀNG ĐỢI [{cfg['label']}] ({total_processed_count} kịch bản) — TỰ ĐỘNG DỪNG WORKER VIẾT KỊCH BẢN!")
     finally:
         client.close()
-        notify_video_batch_studio_queue_completed(cfg["niche"], total_projects=len(pending_items))
+        notify_video_batch_studio_queue_completed(cfg["niche"], total_projects=total_processed_count)
 
 
 if __name__ == "__main__":

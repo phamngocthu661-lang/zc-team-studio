@@ -2103,7 +2103,10 @@ contextBridge.exposeInMainWorld('vbs', {
       }
     },
     resumeAfterStock: (newMediaFolder = '') => ipcRenderer.invoke('scriptBridge:resumeAfterStock', { newMediaFolder }),
+    approveGreenPosition: (payload = {}) => ipcRenderer.invoke('scriptBridge:approveGreenPosition', payload),
+    rescanGreenCrop: (payload = {}) => ipcRenderer.invoke('scriptBridge:rescanGreenCrop', payload),
     onInsufficientStock: (fn) => sub('scriptBridge:insufficientStock', fn),
+    onRequireGreenCheck: (fn) => sub('scriptBridge:requireGreenCheck', fn),
     onState: (fn) => sub('scriptBridge:state', async (st) => {
       if (st) {
         if (!_realPythonOnline) {

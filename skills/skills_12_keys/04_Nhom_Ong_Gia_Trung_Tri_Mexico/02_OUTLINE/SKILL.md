@@ -1,6 +1,6 @@
 ---
 name: padre-mx-outline-writer
-version: 1.1.0
+version: 1.2.0
 description: "Step2 only. Generate a 7-Part forensic Mexican Spanish father-betrayal outline, continuity canon, and earned legal/emotional payoff from the locked title."
 ---
 # PADRE MX — 7 PART OUTLINE / CANON ENGINE (STEP2 ONLY)
@@ -34,3 +34,6 @@ Check the villain is plausible, the father's strategic options are actually lawf
 ## V1.1 Mandatory story & date preflight
 Add a structured CAST_AGE_TIMELINE and FLASHBACK_BIRTH_LEDGER: for every character with stated age, derive possible birth year(s) at every dated scene. Pregnancy, child birth, marriage, founding, death, inheritance and contract timing must not contradict those ages. Verify THEN lock; flashback phrases must clearly identify whether earlier than or after the workshop founding. A 41-year-old in 2026 was born 1984/1985: do not state or imply a new pregnancy with him in 1986.
 Ensure each Part has (a) a new family cost, (b) an independent, visible action or revelation, (c) a new power constraint, (d) no repetitive moral essay. Put the promised conflict and source of leverage in demonstrable scenes; the father cannot only read paperwork without consequences. Provide measurable Part-level scene and emotional turning points in outline, but no ungrounded legal miracles.
+
+## V1.2 outline-to-writer length plan
+Build 7 distinct, nonredundant Parts that can honestly sustain 70,000–80,000 characters, not the 35k–40k half-length observed in some drafts. Lock separate per-stage targets: A (Parts 1–2) 20,000–24,000; B (Parts 3–5) 30,000–35,000; C (Parts 6–7) 20,000–25,000 characters. Each individual Part >=8,500 characters. Preferred total 74k–78k. Add scene objectives and turning points; never pad with repetitive retrospection.

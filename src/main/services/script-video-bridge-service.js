@@ -82,6 +82,9 @@ class ScriptVideoBridgeService {
     // Hàng đợi Bàn #7 (Tạo Voice & Render Video GPU)
     this.queue = [];
     this.activeJob = null;
+    this.activeJobs = new Map();
+    this._cachedAutoBalancePlan = null;
+    this._cachedAutoBalanceAt = 0;
   }
 
   _resolvePythonExecutable(preferredRoot = null) {
@@ -958,11 +961,73 @@ class ScriptVideoBridgeService {
     return this.activeChannelKey || 'mafia';
   }
 
+  async _computeAutoBalancedBridgeConcurrency() {
+    const now = Date.now();
+    try {
+      const rc = this.batchService?.resourceController;
+      if (rc && typeof rc.recommendResourcePlan === 'function') {
+        if (!this._cachedAutoBalancePlan || (now - this._cachedAutoBalanceAt) > 15000) {
+          this._cachedAutoBalancePlan = await rc.recommendResourcePlan(this.lockedVideoConfig || {
+            accelerationMode: 'AUTO_STABLE',
+            performanceProfile: 'AUTO',
+            autoResourceMode: true
+          });
+          this._cachedAutoBalanceAt = now;
+        }
+        const plan = this._cachedAutoBalancePlan || {};
+        let maxW = Math.max(1, Math.min(3, Number(plan.maxWorkers || plan.initialWorkers || 2)));
+        let targetW = Math.max(1, Math.min(3, Number(plan.initialWorkers || maxW || 2)));
+        if (typeof rc.getLiveSnapshot === 'function') {
+          const snap = await rc.getLiveSnapshot();
+          const cpuPct = Number(snap?.cpuUsagePercent ?? snap?.cpuPercent ?? 0);
+          const memFreeMb = Number(snap?.freeMemoryMb ?? snap?.memoryFreeMb ?? 8192);
+          const gpu0 = snap?.gpu || (snap?.gpus || [])[0] || null;
+          const gpuMemPct = gpu0 && gpu0.memoryTotalMb > 0
+            ? (Number(gpu0.memoryUsedMb || 0) / Number(gpu0.memoryTotalMb)) * 100
+            : 0;
+          if (cpuPct >= 92 || memFreeMb < 1800 || gpuMemPct >= 90) {
+            targetW = 1;
+          } else if (cpuPct >= 82 || memFreeMb < 2800 || gpuMemPct >= 82) {
+            targetW = Math.min(targetW, 2);
+          }
+        }
+        return {
+          targetWorkers: Math.max(1, Math.min(3, targetW)),
+          maxWorkers: Math.max(1, Math.min(3, maxW)),
+          summary: plan.summary || `Auto cân bằng ${targetW}/${maxW} luồng GPU`
+        };
+      }
+    } catch {}
+    const cpuCount = Math.max(1, os.cpus()?.length || 4);
+    const totalMemGb = (os.totalmem() || 0) / (1024 ** 3);
+    const fallbackWorkers = (cpuCount >= 10 && totalMemGb >= 14) ? 3 : (cpuCount >= 6 && totalMemGb >= 8 ? 2 : 1);
+    return {
+      targetWorkers: fallbackWorkers,
+      maxWorkers: fallbackWorkers,
+      summary: `Auto cân bằng ${fallbackWorkers} luồng song song`
+    };
+  }
+
+  _getAutoBalanceInfoSync() {
+    const plan = this._cachedAutoBalancePlan;
+    const cpuCount = Math.max(1, os.cpus()?.length || 4);
+    const totalMemGb = (os.totalmem() || 0) / (1024 ** 3);
+    const defaultMax = (cpuCount >= 10 && totalMemGb >= 14) ? 3 : (cpuCount >= 6 && totalMemGb >= 8 ? 2 : 1);
+    const maxWorkers = Math.max(1, Math.min(3, Number(plan?.maxWorkers || plan?.initialWorkers || defaultMax)));
+    const activeWorkers = this.activeJobs ? this.activeJobs.size : (this.activeJob ? 1 : 0);
+    return {
+      activeWorkers,
+      maxWorkers,
+      label: `⚡ Auto Cân Bằng: ${activeWorkers}/${maxWorkers} luồng GPU song song`
+    };
+  }
+
   getPublicState() {
     const normalizedQueue = this.queue.slice(-200).map((item) => ({
       ...item,
       niche: this._detectJobNiche(item, item.scriptPath)
     }));
+    const activeJobsList = this.activeJobs ? Array.from(this.activeJobs.values()).map((entry) => entry.job) : [];
     return {
       online: true,
       bridgePort: BRIDGE_PORT,
@@ -975,7 +1040,9 @@ class ScriptVideoBridgeService {
       channelConfigs: this.channelConfigs || {},
       lockedConfigSummary: this.summarizeLockedConfig(),
       lockedVideoConfig: this.lockedVideoConfig,
-      activeJob: this.activeJob,
+      activeJob: this.activeJob || activeJobsList[0] || null,
+      activeJobsCount: activeJobsList.length,
+      autoBalanceInfo: this._getAutoBalanceInfoSync(),
       pausedReason: this.pausedReason || null,
       pausedStockAlert: this.pausedStockAlert || null,
       queue: normalizedQueue
@@ -995,6 +1062,198 @@ class ScriptVideoBridgeService {
       };
       fs.writeFileSync(statePath, JSON.stringify(updated, null, 2), 'utf8');
     } catch {}
+  }
+
+  _resolvePadreMxGeneratorScript() {
+    const appDir = path.resolve(__dirname, '..', '..', '..');
+    const studioRoot = this.settings?.scriptStudioRoot || this._detectScriptStudioRoot();
+    const candidates = [
+      studioRoot ? path.join(studioRoot, 'engine', 'padre_mx_thumbnail_generator.py') : null,
+      studioRoot ? path.join(studioRoot, 'resources', 'app', 'engine', 'padre_mx_thumbnail_generator.py') : null,
+      path.join(appDir, 'engine', 'padre_mx_thumbnail_generator.py'),
+      'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\engine\\padre_mx_thumbnail_generator.py'
+    ].filter(Boolean);
+    return candidates.find((p) => fs.existsSync(p)) || '';
+  }
+
+  _ensurePadreMxGreenCutoutForJob(job, { forceRegenerate = false } = {}) {
+    if (!job || String(job.niche || '') !== '04_Nhom_Ong_Gia_Trung_Tri_Mexico') {
+      return job;
+    }
+    try {
+      const scriptDir = job.tongHopDir || path.dirname(job.scriptPath);
+      const rawBase = path.basename(job.scriptPath, path.extname(job.scriptPath));
+      const cleanBase = rawBase.replace(/_KB$/i, '');
+
+      const thThumb = path.join(scriptDir, `${cleanBase}_THUMBNAIL.png`);
+      const thGreenFull = path.join(scriptDir, `${cleanBase}_NENXANH.png`);
+      const thCutoutKb = path.join(scriptDir, `${cleanBase}_KB.png`);
+      const thCutoutBase = path.join(scriptDir, `${cleanBase}.png`);
+      const thMeta = path.join(scriptDir, `${cleanBase}_GREEN_META.json`);
+
+      const pyExe = this._resolvePythonExecutable(this.settings?.scriptStudioRoot);
+      const genScript = this._resolvePadreMxGeneratorScript();
+      const { execFileSync } = require('node:child_process');
+
+      // Nếu chưa có ảnh nền xanh đã cắt gọn cho kịch bản này, hoặc yêu cầu tạo/quét lại
+      const hasCutout = fs.existsSync(thCutoutKb) || fs.existsSync(thCutoutBase);
+      if ((!hasCutout || forceRegenerate) && genScript && fs.existsSync(genScript)) {
+        const targetProjDir = (job.projectDir && fs.existsSync(job.projectDir))
+          ? job.projectDir
+          : path.join(scriptDir, '_padre_mx_assets', cleanBase);
+        try {
+          fs.mkdirSync(targetProjDir, { recursive: true });
+        } catch {}
+
+        // Nếu người dùng đã có sẵn file _NENXANH.png nhưng chưa cắt gọn, quét & cắt gọn trực tiếp
+        if (!forceRegenerate && fs.existsSync(thGreenFull) && !hasCutout) {
+          execFileSync(pyExe, [
+            genScript,
+            '--crop-only-src', thGreenFull,
+            '--crop-only-out', thCutoutKb
+          ], {
+            windowsHide: true,
+            timeout: 25000,
+            encoding: 'utf8'
+          });
+          if (fs.existsSync(thCutoutKb) && !fs.existsSync(thCutoutBase)) {
+            try { fs.copyFileSync(thCutoutKb, thCutoutBase); } catch {}
+          }
+        } else {
+          execFileSync(pyExe, [
+            genScript,
+            '--project-id', String(job.projectId || cleanBase),
+            '--project-dir', targetProjDir,
+            '--title', String(job.winnerTitle || cleanBase.replace(/_/g, ' ')),
+            '--tong-hop-base', cleanBase,
+            '--tong-hop-dir', scriptDir
+          ], {
+            windowsHide: true,
+            timeout: 35000,
+            encoding: 'utf8'
+          });
+        }
+      }
+
+      let metaObj = null;
+      if (fs.existsSync(thMeta)) {
+        try { metaObj = JSON.parse(fs.readFileSync(thMeta, 'utf8')); } catch {}
+      } else if (job.projectDir && fs.existsSync(path.join(job.projectDir, 'GREEN_PLACEMENT_META.json'))) {
+        try { metaObj = JSON.parse(fs.readFileSync(path.join(job.projectDir, 'GREEN_PLACEMENT_META.json'), 'utf8')); } catch {}
+      }
+
+      const rec = metaObj?.recommended_placement || job.greenPlacement || {};
+      const resolvedCutout = fs.existsSync(thCutoutKb)
+        ? thCutoutKb
+        : (fs.existsSync(thCutoutBase) ? thCutoutBase : (job.greenCutoutPath || ''));
+      const resolvedThumb = fs.existsSync(thThumb)
+        ? thThumb
+        : ((job.projectDir && fs.existsSync(path.join(job.projectDir, 'THUMBNAIL.png')))
+          ? path.join(job.projectDir, 'THUMBNAIL.png')
+          : (job.thumbnailPath || ''));
+      const resolvedGreenFull = fs.existsSync(thGreenFull)
+        ? thGreenFull
+        : ((job.projectDir && fs.existsSync(path.join(job.projectDir, 'THUMBNAIL-NENXANH.png')))
+          ? path.join(job.projectDir, 'THUMBNAIL-NENXANH.png')
+          : (job.greenFullPath || ''));
+
+      const defaultH = Number(rec.height || 740);
+      const defaultW = Number(rec.width || 570);
+      const defaultX = Number.isFinite(Number(rec.x)) ? Number(rec.x) : 0;
+      const defaultY = Number.isFinite(Number(rec.y)) ? Number(rec.y) : (1080 - defaultH);
+
+      job.thumbnailPath = resolvedThumb;
+      job.greenFullPath = resolvedGreenFull;
+      job.greenCutoutPath = resolvedCutout;
+      job.greenMetaPath = fs.existsSync(thMeta) ? thMeta : '';
+      job.greenScannedBbox = metaObj?.scanned_subject_bbox || null;
+      job.greenCroppedSize = metaObj?.cropped_size || null;
+      job.greenPlacement = {
+        position: 'BOTTOM_LEFT',
+        x: Math.round(defaultX),
+        y: Math.round(defaultY),
+        width: Math.round(defaultW),
+        height: Math.round(defaultH),
+        keyColor: rec.keyColor || '#00FF00',
+        similarity: Number(rec.similarity ?? 0.24),
+        softness: Number(rec.softness ?? 0.07),
+        assetMode: 'GREEN',
+        edited: true
+      };
+    } catch (err) {
+      console.warn('[ScriptVideoBridge] Lỗi chuẩn bị ảnh nền xanh cắt gọn cho Key 04:', err?.message || err);
+    }
+    return job;
+  }
+
+  approveGreenPositionForJob({ jobId = '', scriptPath = '', greenPlacement = null, applyToAllKey04 = false } = {}) {
+    let approvedCount = 0;
+    const cleanPlacement = (greenPlacement && typeof greenPlacement === 'object') ? {
+      position: 'BOTTOM_LEFT',
+      x: Number.isFinite(Number(greenPlacement.x)) ? Math.round(Number(greenPlacement.x)) : 0,
+      y: Number.isFinite(Number(greenPlacement.y)) ? Math.round(Number(greenPlacement.y)) : 340,
+      width: Number.isFinite(Number(greenPlacement.width)) && Number(greenPlacement.width) > 0 ? Math.round(Number(greenPlacement.width)) : 570,
+      height: Number.isFinite(Number(greenPlacement.height)) && Number(greenPlacement.height) > 0 ? Math.round(Number(greenPlacement.height)) : 740,
+      keyColor: greenPlacement.keyColor || '#00FF00',
+      similarity: Number(greenPlacement.similarity ?? 0.24),
+      softness: Number(greenPlacement.softness ?? 0.07),
+      assetMode: 'GREEN',
+      edited: true
+    } : null;
+
+    if (applyToAllKey04 && cleanPlacement) {
+      this.key04BatchApprovedPlacement = cleanPlacement;
+    }
+
+    for (const item of this.queue) {
+      const isTarget = (jobId && item.id === jobId) ||
+        (scriptPath && path.resolve(item.scriptPath) === path.resolve(scriptPath)) ||
+        (applyToAllKey04 && item.niche === '04_Nhom_Ong_Gia_Trung_Tri_Mexico' && item.status === 'WAITING_GREEN_CHECK');
+      if (!isTarget) continue;
+
+      if (cleanPlacement) {
+        item.greenPlacement = {
+          ...(item.greenPlacement || {}),
+          ...cleanPlacement
+        };
+        if (item.greenMetaPath && fs.existsSync(item.greenMetaPath)) {
+          try {
+            const curMeta = JSON.parse(fs.readFileSync(item.greenMetaPath, 'utf8'));
+            curMeta.recommended_placement = item.greenPlacement;
+            curMeta.verified_by_user = true;
+            curMeta.verified_at = new Date().toISOString();
+            fs.writeFileSync(item.greenMetaPath, JSON.stringify(curMeta, null, 2), 'utf8');
+          } catch {}
+        }
+      }
+
+      item.greenPositionVerified = true;
+      item.greenVerifiedAt = Date.now();
+      if (item.status === 'WAITING_GREEN_CHECK') {
+        item.status = 'WAITING_GPU';
+        item.stage = `✅ ĐÃ KIỂM TRA VỊ TRÍ ẢNH NỀN XANH (X:${item.greenPlacement?.x ?? 16}, Y:${item.greenPlacement?.y ?? 400}) ➔ CHỜ RENDER THEO TEMPLATE`;
+      }
+      this._updateProjectStateJson(item.projectDir, {
+        video_bridge_status: item.status,
+        live_note: `✅ Bàn #7: Đã kiểm tra kỹ vị trí ảnh nền xanh góc trái dưới (X=${item.greenPlacement?.x ?? 16}, Y=${item.greenPlacement?.y ?? 400}) ➔ Bắt đầu tạo video theo Template!`
+      });
+      approvedCount += 1;
+    }
+
+    if (approvedCount > 0) {
+      this._logToBoth(
+        `✅ Đã xác nhận vị trí ảnh nền xanh góc trái dưới cho ${approvedCount} kịch bản Key 04 ➔ Bắt đầu tạo video theo Template đã cấu hình!`
+      );
+      this._emitBridgeState();
+      this._processQueue().catch((err) => {
+        console.error('[ScriptVideoBridge] Lỗi chạy hàng đợi sau khi duyệt vị trí ảnh nền xanh:', err);
+      });
+    }
+    return {
+      ok: approvedCount > 0,
+      approvedCount,
+      state: this.getPublicState()
+    };
   }
 
   enqueueCompletedScript(payload = {}, { forceImmediate = false } = {}) {
@@ -1020,11 +1279,13 @@ class ScriptVideoBridgeService {
     // Tránh trùng lặp nếu kịch bản này đang nằm trong hàng đợi chờ hoặc đang render
     const existing = this.queue.find(
       (item) => path.resolve(item.scriptPath) === path.resolve(scriptPath) &&
-        ['WAITING_GPU', 'WAITING_BATCH', 'RENDERING'].includes(item.status)
+        ['WAITING_GPU', 'WAITING_BATCH', 'WAITING_GREEN_CHECK', 'RENDERING'].includes(item.status)
     );
     if (existing) {
       if (forceImmediate && existing.status === 'WAITING_BATCH') {
-        existing.status = 'WAITING_GPU';
+        existing.status = (existing.niche === '04_Nhom_Ong_Gia_Trung_Tri_Mexico' && !existing.greenPositionVerified)
+          ? 'WAITING_GREEN_CHECK'
+          : 'WAITING_GPU';
         this._emitBridgeState();
         this._processQueue().catch(() => {});
       }
@@ -1041,6 +1302,7 @@ class ScriptVideoBridgeService {
     const baseName = path.basename(scriptPath, path.extname(scriptPath));
     const shouldWaitBatch = !forceImmediate && this.settings.triggerMode === 'BATCH_AFTER_ALL';
     const detectedNiche = this._detectJobNiche(payload, scriptPath);
+    const isKey04PadreMx = detectedNiche === '04_Nhom_Ong_Gia_Trung_Tri_Mexico';
     const job = {
       id: crypto.randomUUID(),
       projectId: payload.project_id || payload.projectId || baseName,
@@ -1051,6 +1313,11 @@ class ScriptVideoBridgeService {
       scriptName: path.basename(scriptPath),
       seoPath: payload.seo_path || payload.seoPath || '',
       tongHopDir: payload.tong_hop_dir || payload.tongHopDir || path.dirname(scriptPath),
+      thumbnailPath: payload.thumbnail_path || payload.thumbnailPath || '',
+      greenFullPath: payload.green_full_path || payload.greenFullPath || '',
+      greenCutoutPath: payload.green_cutout_path || payload.greenCutoutPath || '',
+      greenPlacement: payload.green_placement || payload.greenPlacement || null,
+      greenPositionVerified: Boolean(payload.green_position_verified || payload.greenPositionVerified),
       status: shouldWaitBatch ? 'WAITING_BATCH' : 'WAITING_GPU',
       stage: shouldWaitBatch ? 'CHỜ XONG CẢ LÔ KỊCH BẢN' : 'CHỜ ĐẾN LƯỢT GPU',
       percent: 0,
@@ -1063,22 +1330,47 @@ class ScriptVideoBridgeService {
       completedAt: null
     };
 
+    // Riêng Key 04_Nhom_Ong_Gia_Trung_Tri_Mexico:
+    // 1. Tự động quét ảnh nền xanh & cắt gọn đặt ở góc trái bên dưới cho riêng kịch bản này
+    // 2. Bắt buộc qua cổng kiểm tra kỹ vị trí ảnh nền xanh trên khung Template trước khi tạo video
+    if (isKey04PadreMx) {
+      this._ensurePadreMxGreenCutoutForJob(job);
+      if (this.key04BatchApprovedPlacement && !job.greenPositionVerified) {
+        job.greenPlacement = {
+          ...(job.greenPlacement || {}),
+          ...this.key04BatchApprovedPlacement
+        };
+        job.greenPositionVerified = true;
+      }
+      if (!shouldWaitBatch && !job.greenPositionVerified) {
+        job.status = 'WAITING_GREEN_CHECK';
+        job.stage = `🔍 CHỜ KIỂM TRA KỸ VỊ TRÍ ẢNH NỀN XANH GÓC TRÁI DƯỚI (${path.basename(job.greenCutoutPath || 'NENXANH.png')}) TRƯỚC KHI TẠO VIDEO`;
+      }
+    }
+
     this.queue.push(job);
     this._updateProjectStateJson(job.projectDir, {
       video_bridge_status: job.status,
-      live_note: shouldWaitBatch
-        ? '⏳ Bàn #7: Đã nhận kịch bản sạch TTS, đang đợi cả lô kịch bản hoàn tất để tạo Voice & Video 1 lượt'
-        : '🎬 Bàn #7: Đã chuyển kịch bản sang hàng đợi Tạo Voice (.wav) & Render Video (.mp4)'
+      live_note: job.status === 'WAITING_GREEN_CHECK'
+        ? '🔍 Bàn #7 (Key 04): Đã quét & cắt gọn ảnh nền xanh đặt ở góc trái dưới — Đang chờ kiểm tra kỹ vị trí ảnh trước khi tạo video theo Template'
+        : shouldWaitBatch
+          ? '⏳ Bàn #7: Đã nhận kịch bản sạch TTS, đang đợi cả lô kịch bản hoàn tất để tạo Voice & Video 1 lượt'
+          : '🎬 Bàn #7: Đã chuyển kịch bản sang hàng đợi Tạo Voice (.wav) & Render Video (.mp4)'
     });
 
     this._logToBoth(
-      shouldWaitBatch
-        ? `📥 Đã nhận kịch bản [${job.scriptName}] từ Bàn #6 (Chế độ Gom lô: đợi xong toàn bộ kịch bản sẽ render 1 lượt).`
-        : `🚀 Đã nhận kịch bản [${job.scriptName}] từ Bàn #6 ➔ Chuyển thẳng sang Bàn #7 (Tạo Voice & Render Video GPU)!`
+      job.status === 'WAITING_GREEN_CHECK'
+        ? `🔍 [Key 04 Padre MX] Đã quét & cắt gọn ảnh nền xanh [${path.basename(job.greenCutoutPath || '')}] đặt ở góc trái dưới (X:${job.greenPlacement?.x ?? 16}, Y:${job.greenPlacement?.y ?? 400}). Vui lòng kiểm tra kỹ vị trí ảnh trước khi bấm Duyệt tạo video!`
+        : shouldWaitBatch
+          ? `📥 Đã nhận kịch bản [${job.scriptName}] từ Bàn #6 (Chế độ Gom lô: đợi xong toàn bộ kịch bản sẽ render 1 lượt).`
+          : `🚀 Đã nhận kịch bản [${job.scriptName}] từ Bàn #6 ➔ Chuyển thẳng sang Bàn #7 (Tạo Voice & Render Video GPU)!`
     );
     this._emitBridgeState();
+    if (job.status === 'WAITING_GREEN_CHECK') {
+      this._sendToRenderer('scriptBridge:requireGreenCheck', job);
+    }
 
-    if (!shouldWaitBatch) {
+    if (!shouldWaitBatch && job.status === 'WAITING_GPU') {
       this._processQueue().catch((err) => {
         console.error('[ScriptVideoBridge] Lỗi xử lý hàng đợi:', err);
       });
@@ -1090,12 +1382,29 @@ class ScriptVideoBridgeService {
   onScriptQueueCompleted(payload = {}) {
     const waitingBatchItems = this.queue.filter((item) => item.status === 'WAITING_BATCH');
     if (waitingBatchItems.length > 0) {
+      let firstGreenCheckJob = null;
       for (const item of waitingBatchItems) {
+        if (item.niche === '04_Nhom_Ong_Gia_Trung_Tri_Mexico') {
+          this._ensurePadreMxGreenCutoutForJob(item);
+          if (this.key04BatchApprovedPlacement && !item.greenPositionVerified) {
+            item.greenPlacement = { ...(item.greenPlacement || {}), ...this.key04BatchApprovedPlacement };
+            item.greenPositionVerified = true;
+          }
+          if (!item.greenPositionVerified) {
+            item.status = 'WAITING_GREEN_CHECK';
+            item.stage = `🔍 CHỜ KIỂM TRA KỸ VỊ TRÍ ẢNH NỀN XANH GÓC TRÁI DƯỚI (${path.basename(item.greenCutoutPath || 'NENXANH.png')}) TRƯỚC KHI TẠO VIDEO`;
+            if (!firstGreenCheckJob) firstGreenCheckJob = item;
+            continue;
+          }
+        }
         item.status = 'WAITING_GPU';
         item.stage = 'CHỜ ĐẾN LƯỢT GPU';
       }
       this._logToBoth(`📦 Toàn bộ lô kịch bản (${waitingBatchItems.length} bài) đã viết xong! Bắt đầu chạy Bàn #7 (Tạo Voice & Render Video GPU)...`);
       this._emitBridgeState();
+      if (firstGreenCheckJob) {
+        this._sendToRenderer('scriptBridge:requireGreenCheck', firstGreenCheckJob);
+      }
       this._processQueue().catch((err) => {
         console.error('[ScriptVideoBridge] Lỗi xử lý hàng đợi sau khi xong lô:', err);
       });
@@ -1135,6 +1444,62 @@ class ScriptVideoBridgeService {
       : 'RENDER_VOICE_THEN_VIDEO';
 
     const scriptBaseName = path.basename(job.scriptPath, path.extname(job.scriptPath));
+    const cleanScriptBaseName = scriptBaseName.replace(/_KB$/i, '');
+
+    // Riêng Key 04_Nhom_Ong_Gia_Trung_Tri_Mexico:
+    // Gắn ảnh nền xanh đã quét & cắt gọn riêng của từng kịch bản ({TenKichBan}_KB.png)
+    // vào góc trái bên dưới (Bottom-Left) theo đúng tọa độ đã kiểm tra duyệt trước khi tạo video.
+    let key04ImageOverrides = {};
+    if (jobKey === '04_Nhom_Ong_Gia_Trung_Tri_Mexico') {
+      if (!job.greenCutoutPath || !fs.existsSync(job.greenCutoutPath)) {
+        this._ensurePadreMxGreenCutoutForJob(job);
+      }
+      if (job.greenCutoutPath && fs.existsSync(job.greenCutoutPath)) {
+        const gp = job.greenPlacement || {
+          x: 0,
+          y: 340,
+          width: 570,
+          height: 740,
+          keyColor: '#00FF00',
+          similarity: 0.24,
+          softness: 0.07,
+          assetMode: 'GREEN',
+          edited: true
+        };
+        const perJobCfg = {
+          x: Math.round(Number(gp.x ?? 0)),
+          y: Math.round(Number(gp.y ?? 340)),
+          width: Math.round(Number(gp.width || 570)),
+          height: Math.round(Number(gp.height || 740)),
+          keyColor: gp.keyColor || '#00FF00',
+          similarity: Number(gp.similarity ?? 0.24),
+          softness: Number(gp.softness ?? 0.07),
+          assetMode: 'GREEN',
+          edited: true
+        };
+        key04ImageOverrides = {
+          enableJobGreenLayer: false,
+          jobGreenFolder: '',
+          singleJobGreenPath: '',
+          singleProjectImagePath: job.greenCutoutPath,
+          projectImageFolder: path.dirname(job.greenCutoutPath),
+          projectImageMode: 'GREEN',
+          defaultFolderImageTransform: {
+            x: perJobCfg.x,
+            y: perJobCfg.y,
+            width: perJobCfg.width,
+            height: perJobCfg.height,
+            rotation: 0,
+            opacity: 1
+          },
+          jobGreenConfigs: {
+            ...(base.jobGreenConfigs || {}),
+            [scriptBaseName]: perJobCfg,
+            [cleanScriptBaseName]: perJobCfg
+          }
+        };
+      }
+    }
 
     const defaultKeyVoice = this._detectDefaultVoiceProfileForKey(jobKey);
     let effectiveVoiceProfileId = (base.voiceProfileId && base.voiceProfileId !== 'default')
@@ -1155,6 +1520,7 @@ class ScriptVideoBridgeService {
 
     return {
       ...base,
+      ...key04ImageOverrides,
       batchName: `AutoVideo_${scriptBaseName}`,
       projectId: base.projectId || selectedProject?.id || null,
       templateId: base.templateId || selectedTemplate?.id || null,
@@ -1182,7 +1548,9 @@ class ScriptVideoBridgeService {
       accelerationMode: base.accelerationMode || 'AUTO_STABLE',
       gpuIndex: Number(base.gpuIndex ?? -1),
       performanceProfile: base.performanceProfile || 'AUTO',
-      maxParallelJobs: 1,
+      autoResourceMode: true,
+      maxParallelJobs: 3,
+      _fromScriptBridge: true,
       stockAllocationMode: ['STOCK_VIDEO', 'STORY_PIP_STOCK'].includes(backgroundMode) ? 'DURATION_POOL' : 'PER_JOB',
       stockPlaybackRate: Number(base.stockPlaybackRate || 0.75),
       extendShortStock: ['STOCK_VIDEO', 'STORY_PIP_STOCK'].includes(backgroundMode) ? false : (base.extendShortStock !== false),
@@ -1197,195 +1565,232 @@ class ScriptVideoBridgeService {
     };
   }
 
+  async _executeSingleBridgeJob(nextJob, slotIndex = 1, maxWorkers = 1) {
+    const abortController = new AbortController();
+    this.activeJobs.set(nextJob.id, { job: nextJob, abortController });
+    this.activeJob = nextJob;
+    this.currentAbortController = abortController;
+
+    nextJob.status = 'RENDERING';
+    nextJob.stage = `⚡ Luồng #${slotIndex}/${maxWorkers} · KHỞI ĐỘNG BÀN #7 (VOICE & VIDEO)`;
+    nextJob.startedAt = Date.now();
+    nextJob.percent = 2;
+    this._emitBridgeState();
+
+    const runConfig = this._buildEffectiveBatchConfigForJob(nextJob);
+    this._logToBoth(
+      `🎬 [Luồng #${slotIndex}/${maxWorkers}] Bắt đầu sản xuất [${nextJob.scriptName}] · Giọng: ${runConfig.voiceProfileId} · Nền: ${runConfig.backgroundMode} · Output: ${runConfig.outputFolder}`
+    );
+    this._updateProjectStateJson(nextJob.projectDir, {
+      video_bridge_status: 'RENDERING',
+      live_note: `🎬 Bàn #7 [Luồng #${slotIndex}/${maxWorkers}] đang chạy: Tạo Voice (.wav) ➔ Whisper (.srt) ➔ Render Video (.mp4)`
+    });
+
+    try {
+      const result = await this.batchService.run(
+        runConfig,
+        {
+          onProgress: (p) => {
+            this._sendToRenderer('batch:progress', p);
+            if (p?.percent !== undefined) {
+              nextJob.percent = Math.max(2, Math.min(99, Math.round(Number(p.percent) || 0)));
+            }
+            const activeCount = Math.max(1, this.activeJobs.size);
+            const prefix = activeCount > 1 ? `[Luồng #${slotIndex}] ` : '';
+            if (p?.stage === 'VOICE_GEN') {
+              nextJob.stage = `${prefix}🎙️ Đang tạo Voice (.wav): ${p.message || `${nextJob.percent}%`}`;
+            } else if (p?.stage === 'SRT_PREP') {
+              nextJob.stage = `${prefix}📝 Đang tạo phụ đề Whisper (.srt): ${p.message || `${nextJob.percent}%`}`;
+            } else if (p?.stage === 'RENDER') {
+              nextJob.stage = `${prefix}🎬 Đang Render GPU NVENC (.mp4): ${nextJob.percent}% ${p.speed ? `(${p.speed})` : ''}`;
+            } else if (p?.message) {
+              nextJob.stage = `${prefix}${p.message}`;
+            }
+            this._emitBridgeState();
+          },
+          onLog: (m) => {
+            this._sendToRenderer('batch:log', m);
+          },
+          onJob: (j) => {
+            this._sendToRenderer('batch:job', j);
+            if (j?.outputPath) {
+              nextJob.videoOutputPath = j.outputPath;
+            }
+            if (j?.srtPath) {
+              nextJob.srtOutputPath = j.srtPath;
+            }
+          },
+          onBatch: (b) => {
+            this._sendToRenderer('batch:state', b);
+          }
+        },
+        abortController.signal
+      );
+
+      const baseName = path.basename(nextJob.scriptPath, path.extname(nextJob.scriptPath));
+      const expectedMp4 = nextJob.videoOutputPath || path.join(runConfig.outputFolder, `${baseName}.mp4`);
+      if (fs.existsSync(expectedMp4)) {
+        nextJob.videoOutputPath = expectedMp4;
+      }
+
+      if (result?.status === 'COMPLETED') {
+        nextJob.status = 'COMPLETED';
+        nextJob.percent = 100;
+        nextJob.completedAt = Date.now();
+        nextJob.stage = runConfig.voiceSourceMode === 'ONLY_RENDER_VOICE'
+          ? `✅ Đã xuất Voice: ${path.basename(nextJob.voiceOutputPath)}`
+          : `✅ Đã xuất Video: ${path.basename(nextJob.videoOutputPath || expectedMp4)}`;
+
+        if (this.settings.copyMp4ToTongHop && nextJob.videoOutputPath && fs.existsSync(nextJob.videoOutputPath)) {
+          try {
+            const destMp4 = path.join(nextJob.tongHopDir || path.dirname(nextJob.scriptPath), path.basename(nextJob.videoOutputPath));
+            if (path.resolve(destMp4) !== path.resolve(nextJob.videoOutputPath)) {
+              fs.copyFileSync(nextJob.videoOutputPath, destMp4);
+            }
+          } catch {}
+        }
+
+        this._updateProjectStateJson(nextJob.projectDir, {
+          video_bridge_status: 'COMPLETED',
+          voice_output_path: nextJob.voiceOutputPath,
+          srt_output_path: nextJob.srtOutputPath,
+          video_output_path: nextJob.videoOutputPath || expectedMp4,
+          live_note: `🏆 ĐÃ HOÀN TẤT KHÉP KÍN 7/7 BÀN (Kịch bản + SEO + Voice WAV + Phụ đề SRT + Video MP4: ${path.basename(nextJob.videoOutputPath || expectedMp4)})`
+        });
+
+        this._logToBoth(
+          `🎉 Hoàn tất 100% Bàn #7 cho [${nextJob.scriptName}]! Thành phẩm: ${nextJob.videoOutputPath || nextJob.voiceOutputPath}`
+        );
+      } else if (result?.status === 'PAUSED_INSUFFICIENT_STOCK') {
+        const details = result?.report?.details || {};
+        const errObj = Object.assign(new Error('Không đủ stock chưa sử dụng để phủ hết thời lượng voice.'), {
+          code: 'INSUFFICIENT_STOCK',
+          requiredMs: Number(details.requiredMs || 0),
+          availableMs: Number(details.availableMs || 0),
+          missingMs: Number(details.missingMs || 0)
+        });
+        throw errObj;
+      } else {
+        throw new Error(result?.error || `Batch kết thúc với trạng thái ${result?.status || 'UNKNOWN'}`);
+      }
+    } catch (err) {
+      const isInsufficientStock = err?.code === 'INSUFFICIENT_STOCK' ||
+        err?.name === 'InsufficientStockError' ||
+        /Không đủ stock/i.test(String(err?.message || ''));
+      if (isInsufficientStock) {
+        const requiredMs = Number(err?.requiredMs || 0);
+        const availableMs = Number(err?.availableMs || 0);
+        const missingMs = Number(err?.missingMs || Math.max(0, requiredMs - availableMs));
+        const reqText = this._formatDurationVi(requiredMs);
+        const availText = this._formatDurationVi(availableMs);
+        const missText = this._formatDurationVi(missingMs);
+        const pauseMsg = `⚠️ KHO STOCK ĐÃ HẾT THỜI LƯỢNG: Kịch bản [${nextJob.scriptName}] cần ${reqText} nhưng Kho Stock [${runConfig.mediaFolder || 'Chưa chọn'}] chỉ còn ${availText} (Thiếu ${missText}). Bàn #7 đã tạm dừng dựng video để bạn bổ sung Stock rồi chạy tiếp (Tiến trình viết kịch bản Bàn #1➔#6 vẫn tiếp tục viết cho đến hết hàng đợi)!`;
+
+        nextJob.status = 'PAUSED_INSUFFICIENT_STOCK';
+        nextJob.error = pauseMsg;
+        nextJob.stage = `⚠️ TẠM DỪNG: HẾT STOCK (Còn ${availText} / Cần ${reqText} · Thiếu ${missText}) — Bổ sung Stock để chạy tiếp`;
+        this.pausedReason = 'INSUFFICIENT_STOCK';
+        this.pausedStockAlert = {
+          timestamp: Date.now(),
+          jobId: nextJob.id,
+          scriptName: nextJob.scriptName,
+          scriptPath: nextJob.scriptPath,
+          niche: nextJob.niche,
+          mediaFolder: runConfig.mediaFolder || '',
+          requiredMs,
+          availableMs,
+          missingMs,
+          requiredText: reqText,
+          availableText: availText,
+          missingText: missText,
+          message: pauseMsg
+        };
+        this._updateProjectStateJson(nextJob.projectDir, {
+          video_bridge_status: 'PAUSED_INSUFFICIENT_STOCK',
+          video_bridge_error: pauseMsg,
+          live_note: pauseMsg
+        });
+        this._logToBoth(pauseMsg);
+        // Lưu ý: KHÔNG gọi /api/stop_worker để tiến trình viết kịch bản (Bàn #1 -> #6) viết hết toàn bộ hàng đợi rồi tự dừng!
+        this._sendToRenderer('scriptBridge:insufficientStock', this.pausedStockAlert);
+        return;
+      }
+
+      nextJob.status = 'FAILED';
+      nextJob.error = err?.message || String(err);
+      nextJob.stage = `❌ Lỗi: ${nextJob.error}`;
+      nextJob.completedAt = Date.now();
+      this._updateProjectStateJson(nextJob.projectDir, {
+        video_bridge_status: 'FAILED',
+        video_bridge_error: nextJob.error,
+        live_note: `⚠️ Bàn #7 (Tạo Video) báo lỗi: ${nextJob.error.slice(0, 120)}`
+      });
+      this._logToBoth(`❌ Lỗi khi tạo Voice/Video cho [${nextJob.scriptName}]: ${nextJob.error}`);
+    } finally {
+      this.activeJobs.delete(nextJob.id);
+      const remainingEntries = Array.from(this.activeJobs.values());
+      this.activeJob = remainingEntries[0]?.job || null;
+      this.currentAbortController = remainingEntries[0]?.abortController || null;
+      this._emitBridgeState();
+    }
+  }
+
   async _processQueue() {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
 
     try {
       while (true) {
-        const nextJob = this.queue.find((item) => item.status === 'WAITING_GPU');
-        if (!nextJob) break;
+        if (this.pausedReason) {
+          if (this.activeJobs.size > 0) {
+            await Promise.race(Array.from(this.activeJobs.values()).map((e) => e.promise));
+            continue;
+          }
+          break;
+        }
 
-        // Nếu người dùng đang bấm chạy 1 Batch thủ công trên giao diện, đợi 3 giây rồi kiểm tra lại
-        if (this.batchService.activeBatchId) {
-          nextJob.stage = 'ĐANG ĐỢI BATCH HIỆN TẠI HOÀN TẤT';
+        const waitingJobs = this.queue.filter((item) => item.status === 'WAITING_GPU');
+        if (waitingJobs.length === 0 && this.activeJobs.size === 0) {
+          break;
+        }
+
+        // Nếu người dùng đang bấm chạy 1 Batch thủ công trên tab Batch, tạm đợi Batch thủ công hoàn tất
+        if (this.batchService.manualBatchRunning) {
+          for (const wJob of waitingJobs) {
+            wJob.stage = 'ĐANG ĐỢI BATCH THỦ CÔNG HOÀN TẤT';
+          }
           this._emitBridgeState();
-          await new Promise((r) => setTimeout(r, 3000));
+          await new Promise((r) => setTimeout(r, 2500));
           continue;
         }
 
-        this.activeJob = nextJob;
-        nextJob.status = 'RENDERING';
-        nextJob.stage = 'KHỞI ĐỘNG BÀN #7 (VOICE & VIDEO)';
-        nextJob.startedAt = Date.now();
-        nextJob.percent = 2;
-        this._emitBridgeState();
+        const autoPlan = await this._computeAutoBalancedBridgeConcurrency();
+        const targetConcurrency = Math.max(1, Math.min(3, Number(autoPlan.targetWorkers || 2)));
 
-        const runConfig = this._buildEffectiveBatchConfigForJob(nextJob);
-        this._logToBoth(
-          `🎬 Bắt đầu sản xuất [${nextJob.scriptName}] · Giọng: ${runConfig.voiceProfileId} · Nền: ${runConfig.backgroundMode} · Output: ${runConfig.outputFolder}`
-        );
-        this._updateProjectStateJson(nextJob.projectDir, {
-          video_bridge_status: 'RENDERING',
-          live_note: `🎬 Bàn #7 đang chạy: Tạo Voice (.wav) ➔ Whisper (.srt) ➔ Render Video (.mp4)`
-        });
-
-        this.currentAbortController = new AbortController();
-        try {
-          const result = await this.batchService.run(
-            runConfig,
-            {
-              onProgress: (p) => {
-                this._sendToRenderer('batch:progress', p);
-                if (p?.percent !== undefined) {
-                  nextJob.percent = Math.max(2, Math.min(99, Math.round(Number(p.percent) || 0)));
-                }
-                if (p?.stage === 'VOICE_GEN') {
-                  nextJob.stage = `🎙️ Đang tạo Voice (.wav): ${p.message || `${nextJob.percent}%`}`;
-                } else if (p?.stage === 'SRT_PREP') {
-                  nextJob.stage = `📝 Đang tạo phụ đề Whisper (.srt): ${p.message || `${nextJob.percent}%`}`;
-                } else if (p?.stage === 'RENDER') {
-                  nextJob.stage = `🎬 Đang Render GPU NVENC (.mp4): ${nextJob.percent}% ${p.speed ? `(${p.speed})` : ''}`;
-                } else if (p?.message) {
-                  nextJob.stage = p.message;
-                }
-                this._emitBridgeState();
-              },
-              onLog: (m) => {
-                this._sendToRenderer('batch:log', m);
-              },
-              onJob: (j) => {
-                this._sendToRenderer('batch:job', j);
-                if (j?.outputPath) {
-                  nextJob.videoOutputPath = j.outputPath;
-                }
-                if (j?.srtPath) {
-                  nextJob.srtOutputPath = j.srtPath;
-                }
-              },
-              onBatch: (b) => {
-                this._sendToRenderer('batch:state', b);
-              }
-            },
-            this.currentAbortController.signal
-          );
-
-          const baseName = path.basename(nextJob.scriptPath, path.extname(nextJob.scriptPath));
-          const expectedMp4 = nextJob.videoOutputPath || path.join(runConfig.outputFolder, `${baseName}.mp4`);
-          if (fs.existsSync(expectedMp4)) {
-            nextJob.videoOutputPath = expectedMp4;
+        while (
+          !this.pausedReason &&
+          !this.batchService.manualBatchRunning &&
+          this.activeJobs.size < targetConcurrency
+        ) {
+          const nextJob = this.queue.find((item) => item.status === 'WAITING_GPU' && !this.activeJobs.has(item.id));
+          if (!nextJob) break;
+          const slotIndex = this.activeJobs.size + 1;
+          const jobPromise = this._executeSingleBridgeJob(nextJob, slotIndex, targetConcurrency);
+          const entry = this.activeJobs.get(nextJob.id);
+          if (entry) {
+            entry.promise = jobPromise;
           }
-
-          if (result?.status === 'COMPLETED') {
-            nextJob.status = 'COMPLETED';
-            nextJob.percent = 100;
-            nextJob.completedAt = Date.now();
-            nextJob.stage = runConfig.voiceSourceMode === 'ONLY_RENDER_VOICE'
-              ? `✅ Đã xuất Voice: ${path.basename(nextJob.voiceOutputPath)}`
-              : `✅ Đã xuất Video: ${path.basename(nextJob.videoOutputPath || expectedMp4)}`;
-
-            if (this.settings.copyMp4ToTongHop && nextJob.videoOutputPath && fs.existsSync(nextJob.videoOutputPath)) {
-              try {
-                const destMp4 = path.join(nextJob.tongHopDir || path.dirname(nextJob.scriptPath), path.basename(nextJob.videoOutputPath));
-                if (path.resolve(destMp4) !== path.resolve(nextJob.videoOutputPath)) {
-                  fs.copyFileSync(nextJob.videoOutputPath, destMp4);
-                }
-              } catch {}
-            }
-
-            this._updateProjectStateJson(nextJob.projectDir, {
-              video_bridge_status: 'COMPLETED',
-              voice_output_path: nextJob.voiceOutputPath,
-              srt_output_path: nextJob.srtOutputPath,
-              video_output_path: nextJob.videoOutputPath || expectedMp4,
-              live_note: `🏆 ĐÃ HOÀN TẤT KHÉP KÍN 7/7 BÀN (Kịch bản + SEO + Voice WAV + Phụ đề SRT + Video MP4: ${path.basename(nextJob.videoOutputPath || expectedMp4)})`
-            });
-
-            this._logToBoth(
-              `🎉 Hoàn tất 100% Bàn #7 cho [${nextJob.scriptName}]! Thành phẩm: ${nextJob.videoOutputPath || nextJob.voiceOutputPath}`
-            );
-          } else if (result?.status === 'PAUSED_INSUFFICIENT_STOCK') {
-            const details = result?.report?.details || {};
-            const errObj = Object.assign(new Error('Không đủ stock chưa sử dụng để phủ hết thời lượng voice.'), {
-              code: 'INSUFFICIENT_STOCK',
-              requiredMs: Number(details.requiredMs || 0),
-              availableMs: Number(details.availableMs || 0),
-              missingMs: Number(details.missingMs || 0)
-            });
-            throw errObj;
-          } else {
-            throw new Error(result?.error || `Batch kết thúc với trạng thái ${result?.status || 'UNKNOWN'}`);
-          }
-        } catch (err) {
-          const isInsufficientStock = err?.code === 'INSUFFICIENT_STOCK' ||
-            err?.name === 'InsufficientStockError' ||
-            /Không đủ stock/i.test(String(err?.message || ''));
-          if (isInsufficientStock) {
-            const requiredMs = Number(err?.requiredMs || 0);
-            const availableMs = Number(err?.availableMs || 0);
-            const missingMs = Number(err?.missingMs || Math.max(0, requiredMs - availableMs));
-            const reqText = this._formatDurationVi(requiredMs);
-            const availText = this._formatDurationVi(availableMs);
-            const missText = this._formatDurationVi(missingMs);
-            const pauseMsg = `⚠️ KHO STOCK ĐÃ HẾT THỜI LƯỢNG: Kịch bản [${nextJob.scriptName}] cần ${reqText} nhưng Kho Stock [${runConfig.mediaFolder || 'Chưa chọn'}] chỉ còn ${availText} (Thiếu ${missText}). Chương trình đã tạm dừng để bạn bổ sung Stock rồi chạy tiếp!`;
-
-            nextJob.status = 'PAUSED_INSUFFICIENT_STOCK';
-            nextJob.error = pauseMsg;
-            nextJob.stage = `⚠️ TẠM DỪNG: HẾT STOCK (Còn ${availText} / Cần ${reqText} · Thiếu ${missText}) — Bổ sung Stock để chạy tiếp`;
-            this.pausedReason = 'INSUFFICIENT_STOCK';
-            this.pausedStockAlert = {
-              timestamp: Date.now(),
-              jobId: nextJob.id,
-              scriptName: nextJob.scriptName,
-              scriptPath: nextJob.scriptPath,
-              niche: nextJob.niche,
-              mediaFolder: runConfig.mediaFolder || '',
-              requiredMs,
-              availableMs,
-              missingMs,
-              requiredText: reqText,
-              availableText: availText,
-              missingText: missText,
-              message: pauseMsg
-            };
-            this._updateProjectStateJson(nextJob.projectDir, {
-              video_bridge_status: 'PAUSED_INSUFFICIENT_STOCK',
-              video_bridge_error: pauseMsg,
-              live_note: pauseMsg
-            });
-            this._logToBoth(pauseMsg);
-            try {
-              const stopReq = http.request({
-                hostname: '127.0.0.1',
-                port: SCRIPT_STUDIO_PORT,
-                path: '/api/stop_worker',
-                method: 'POST',
-                timeout: 1500,
-                headers: { 'Content-Type': 'application/json', 'Content-Length': 2 }
-              });
-              stopReq.on('error', () => {});
-              stopReq.write('{}');
-              stopReq.end();
-            } catch {}
-            this._sendToRenderer('scriptBridge:insufficientStock', this.pausedStockAlert);
-            break;
-          }
-
-          nextJob.status = 'FAILED';
-          nextJob.error = err?.message || String(err);
-          nextJob.stage = `❌ Lỗi: ${nextJob.error}`;
-          nextJob.completedAt = Date.now();
-          this._updateProjectStateJson(nextJob.projectDir, {
-            video_bridge_status: 'FAILED',
-            video_bridge_error: nextJob.error,
-            live_note: `⚠️ Bàn #7 (Tạo Video) báo lỗi: ${nextJob.error.slice(0, 120)}`
-          });
-          this._logToBoth(`❌ Lỗi khi tạo Voice/Video cho [${nextJob.scriptName}]: ${nextJob.error}`);
-        } finally {
-          this.currentAbortController = null;
-          this.activeJob = null;
-          this._emitBridgeState();
         }
+
+        if (this.activeJobs.size === 0) {
+          break;
+        }
+
+        await Promise.race(
+          Array.from(this.activeJobs.values())
+            .map((e) => e.promise)
+            .filter(Boolean)
+        );
       }
     } finally {
       this.isProcessingQueue = false;
@@ -1464,7 +1869,7 @@ class ScriptVideoBridgeService {
   }
 
   clearCompletedQueue() {
-    this.queue = this.queue.filter((item) => ['WAITING_GPU', 'WAITING_BATCH', 'RENDERING', 'PAUSED_INSUFFICIENT_STOCK'].includes(item.status));
+    this.queue = this.queue.filter((item) => ['WAITING_GPU', 'WAITING_BATCH', 'WAITING_GREEN_CHECK', 'RENDERING', 'PAUSED_INSUFFICIENT_STOCK'].includes(item.status));
     this._emitBridgeState();
     return this.getPublicState();
   }
@@ -1667,6 +2072,29 @@ class ScriptVideoBridgeService {
           const body = await readJsonBody(req);
           const result = this.enqueueFolderScripts(body.folder_path || body.folderPath);
           sendJson(res, 200, { ok: true, ...result, state: this.getPublicState() });
+          return;
+        }
+
+        if (req.method === 'POST' && pathname === '/api/bridge/approve-green-position') {
+          const body = await readJsonBody(req);
+          const result = this.approveGreenPositionForJob({
+            jobId: body.jobId || body.job_id || '',
+            scriptPath: body.scriptPath || body.script_path || '',
+            greenPlacement: body.greenPlacement || body.green_placement || null,
+            applyToAllKey04: Boolean(body.applyToAllKey04 || body.apply_to_all_key04)
+          });
+          sendJson(res, 200, result);
+          return;
+        }
+
+        if (req.method === 'POST' && pathname === '/api/bridge/rescan-green-crop') {
+          const body = await readJsonBody(req);
+          const targetJob = this.queue.find((item) => item.id === (body.jobId || body.job_id));
+          if (targetJob) {
+            this._ensurePadreMxGreenCutoutForJob(targetJob, { forceRegenerate: Boolean(body.forceRegenerate) });
+            this._emitBridgeState();
+          }
+          sendJson(res, 200, { ok: Boolean(targetJob), job: targetJob || null, state: this.getPublicState() });
           return;
         }
 
@@ -1878,6 +2306,11 @@ foreach ($p in $procs) {
   async shutdown(options = {}) {
     try {
       this.currentAbortController?.abort();
+      if (this.activeJobs && this.activeJobs.size > 0) {
+        for (const entry of this.activeJobs.values()) {
+          try { entry?.abortController?.abort(); } catch {}
+        }
+      }
     } catch {}
     if (this.httpServer) {
       try {

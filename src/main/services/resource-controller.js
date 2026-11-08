@@ -4,7 +4,7 @@ const os = require('node:os');
 
 const MAX_WORKERS = 8;
 const DEFAULT_CPU_RESERVE = 2;
-const DEFAULT_MEMORY_PER_WORKER_MB = 3000;
+const DEFAULT_MEMORY_PER_WORKER_MB = 2000;
 
 function numberOr(value, fallback = 0) {
   const parsed = Number(value);
@@ -62,7 +62,7 @@ function selectedGpuInfo(system = {}, requestedGpuIndex = -1) {
     memoryUsedMb: Math.max(0, numberOr(gpu?.memoryUsedMb ?? gpu?.memory_used_mb)),
     utilizationPercent: clamp(numberOr(gpu?.utilizationPercent ?? gpu?.utilization_percent), 0, 100),
     encoderUtilizationPercent: clamp(numberOr(gpu?.encoderUtilizationPercent ?? gpu?.encoder_utilization_percent), 0, 100),
-    ready: Boolean(gpu?.h264NvencReady || gpu?.h264NvencRuntime || gpu?.h264Nvenc || system.nvencRuntime || system.h264Nvenc)
+    ready: Boolean(gpu?.ready || gpu?.h264NvencReady || gpu?.h264NvencRuntime || gpu?.h264Nvenc || system.nvencRuntime || system.h264Nvenc || system.nvencAvailable)
   };
 }
 
@@ -80,7 +80,7 @@ function isPascalGtx10(system = {}) {
 
 function classifyWorkload(config = {}, system = {}) {
   const requestedAcceleration = String(config.accelerationMode || 'AUTO_STABLE').toUpperCase();
-  const hasNvenc = Boolean(system.nvencRuntime || system.h264NvencRuntime || system.h264Nvenc || system.nvencPotential);
+  const hasNvenc = Boolean(system.nvencRuntime || system.h264NvencRuntime || system.h264Nvenc || system.nvencPotential || system.nvencAvailable || (system.gpus || [])[0]?.ready);
   if (requestedAcceleration === 'CPU' || !hasNvenc) return 'CPU';
   if (
     ['FULL_CUDA', 'FULL_GPU_ZERO_COPY'].includes(requestedAcceleration) &&
@@ -114,6 +114,7 @@ function classifyWorkload(config = {}, system = {}) {
 }
 
 function isAutoResourceConfig(config = {}) {
+  if (config.autoResourceMode === false) return false;
   const workers = config.maxParallelJobs;
   const profile = String(config.performanceProfile || '').toUpperCase();
   const acceleration = String(config.accelerationMode || '').toUpperCase();
@@ -121,14 +122,16 @@ function isAutoResourceConfig(config = {}) {
     String(workers || '').toUpperCase() === 'AUTO' ||
     (workers === undefined || workers === null || !Number.isFinite(Number(workers))) ||
     profile === 'AUTO' ||
-    acceleration === 'AUTO';
+    acceleration === 'AUTO' ||
+    acceleration === 'AUTO_STABLE';
 }
 
 function gpuWorkerCapacity(workload, gpu) {
-  if (!gpu.ready || !gpu.memoryTotalMb) return workload === 'CPU' ? MAX_WORKERS : 1;
-  if (gpu.memoryTotalMb >= 16_000) return 4;
-  if (gpu.memoryTotalMb >= 12_000) return 3;
-  if (gpu.memoryTotalMb >= 8_000) return 2;
+  if (!gpu.ready) return workload === 'CPU' ? MAX_WORKERS : 2;
+  if (!gpu.memoryTotalMb) return 3;
+  if (gpu.memoryTotalMb >= 15_000) return 4;
+  if (gpu.memoryTotalMb >= 5_500) return 3;
+  if (gpu.memoryTotalMb >= 3_500) return 2;
   return 1;
 }
 
@@ -137,21 +140,33 @@ function recommendResourcePlan({ config = {}, system = {}, host = null, jobCount
   const workload = classifyWorkload(config, system);
   const gpu = selectedGpuInfo(system, config.gpuIndex);
   const logicalCpuCount = Math.max(1, numberOr(resources.logicalCpuCount, os.cpus().length));
-  const cpuReserve = logicalCpuCount >= 8 ? DEFAULT_CPU_RESERVE : 1;
+  const cpuReserve = logicalCpuCount >= 12 ? DEFAULT_CPU_RESERVE : 1;
   const cpuBudget = Math.max(1, logicalCpuCount - cpuReserve);
-  const cpuCostPerWorker = workload === 'CPU' ? 4 : workload === 'CUDA' ? 3 : 4;
+  const cpuCostPerWorker = workload === 'CPU' ? 4 : 3;
   const cpuCapacity = Math.max(1, Math.floor(cpuBudget / cpuCostPerWorker));
   const gpuCapacity = gpuWorkerCapacity(workload, gpu);
+  const totalMemoryMb = Math.max(1, numberOr(resources.totalMemoryMb, Math.round(os.totalmem() / 1024 / 1024)));
   const freeMemoryMb = Math.max(512, numberOr(resources.freeMemoryMb, Math.round(os.freemem() / 1024 / 1024)));
-  const memoryPerWorkerMb = workload === 'CPU' ? 2200 : DEFAULT_MEMORY_PER_WORKER_MB;
-  const memoryCapacity = Math.max(1, Math.floor(freeMemoryMb / memoryPerWorkerMb));
+  const effectiveMemoryMb = Math.max(freeMemoryMb, Math.round(totalMemoryMb * 0.45));
+  const memoryPerWorkerMb = workload === 'CPU' ? 1800 : DEFAULT_MEMORY_PER_WORKER_MB;
+  const memoryCapacity = Math.max(1, Math.floor(effectiveMemoryMb / memoryPerWorkerMb));
   const availableJobs = Math.max(1, Math.round(numberOr(jobCount, 1)));
-  const maxWorkers = clamp(
-    Math.min(MAX_WORKERS, availableJobs, cpuCapacity, gpuCapacity, memoryCapacity),
+  const hardwareMaxWorkers = clamp(
+    Math.min(MAX_WORKERS, cpuCapacity, gpuCapacity, memoryCapacity),
     1,
     MAX_WORKERS
   );
-  const initialWorkers = Math.min(maxWorkers, workload === 'CPU' ? 2 : 2);
+  const maxWorkers = clamp(
+    Math.min(hardwareMaxWorkers, availableJobs),
+    1,
+    MAX_WORKERS
+  );
+  const isStrongMachine = logicalCpuCount >= 10 && totalMemoryMb >= 14_000 && gpuCapacity >= 3 && freeMemoryMb >= 4_000;
+  const defaultTargetWorkers = isStrongMachine ? 3 : 2;
+  const requestedWorkers = Number(config.maxParallelJobs);
+  const initialWorkers = Number.isFinite(requestedWorkers) && requestedWorkers > 1
+    ? clamp(Math.round(requestedWorkers), 1, maxWorkers)
+    : Math.min(maxWorkers, defaultTargetWorkers);
   const filterComplexThreads = clamp(
     Math.floor(cpuBudget / Math.max(1, initialWorkers)),
     2,
@@ -198,10 +213,11 @@ function recommendResourcePlan({ config = {}, system = {}, host = null, jobCount
     workers: initialWorkers,
     initialWorkers,
     maxWorkers,
+    hardwareMaxWorkers,
     cpuReserve,
     host: {
       logicalCpuCount,
-      totalMemoryMb: Math.max(1, numberOr(resources.totalMemoryMb, 0)),
+      totalMemoryMb,
       freeMemoryMb
     },
     gpu,
@@ -289,6 +305,21 @@ class ResourceController {
 
   recommend(args = {}) {
     return recommendResourcePlan(args);
+  }
+
+  async recommendResourcePlan(config = {}, jobCount = 3) {
+    let system = {};
+    if (this.ffmpeg && typeof this.ffmpeg.detectSystem === 'function') {
+      try {
+        system = await this.ffmpeg.detectSystem();
+      } catch {}
+    }
+    const host = this.snapshot();
+    return recommendResourcePlan({ config, system, host, jobCount });
+  }
+
+  async getLiveSnapshot() {
+    return this.sample(-1);
   }
 
   nextWorkers(plan, snapshot, currentWorkers) {

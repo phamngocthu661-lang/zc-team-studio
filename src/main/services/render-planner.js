@@ -202,6 +202,8 @@ function layerRenderTier(layer = {}) {
   const type = layer.type || layer.layerType || layer.layer_type;
   const role = String(layer.renderTier || layer.render_tier || '').toUpperCase();
   if (role === 'BACKGROUND' || role === 'STOCK') return 0;
+  if (role === 'FOREGROUND' || layer.renderAboveTemplate === true) return 3;
+  if (layer.dynamicVoiceImage === true && (type === 'GREENSCREEN_IMAGE' || type === 'GREENSCREEN_VIDEO')) return 3;
   if (layer.dynamicVoiceImage === true || type === 'VOICE_IMAGE' || role === 'VOICE_IMAGE') return 1;
   return 2;
 }

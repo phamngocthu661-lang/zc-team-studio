@@ -1,33 +1,54 @@
 ---
 name: padre-mx-seo-packaging
-version: 1.1.0
-description: "Step6 only. Produce fact-locked es-MX title/description/tags and 3 distinct thumbnail 16:9 hypotheses/trailer for a script with exact independent QA READY hash; never claim unrendered images."
+version: 1.2.1
+description: "Step6 only. Verified es-MX SEO and exactly two matched 16:9 PNG deliverables: THUMBNAIL.png + THUMBNAIL-NENXANH.png with strict 80/20 layout: text-heavy left zone and main man on the right."
 ---
-# PADRE MX — SEO & THUMBNAIL PACKAGING (STEP6 ONLY)
+# PADRE MX — STEP6 SEO + TWO MATCHED THUMBNAIL IMAGES (80/20 FIXED LAYOUT)
 
-First load shared contract + `references/MEXICO_CHANNEL_DNA.md` + `references/SEO_THUMBNAIL_RULES.md`, current script, QA_FROZEN, and outline. Never package on a QA score copied from conversation without exact SHA. Run:
+Before Step6 read `references/CROSS_SKILL_QUALITY_CONTRACT.md`, `references/MEXICO_CHANNEL_DNA.md`, `references/SEO_THUMBNAIL_RULES.md`, the actual final script, QA_FROZEN and locked outline. The canonical title is immutable. Do not create anything for a failed QA-ready preflight.
+
+Run source/QA hash preflight:
 ```
 python scripts/verify_seo_ready.py --script CURRENT_SCRIPT.txt --qa-frozen QA_FROZEN.json --outline-file CURRENT_FINAL_OUTLINE.txt --title "CURRENT_FINAL_TITLE" [--repair-proof REPAIR_PROOF.json]
 ```
-If not PASS → block, report why. Do not use old READY against a new hash.
+If no PASS, block rather than invent readiness. Step3 final script must contain 70k–80k true Unicode body characters. Do not modify manuscript at Step6.
 
-## Content-lock
-1. `CURRENT_FINAL_TITLE` EXACT frozen locked es-MX title, <=100 chars; DO NOT replace silently.
-2. Exactly 2 secondary curiosity title options also <=100 chars, no fabricated outcomes.
-3. Short vivid es-MX video description based on actually written beats, not generic moral lessons, optional no hashtag/icon per user preference.
-4. Primary/secondary SEO keywords, informative tags (target ~450–500 chars MAX 500 when requested); count actual Unicode characters; separate optional hashtags (3–5) if requested.
-5. Three distinct **thumbnail hypotheses A/B/C**: a) very high-pressure visible injustice, b) father's silent evidence/strategy, c) consequence of victim's refusal. Each has one sharp hook text (2–6 readable lines, preferably 12–24 words total; no 40-word block) and one image prompt 16:9 with elderly father right and narrative on left; avoid direct copies of competitor images. Do not force green/yellow/red on every video; optimize legibility.
-6. One trailer script 8–15 seconds, 2–3 shots actually contained in story, no false proof/reveal.
-7. `PROMISE_TO_SCENE_MAP` with 3 actual scene quotes/Part refs verifying primary and thumbnail hooks. `FACT_LOCK` table people/ages/currency/ownership.
+## Metadata deliverable
+1. Primary `CURRENT_FINAL_TITLE` exact es-MX <=100 codepoints, never relabel.
+2. Exactly TWO supporting title options A/B, each <=100 codepoints; these are NOT thumbnail alternatives.
+3. Concise vivid es-MX description and truthful hook based on real scenes.
+4. Useful keywords, comma-separated tags with 450–500 chars including spaces/punctuation, optional separate hashtags.
+5. Exactly ONE selected thumbnail concept (no 3 A/B/C images). Hook matches the title and a witnessed moment, does not reveal false outcome. Text in natural, correctly accented es-MX.
+6. One 8–15 second trailer script based on existing beats.
+7. `PROMISE_TO_SCENE_MAP`: >=3 verbatim quotes + matching Part numbers from actual approved script, and one `FACT_LOCK` table.
+8. Persist `STEP6_SEO_PACKAGE.md` using **these exact two headings** and labels:
+```
+## Imagen THUMBNAIL
+**Archivo:** THUMBNAIL.png
+**Prompt THUMBNAIL 16:9:** ...
 
-Thumbnail image generation when specifically requested: render A, B, C as three separate 16:9 images if the environment has image generation capability; never combine into a 3-up collage, never pretend prompt=rendered file, never claim A/B testing from speculative CTR.
+## Imagen THUMBNAIL-NENXANH
+**Archivo:** THUMBNAIL-NENXANH.png
+**Prompt THUMBNAIL-NENXANH 16:9:** ...
+```
+Then verify package:
+```
+python scripts/validate_seo_package.py --package STEP6_SEO_PACKAGE.md --script EXACT_QA_READY_SCRIPT.txt --title "CURRENT_FINAL_TITLE"
+```
+A prompt document is only metadata; it never counts as a completed rendered image.
 
-If source contains an unresolved legal discrepancy or the script is not genuinely READY: stop packaging, do not fix content here, require new QA/production version.
+## MANDATORY two-image production (same Step6)
+**Produce exactly TWO FINAL image files, not three**. Render actual 16:9 RGB PNGs at equal resolution, preferably 1920x1080 (>=1280x720):
+- `THUMBNAIL.png`: finished clickable Spanish thumbnail. Reference layout from `references/example_thumbnail.jpg`: **text-heavy left block occupying about 78–82% of the canvas width** and the **main man on the right occupying about 18–22%**. The left area must carry the dense multi-line Spanish headline, using bold uppercase typography with mixed black / cyan / orange emphasis on a clean white or very light background. Keep a warm red bottom banner and a strong yellow/orange kicker if needed, but never let the text block become narrow. The right side shows the believable photographic main man only, cropped vertically and aligned to the right edge. Original story-driven copy, NO source text copied.
+- `THUMBNAIL-NENXANH.png`: matching cutout subject on EXACT flat chroma green RGB(0,255,0) / #00FF00. Same 16:9 pixel dimensions and **identical person, hairstyle, face, clothing, expression, crop, x/y placement, size, direction and lighting** as `THUMBNAIL.png`. Absolutely NO text, title, badge, icon, gradients, floor, texture, shadows, edge haze, green spill, green clothes or secondary people. Keep the **same 80/20 composition logic**: the man remains on the right occupying about 18–22% of the width, and the left about 78–82% stays uniformly pure green (see `references/example_green_screen.png`).
 
-## V1.1 SEO editorial double gate
-After the technical preflight, independently read the revised exact-hash script and verify not only three source quotes but also the title/thumbnail reveal timing. Do not frame a pending loan APPLICATION as a signed loan, or label an owner as the formal employer unless the script establishes it. Generate three genuinely different A/B/C composition AND value propositions; not three close-ups of the same archive. If QA V1.0 approved a contradicted story, do not rely on its 99/100 score; require a new V1.1 QA review and exact source hash. Thumbnail prompts are not image files.
+### Identity/position lock
+Build or isolate ONE realistic subject portrait cutout (transparent alpha layer internally) and use it for BOTH deliverables. Place it on identical pixel coordinates. **Lock the composition to a text-left / man-right 80/20 split**. Final thumbnail: the left 78–82% is reserved for the text system and the right 18–22% contains the man. Greenscreen: keep the man on the exact same coordinates and replace the rest of the canvas with solid #00FF00. DO NOT independently regenerate a similar-looking man; DO NOT crop/zoom/reposition for the second image. Avoid cutting hair, shoulders, hands. Do not include readable prop text.
 
-## V1.1 Required persisted packaging check
-Before marking SEO complete, save the exact `.md` containing 2 support titles, tags, 3 thumbnail hypotheses and 3 verbatim scene quotes; run:
-`python scripts/validate_seo_package.py --package STEP6_SEO_PACKAGE.md --script EXACT_QA_READY_SCRIPT.txt --title "CURRENT_FINAL_TITLE"`
-Require tags 450–500 characters, three actual source quotations and three distinct 16:9 prompts. A *prompt* is not an image. On failure, regenerate ONLY the SEO metadata/prompt document; NEVER modify approved script or run Step5 again. Score and file SHA do not measure click rate or retention.
+### Required final QA
+1. Run `python scripts/validate_thumbnail_pair.py --thumbnail THUMBNAIL.png --green THUMBNAIL-NENXANH.png`.
+2. Visually inspect and affirm both actual files are 16:9, same resolution, matching subject pixels/position, right placement, clean keyable green, and final Spanish typography. The script only checks mechanical image properties, not subjective identity or copied visuals.
+3. Report EXACT delivered paths, size, name and QA status. Explicitly confirm the **left text zone is ~80% and the man-right zone is ~20% in both images**. Output `STEP6_DONE` only after metadata/content QA + BOTH ACTUAL IMAGES passed. If image generation/compositing tools unavailable or paths not physically created, say `STEP6_METADATA_ONLY / IMAGES_NOT_RENDERED` without inventing files or claiming complete delivery.
+
+## Hard locks
+No false 'historia real', fake judicial seizure, fictional stock legal document, or text copied from example thumbnails. References demonstrate ONLY layout, palette and **80/20 right-side alignment**; cast and story visuals must be original. Exact QA script SHA binding required. SEO optimization never reopens the one-time Step5 repair cycle.

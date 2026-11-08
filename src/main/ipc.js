@@ -722,6 +722,23 @@ function registerIpc(ctx){const {mainWindow,database,licenseService,ffmpegServic
     return await scriptBridgeService.resumeAfterStockReplenished({ newMediaFolder });
   });
 
+  ipcMain.handle('scriptBridge:approveGreenPosition', (_e, payload = {}) => {
+    guardLicense();
+    if (!scriptBridgeService) return { ok: false };
+    return scriptBridgeService.approveGreenPositionForJob(payload);
+  });
+
+  ipcMain.handle('scriptBridge:rescanGreenCrop', (_e, payload = {}) => {
+    guardLicense();
+    if (!scriptBridgeService) return { ok: false };
+    const targetJob = (scriptBridgeService.queue || []).find((item) => item.id === payload.jobId);
+    if (targetJob) {
+      scriptBridgeService._ensurePadreMxGreenCutoutForJob(targetJob, { forceRegenerate: Boolean(payload.forceRegenerate) });
+      scriptBridgeService._emitBridgeState();
+    }
+    return { ok: Boolean(targetJob), job: targetJob || null, state: scriptBridgeService.getPublicState() };
+  });
+
   ipcMain.handle('libraries:detailedReport', (_e, idOrPath, playbackRate = 0.75) => {
     return database.getStockFolderDetailedReport(idOrPath, playbackRate);
   });

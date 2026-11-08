@@ -1,10 +1,11 @@
 {
-  "version": "V1.0.19",
-  "build_number": 133,
-  "released_at": "2026-11-07 22:10:54",
+  "version": "V1.0.20",
+  "build_number": 134,
+  "released_at": "2026-11-08 08:03:10",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.20 (Build #134) - 2026-11-08 08:03:10] Nâng cấp Key 04 (PADRE MX V1.2.1 HOTFIX — Tự động tạo cặp THUMBNAIL.png 80/20 + THUMBNAIL-NENXANH.png #00FF00, quét & cắt gọn ảnh nền xanh đặt góc trái dưới kích thước x2 598x740px và cổng kiểm tra vị trí trước khi render) + Bổ sung 20 video Động Vật 001..020 vào Kho_Green + Mở khóa Auto Cân Bằng Render đa luồng 2-3 video song song",
     "[V1.0.19 (Build #133) - 2026-11-07 22:10:54] Sửa triệt để lỗi báo nhầm Không tìm thấy thư mục tại Kho Stock (D:\\DJI-29.8), tự động đồng bộ & quét thời lượng Stock ngay khi chọn folder (kể cả thư mục con)",
     "[V1.0.18 (Build #132) - 2026-11-07 20:47:48] Bổ sung 20 video Phông Xanh mới (Chó 1..2, Gấu 1..2, Meo 1..2, Sóng 1..5, SUB 1..5, Thỏ 1..2, Vịt 1..2) vào Kho_Green",
     "[V1.0.17 (Build #131) - 2026-11-07 16:54:55] Bổ sung 06 video Phông Xanh sub-001..sub-006 vào Kho_Green & Nâng cấp Quản lý Kho Stock (Hiển thị thời lượng còn lại, Lịch sử dùng Stock, Khóa chống lặp 100% và Tự động tạm dừng khi hết Stock)",
@@ -18,8 +19,7 @@
     "[V1.0.9 (Build #123) - 2026-11-05 12:48:44] Ban cap nhat V1.0.9 (Build #123): Fix triet de loi Voice Homeless 30 phut (bo sung refText chuan cho Kho_Voice/homeless & daden), them cong kiem dinh cung Kich ban <-> Voice <-> Video (verifyScriptAudioConsistency) chan bao thanh cong gia, va dong bo do dai kich ban Homeless 74.5k-78.5k ky tu",
     "[V1.0.8 (Build #122) - 2026-11-05 09:48:08] Dọn sạch file rác máy code trong thư mục khách hàng (chỉ giữ code trong resources/app), tự động làm sạch thư mục ngoài cùng khi khách cập nhật OTA, và gom gọn toàn bộ các file/folder lặp vào PROJECTS/, data/, skills/, docs/",
     "[V1.0.7 (Build #121) - 2026-11-05 09:15:35] Bản V1.0.7: Tự động Reset & Mở lại hoàn toàn ứng dụng (Full App Relaunch) sau khi cập nhật OTA + Tự động đóng sạch 100% toàn bộ các ứng dụng & tiến trình liên quan (Python 8098, VoiceStudio 3900, Chrome ChatGPT 9222-9224, FFmpeg/Whisper) khi tắt ứng dụng",
-    "[V1.0.6 (Build #120) - 2026-11-05 08:58:21] Nâng cấp V1.0.6: Gộp gọn thanh công cụ, loại bỏ hoàn toàn các ô chọn bị lặp 2 lần (CHỌN KEY vs GIAO VIỆC, Chế độ Tiêu đề, Tự động Bàn #7)",
-    "[V1.0.5 (Build #119) - 2026-11-05 08:50:19] Nâng cấp V1.0.5: Mở rộng khung Bàn #7 toàn màn hình hiển thị 16-22 video cùng lúc, tách độc lập 100% dữ liệu & giao diện giữa các Tab/Kênh (Homeless/Mafia/Mexico)"
+    "[V1.0.6 (Build #120) - 2026-11-05 08:58:21] Nâng cấp V1.0.6: Gộp gọn thanh công cụ, loại bỏ hoàn toàn các ô chọn bị lặp 2 lần (CHỌN KEY vs GIAO VIỆC, Chế độ Tiêu đề, Tự động Bàn #7)"
   ],
-  "release_date": "2026-11-07 22:10:54"
+  "release_date": "2026-11-08 08:03:10"
 }
