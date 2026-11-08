@@ -1,0 +1,43 @@
+{
+  "version": "V1.0.23",
+  "build_number": 137,
+  "released_at": "2026-11-08 16:13:35",
+  "note": "Tích hợp Hệ thống Giám sát Log & Lỗi Máy Khách từ xa (Cloud Telemetry), Điều khiển từ xa ký số Ed25519 (VBSCMD.) và Kịch bản đồng bộ/dọn file OTA (ota_sync_manifest.json)",
+  "force_delete_paths": [
+    "engine/__pycache__",
+    "LIVE_STUDIO_LOG.txt",
+    "Test_Sub_CapCut_1Phut.mp4"
+  ],
+  "post_update_migrations": {
+    "unlock_stuck_starting_projects": true,
+    "sanitize_live_log_utf8": true
+  },
+  "critical_files_sha256": {
+    "version.json": "7da6fd468f513884a86776379bd8573c9e1a6e1a8b91cb7db21abf15aab265a0",
+    "package.json": "d970c05473684c71152c3d3e1c75ec5f988f89439b55207387c6e655e9ad2570",
+    "mafia_dashboard_server.py": "623905ee14849f92385e7ffd1e4ee45afcaa727898d269b1e6ddba016c7093c1",
+    "assets/script_studio_dashboard.html": "99ae6f39a3eee487eba0da38344ee7c2d9e2be7b7694c92297d8a9241b78132e",
+    "engine/mafia_chatgpt_pipeline.py": "29829afac72cb4fab334b00ee70289cf5a9e0a46d5a8eb7a95569d3992582068",
+    "engine/chatgpt_web_client.py": "85610c4b34b932f13cd710598d5641bbb99a99b0e0f4510856c1ab6c0bf9d805",
+    "engine/telemetry_client.py": "adb47b6fbeb5afa793a08f79e1aaac99b64822fed4b7b72856c71ec9e1cefde0",
+    "engine/pull_client_logs.py": "ee28e2ed3313a2d4336cc6756dd04560f97dcd60471f582b9907e33403d0df3f",
+    "engine/license_manager.py": "6d8f5c56cfd714ed9821e3021e085cf90921f38a4f6ea8ed31b28161510e4975",
+    "engine/channel_memory_guard.py": "6be514c63ea2f899916c601497d2c2399a1618d461b934331ff4034fa5c7718e",
+    "engine/tts_post_director.py": "42f6c3a7f6336f44ff2c5d30d73b623d88f46f38e66b0b5921f0003502033a4d",
+    "engine/auto_tab_sweeper_daemon.py": "16d4bc60cce83091a030e7ffd8a110694df091da4088ab03823394bac08c51eb",
+    "engine/padre_mx_thumbnail_generator.py": "855821b7cfee28b6e80f068f3ed0feb27eb7bd90f9313661c376532a8b359233",
+    "src/main/main.js": "36f8b2ed56e2746280fe91a1e36da2adcc4b4726b68f7fe9d25b97b9b51ec95a",
+    "src/main/database.js": "2208380083e42e7a9348fd3cc56c065c6a6bf2eb8a06b492d81d87f6cfaf563d",
+    "src/main/ipc.js": "ef26640fe1dcc90c330970644150a20ee0515195e450a6c4ac1da02505b4a0e4",
+    "src/main/preload.js": "d2145c81db3f84f177910e84810f014ea1ca65cd9b92bec2471a4c32db71c399",
+    "src/main/services/updater-service.js": "b33cb8c9c9fc39173747276566448c0dc095ce68d4c483b3881f60acfe5301e0",
+    "src/main/services/telemetry-service.js": "96aa618ce6df32bc0878c7985af296d572be05803fce4bef39785a954ad7d31d",
+    "src/main/services/license-service.js": "a9298f10c8309120ae94efdce0554fb60843a491129da3ff0d8f1397810c74c5",
+    "src/main/services/script-video-bridge-service.js": "55a05bdeeb868bb5d351df68a0e24f62df9a2db8f84f84fc095cd0bee38de9f2",
+    "src/main/services/batch-service.js": "0470b8a5b1bed7ccf93d3054f5bd514685c2341b550c34e26994193a15dadd4d",
+    "src/main/services/render-planner.js": "3a99aab7f2994fd12fa1fd9ae8d7a2a07aa174b6ad298fa1c3b52a71ecf9ce6f",
+    "src/renderer/index.html": "233e0d7fd655bf8018a0c983321dd09bc4f5f0fa0909a12ea789490d9b46d963",
+    "src/renderer/app.js": "4f5b59035a25d7023acfd32d3d6745ae673531997b3f10c43138c2465fdc7bbd",
+    "src/renderer/styles.css": "122e926428119974ef80e40116153955af1c532b8b072423bd91b75f60c98e7d"
+  }
+}

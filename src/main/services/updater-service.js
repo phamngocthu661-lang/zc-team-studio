@@ -686,12 +686,46 @@ class UpdaterService {
             try { fs.rmSync(oldInApp, { recursive: true, force: true }); } catch {}
           }
         }
-        for (const f of ['package.json', 'version.json', 'mafia_dashboard_server.py']) {
+        for (const f of ['package.json', 'version.json', 'mafia_dashboard_server.py', 'ota_sync_manifest.json']) {
           if (fs.existsSync(path.join(srcRoot, f))) {
             try {
               fs.copyFileSync(path.join(srcRoot, f), path.join(resolved, f));
               updatedFilesCount += 1;
             } catch {}
+          }
+        }
+      }
+
+      // 2.5 Thực thi kịch bản ota_sync_manifest.json (Xóa file chỉ định, đối chiếu SHA-256 & tự mở khóa dự án treo)
+      let otaManifest = null;
+      const manifestInSrc = path.join(srcRoot, 'ota_sync_manifest.json');
+      if (fs.existsSync(manifestInSrc)) {
+        try {
+          otaManifest = JSON.parse(fs.readFileSync(manifestInSrc, 'utf8'));
+        } catch {}
+      }
+      if (otaManifest) {
+        const forceDeletes = Array.isArray(otaManifest.force_delete_paths) ? otaManifest.force_delete_paths : [];
+        for (const targetAppDir of visitedAppDirs) {
+          for (const relDel of forceDeletes) {
+            const cleanRel = String(relDel || '').replace(/^[\\/]+/, '');
+            if (!cleanRel || cleanRel.includes('..')) continue;
+            const fullDel = path.join(targetAppDir, cleanRel);
+            if (fs.existsSync(fullDel)) {
+              try { fs.rmSync(fullDel, { recursive: true, force: true }); } catch {}
+            }
+          }
+          // Đảm bảo 100% các file critical_files_sha256 đều được copy chuẩn từ srcRoot
+          const shaMap = otaManifest.critical_files_sha256 || {};
+          for (const relFile of Object.keys(shaMap)) {
+            const srcF = path.join(srcRoot, relFile);
+            const dstF = path.join(targetAppDir, relFile);
+            if (fs.existsSync(srcF)) {
+              try {
+                fs.mkdirSync(path.dirname(dstF), { recursive: true });
+                fs.copyFileSync(srcF, dstF);
+              } catch {}
+            }
           }
         }
       }
@@ -801,6 +835,35 @@ class UpdaterService {
             try { fs.unlinkSync(p); } catch {}
           }
         }
+
+        // Thực thi post_update_migrations trên thư mục khách hàng (Mở khóa dự án kẹt STEP_1_STARTING & làm sạch UTF-8 log)
+        try {
+          if (fs.existsSync(projectsBase)) {
+            for (const pGroup of fs.readdirSync(projectsBase)) {
+              const groupDir = path.join(projectsBase, pGroup);
+              if (!fs.statSync(groupDir).isDirectory()) continue;
+              for (const projName of fs.readdirSync(groupDir)) {
+                const stPath = path.join(groupDir, projName, 'STATE.json');
+                if (fs.existsSync(stPath)) {
+                  try {
+                    const stObj = JSON.parse(fs.readFileSync(stPath, 'utf8'));
+                    if (['STEP_1_STARTING', 'STEP_1_5_STARTING'].includes(stObj.current_step_status)) {
+                      stObj.current_step_status = stObj.skip_title_rewrite ? 'QUEUED_SKIP_STEP_1' : 'QUEUED';
+                      stObj.live_note = '♻️ Đã cập nhật bản mới & làm sạch trạng thái chờ — Bấm [▶️ Chạy Tiếp Hàng Đợi] để chạy ngay!';
+                      fs.writeFileSync(stPath, JSON.stringify(stObj, null, 2), 'utf8');
+                    }
+                  } catch {}
+                }
+              }
+            }
+          }
+          const liveLogFile = path.join(logsDir, 'LIVE_STUDIO_LOG.txt');
+          if (fs.existsSync(liveLogFile)) {
+            const rawBuf = fs.readFileSync(liveLogFile);
+            const cleanText = rawBuf.toString('utf8').replace(/\uFFFD/g, '');
+            fs.writeFileSync(liveLogFile, cleanText, 'utf8');
+          }
+        } catch {}
       }
 
       emitProgress(92, 'Đang chuẩn bị đóng toàn bộ tiến trình cũ và khởi động lại ứng dụng...');

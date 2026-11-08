@@ -1,10 +1,11 @@
 {
-  "version": "V1.0.22",
-  "build_number": 136,
-  "released_at": "2026-11-08 15:18:17",
+  "version": "V1.0.23",
+  "build_number": 137,
+  "released_at": "2026-11-08 16:13:35",
   "repo": "phamngocthu661-lang/zc-team-studio",
   "branch": "main",
   "changelog": [
+    "[V1.0.23 (Build #137) - 2026-11-08 16:13:35] Tích hợp Hệ thống Giám sát Log & Lỗi Máy Khách từ xa (Cloud Telemetry), Điều khiển từ xa ký số Ed25519 (VBSCMD.) và Kịch bản đồng bộ/dọn file OTA (ota_sync_manifest.json)",
     "[V1.0.22 (Build #136) - 2026-11-08 15:18:17] Sửa triệt để lỗi treo đứng im sau [PIPELINE-START] (Deadlock tự khóa ACCOUNT_LOAD_LOCK trong acquire_account_for_project), lỗi nhân đôi log & đồng bộ Key 04",
     "[V1.0.21 (Build #135) - 2026-11-08 10:19:54] Nâng cấp Key 04 (04_Nhom_Ong_Gia_Trung_Tri_Mexico): (1) Tích hợp cơ chế tạo ảnh Thumbnail & Nền Xanh trực tiếp trên ChatGPT Web (start_fresh_chat + Estuary Backend API harvest Base64 + Auto-Switch Nick khi Rate Limit 30 phút giống 100% TOOL_NHAT_DRAMA); (2) Bổ sung tính năng Quét các kịch bản đã tạo và tự động tạo bù Thumbnail (THUMBNAIL.png 80/20) + Ảnh Nền Xanh (THUMBNAIL-NENXANH.png #00FF00 + GREEN_CUTOUT_BOTTOM_LEFT.png / _KB.png 598x740px) trên Dashboard, tab Tạo Batch Video và tự động chạy trước khi Render Video để chống lỗi thiếu ảnh.",
     "[V1.0.20 (Build #134) - 2026-11-08 08:03:10] Nâng cấp Key 04 (PADRE MX V1.2.1 HOTFIX — Tự động tạo cặp THUMBNAIL.png 80/20 + THUMBNAIL-NENXANH.png #00FF00, quét & cắt gọn ảnh nền xanh đặt góc trái dưới kích thước x2 598x740px và cổng kiểm tra vị trí trước khi render) + Bổ sung 20 video Động Vật 001..020 vào Kho_Green + Mở khóa Auto Cân Bằng Render đa luồng 2-3 video song song",
@@ -18,8 +19,7 @@
     "[V1.0.12 (Build #126) - 2026-11-07 00:21:14] Triệt tiêu 100% lỗi vòng lặp vô tận khi viết kịch bản trên toàn bộ 15 Key (01..12, Mexico Bà Cô, Homeless V12, Mafia V1.4) & Kiểm định End-to-End 15/15 Key (Full _KB.txt + Full _SEO.txt đạt 99/100): (1) Đồng bộ ngân sách độ dài động theo từng Key (_get_active_key_runtime_spec: 15k-25k cho Key 05, 18k-26k cho Key 06, 42k-48k cho Key 09, 40k-52k cho Key 10, 40k-50k cho Key 11, 65k-78k cho Key 12, 70k-80k cho Key 01/02/03/04/07/08/Mexico/Homeless, 44k-48k cho Mafia) kèm khóa diagnosed_parts_once chống gọi AI nối tiếp lặp vô hạn; (2) Khóa chính sách One-Repair Policy (max_rewrite_rounds = 1) và bỏ cắt cụt [:7500] ở Bước 4B; (3) Lọc sạch 100% chỉ thị gọi script .py/.json nội bộ trên cả 75 cụm Skill (15 Keys x 5 Steps); (4) Bổ sung bộ chuẩn hóa TTS tiếng Nhật (sanitize_and_normalize_japanese_tts), đếm từ CJK và nhận diện tiêu đề [PART]/[PARTE]/[STORY]/[パート]/[第N部] đa ngôn ngữ.",
     "[V1.0.11 (Build #125) - 2026-11-05 14:17:59] Khắc phục triệt để lỗi đứng ở 70% khi cập nhật OTA từ các phiên bản cũ (V1.0.6..V1.0.10): Gỡ python_runtime khỏi gói ZIP OTA để tránh lỗi Windows khóa file EBUSY trên python.exe đang chạy ngầm, bọc an toàn try/catch cho từng file khi giải nén và tự động khởi động lại ứng dụng sau khi cập nhật xong.",
     "[V1.0.10 (Build #124) - 2026-11-05 13:15:05] Nâng cấp V1.1.0 (Build #124): Kiểm định độc lập & Pass 100% toàn bộ 15 Kênh/Key (75/75 cụm Skill), chuẩn hóa 58/58 kịch bản Homeless & Mafia đạt 99/100 (bung 100% số tiền $, danh xưng viết tắt Mr./Mrs./Ms./Dr., gộp đoạn ngắn tự nhiên, khử đoạn lặp), sửa lỗi VIDEO_EXTENSIONS.has trong resolveProjectImageLayers và vượt qua 189/189 bài Unit/Integration Tests.",
-    "[V1.0.9 (Build #123) - 2026-11-05 12:48:44] Ban cap nhat V1.0.9 (Build #123): Fix triet de loi Voice Homeless 30 phut (bo sung refText chuan cho Kho_Voice/homeless & daden), them cong kiem dinh cung Kich ban <-> Voice <-> Video (verifyScriptAudioConsistency) chan bao thanh cong gia, va dong bo do dai kich ban Homeless 74.5k-78.5k ky tu",
-    "[V1.0.8 (Build #122) - 2026-11-05 09:48:08] Dọn sạch file rác máy code trong thư mục khách hàng (chỉ giữ code trong resources/app), tự động làm sạch thư mục ngoài cùng khi khách cập nhật OTA, và gom gọn toàn bộ các file/folder lặp vào PROJECTS/, data/, skills/, docs/"
+    "[V1.0.9 (Build #123) - 2026-11-05 12:48:44] Ban cap nhat V1.0.9 (Build #123): Fix triet de loi Voice Homeless 30 phut (bo sung refText chuan cho Kho_Voice/homeless & daden), them cong kiem dinh cung Kich ban <-> Voice <-> Video (verifyScriptAudioConsistency) chan bao thanh cong gia, va dong bo do dai kich ban Homeless 74.5k-78.5k ky tu"
   ],
-  "release_date": "2026-11-08 15:18:17"
+  "release_date": "2026-11-08 16:13:35"
 }

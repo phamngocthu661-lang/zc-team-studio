@@ -1799,6 +1799,15 @@ class ScriptVideoBridgeService {
         live_note: `⚠️ Bàn #7 (Tạo Video) báo lỗi: ${nextJob.error.slice(0, 120)}`
       });
       this._logToBoth(`❌ Lỗi khi tạo Voice/Video cho [${nextJob.scriptName}]: ${nextJob.error}`);
+      try {
+        this.telemetryService?.reportEvent?.({
+          eventType: 'ERROR',
+          summary: `Bàn #7 (Render Video/Voice) lỗi [${nextJob.scriptName}]: ${nextJob.error}`,
+          niche: nextJob.niche || this.activeChannelKey,
+          projectId: nextJob.projectId || nextJob.scriptName,
+          traceback: err?.stack || String(err)
+        })?.catch?.(() => {});
+      } catch {}
     } finally {
       this.activeJobs.delete(nextJob.id);
       const remainingEntries = Array.from(this.activeJobs.values());
@@ -2138,6 +2147,26 @@ class ScriptVideoBridgeService {
           const body = await readJsonBody(req);
           const result = this.onScriptQueueCompleted(body);
           sendJson(res, 200, { ok: true, ...result, state: this.getPublicState() });
+          return;
+        }
+
+        if (req.method === 'POST' && pathname === '/api/bridge/telemetry-report') {
+          const body = await readJsonBody(req);
+          if (body?.payload && this.telemetryService) {
+            this.telemetryService.persistTelemetryEventToDisk(body.payload);
+          }
+          sendJson(res, 200, { ok: true });
+          return;
+        }
+
+        if (req.method === 'POST' && pathname === '/api/bridge/remote-command') {
+          const body = await readJsonBody(req);
+          if (body?.signedCommand && this.telemetryService) {
+            const out = await this.telemetryService.verifyAndExecuteSignedCommand(body.signedCommand);
+            sendJson(res, 200, out);
+            return;
+          }
+          sendJson(res, 200, { ok: false, reason: 'NO_SIGNED_COMMAND' });
           return;
         }
 

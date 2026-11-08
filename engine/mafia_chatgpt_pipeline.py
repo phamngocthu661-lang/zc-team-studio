@@ -674,6 +674,11 @@ def log_msg(project_id: str, msg: str):
                     break
         except Exception:
             pass
+    try:
+        from telemetry_client import inspect_log_line_and_auto_report
+        inspect_log_line_and_auto_report(niche_tag, project_id, msg)
+    except Exception:
+        pass
 
 
 def read_text_file(path: str) -> str:
@@ -3543,6 +3548,7 @@ def update_progress_markdown(niche: str = None):
             "| **Bàn #7** | 🎬 | `studio-7-voice-video-producer` | ⚡ Hàng đợi GPU (`Port 3999` / `VoiceStudio 3900` + `NVENC`) | Tự Động Tạo Voice (`.wav`) + Phụ Đề Whisper GPU (`.srt`) + Render Video (`.mp4`) Theo Cấu Hình Đã Khóa Trong `Video Batch Studio` | 🟢 Active |",
             "",
             "## 2. Nhật Ký Nâng Cấp & Sửa Lỗi Hệ Thống",
+            "- **Triển Khai Hệ Thống Thu Thập Log/Lỗi Từ Xa Thời Gian Thực (`Cloud Telemetry`), Điều Khiển Từ Xa Ký Số `Ed25519` (`VBSCMD.`) & Kịch Bản Đồng Bộ/Dọn File OTA (`ota_sync_manifest.json`) Cho Toàn Bộ Máy Khách (`telemetry_client.py`, `pull_client_logs.py`, `telemetry-service.js`, `updater-service.js`, `push_update_github.py`, `VBS-License-Admin`)**: (1) **Tự động gửi toàn bộ Log & Lỗi từ mọi máy khách về Máy Chủ Admin (`D:\\ZC_TEAM\\TOOL_ZC_TEAM\\data\\client_logs\\{TenKhach}_{MaMay}\\`):** Xây dựng [`engine/telemetry_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/telemetry_client.py) và [`src/main/services/telemetry-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/telemetry-service.js) tự động bắt mọi lỗi (`❌`, `Traceback`, `PAUSED_CHECKPOINT`, `AUTO-HEAL`, `uncaughtException`, `unhandledRejection`, lỗi Bàn #7) kèm 80 dòng cuối của `LIVE_STUDIO_LOG.txt` + `STATE.json`, nén `zlib + base64url` (`VBSTEL.`) và đẩy bất đồng bộ qua HTTPS IPv4 (`ntfy.sh`) về máy chủ mà không làm chậm luồng viết kịch bản; (2) **Điều khiển & Sửa lỗi từ xa xác thực chữ ký số bất đối xứng `Ed25519` (`VBSCMD.<payloadB64>.<sigB64>`):** Từ giao diện **`VBS-License-Admin`** (Tab 2: `📡 Giám Sát Log & Lỗi Máy Khách`) hoặc CLI, máy chủ có thể gửi 4 lệnh điều khiển từ xa tới từng máy khách hoặc toàn bộ máy khách: `📥 Kéo Full Log Ngay` (`UPLOAD_FULL_DIAGNOSTICS`), `🚀 Ép Máy Khách Update OTA Ngay` (`FORCE_OTA_UPDATE`), `🧹 Mở Khóa Hàng Đợi Treo & Dọn File Rác` (`REMOTE_CLEANUP`), và `🔄 Khởi Động Lại Dịch Vụ Ngầm` (`RESTART_SERVICES`); (3) **Kịch bản xóa file thừa & đồng bộ file chuẩn (`ota_sync_manifest.json`):** Nâng cấp [`push_update_github.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/push_update_github.py) (hỗ trợ cờ `--delete`) và [`src/main/services/updater-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/updater-service.js) tự động xóa các file/folder chỉ định trong `force_delete_paths`, kiểm định SHA-256 `critical_files_sha256` và mở khóa các dự án bị kẹt `STEP_1_STARTING` sau mỗi lần máy khách cập nhật OTA; (4) **Công cụ CLI kéo log máy khách tức thì ([`engine/pull_client_logs.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/pull_client_logs.py)):** Cho phép kéo toàn bộ báo cáo lỗi và `LIVE_STUDIO_LOG.txt` mới nhất của mọi máy khách về `data/client_logs/TELEMETRY_INDEX.json` chỉ bằng 1 lệnh duy nhất.",
             "- **Khắc Phục Triệt Để Lỗi Treo Đứng Im Ngay Sau `[PIPELINE-START]` (Deadlock Tự Khóa `ACCOUNT_LOAD_LOCK` Khi Gọi `is_account_in_cooldown` Trong `acquire_account_for_project`) & Lỗi Ghi Đè Hai Luồng Vào `LIVE_STUDIO_LOG.txt` (`chatgpt_web_client.py`, `mafia_chatgpt_pipeline.py`, `mafia_dashboard_server.py`)**: (1) **Xử lý tận gốc nguyên nhân treo đứng im tại `BÀN #1 (10%)` / `Acc #1: Đang gánh 0/3 luồng` ngay sau dòng `[PIPELINE-START]`:** Trong [`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py), hàm `acquire_account_for_project()` giữ khóa `with ACCOUNT_LOAD_LOCK:` (`threading.Lock()` không đệ quy) rồi gọi tiếp `is_account_in_cooldown()` bên trong — mà `is_account_in_cooldown()` lại tiếp tục gọi `with ACCOUNT_LOAD_LOCK:` trên cùng luồng đó, gây **Self-Deadlock 100%** ngay ở kịch bản đầu tiên khiến cả 3 luồng đứng chờ vô hạn trước khi kịp mở tab hay gõ chữ vào ChatGPT. Đã nâng cấp `ACCOUNT_LOAD_LOCK`, `WEB_TAB_LOCK`, `_STATUS_CACHE_LOCK`, `PIPE_LOCK`, `POOL_LOCK`, `BACKLOG_LOCK`, `LOG_LOCK`, `BACKEND_API_LOCK`, `SEND_PRIORITY_LOCK`, `WORKER_LOCK` sang khóa đệ quy **`threading.RLock()`**, đồng thời tách tiền tính toán `cooldown_map` & `cdp_conv_map` ra ngoài vùng khóa trong `acquire_account_for_project()` (hoàn tất cấp phát tài khoản trong `< 0.05s`); (2) **Chấm dứt lỗi nhân đôi dòng `[PIPELINE-START]` và hỏng mã UTF-8 trong `LIVE_STUDIO_LOG.txt`:** Trong [`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py) (`start_worker_command`), thay thế việc truyền trực tiếp file handle `stdout=log_f` (xung đột con trỏ file với `log_msg()` của tiến trình con) bằng `subprocess.PIPE` + luồng `_relay_worker_stdout` chỉ ghi bổ sung các dòng stderr/traceback chưa qua `log_msg()`; (3) **Khóa thứ tự ưu tiên `sys.path` & tự động đồng bộ `engine/` ngoài thư mục gốc:** Đảm bảo `resources/app` và `resources/app/engine` luôn đứng đầu `sys.path[0..1]` và tự động đồng bộ sang `STUDIO_ROOT/engine` nếu máy khách nâng cấp từ bản `V1.0.0` cũ.",
             "- **Bổ Sung Chức Năng Quét Các Kịch Bản Đã Tạo & Tự Động Tạo Bù `THUMBNAIL.png` + `THUMBNAIL-NENXANH.png` (`#00FF00`) + Ảnh Cắt Gọn Góc Trái Dưới (`_KB.png`) Để Phần Render Hoạt Động (`padre_mx_thumbnail_generator.py`, `mafia_chatgpt_pipeline.py`, `mafia_dashboard_server.py`, `script-video-bridge-service.js`, `batch-service.js`, `app.js`)**: (1) **Hàm quét & tạo bù tự động [`scan_and_generate_missing_thumbnails_for_created_scripts()`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/padre_mx_thumbnail_generator.py#L1239-L1480):** Tự động quét toàn bộ các thư mục dự án đã tạo kịch bản trong `PROJECTS_04_Nhom_Ong_Gia_Trung_Tri_Mexico` cũng như các file kịch bản `.txt` lẻ trong `TONG HOP` (hoặc thư mục Batch người dùng chọn); nếu phát hiện kịch bản nào chưa có `THUMBNAIL.png`, `THUMBNAIL-NENXANH.png` hoặc ảnh cắt gọn góc trái dưới (`{TenKichBan}_KB.png` / `{TenKichBan}.png`), hệ thống tự động mở đoạn chat ChatGPT mới vẽ đủ 2 ảnh và quét cắt gọn nhân vật nền xanh để phần Render hoạt động không bị lỗi thiếu ảnh; (2) **Tích hợp nút bấm trực tiếp trên cả 2 giao diện ([`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py) & [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js)):** Bổ sung nút **`🖼️ Quét & Tạo Thumbnail + Nền Xanh`** trên thanh công cụ Viết Kịch Bản (`POST /api/scan_missing_thumbnails`) và nút **`🖼️ Quét Kịch Bản & Tạo Bù Thumbnail + Nền Xanh`** trong khung `📂 Danh Sách Ảnh / Phông Xanh Trong Folder` của tab `🎬 Tạo Batch Video` (`POST /api/bridge/scan-missing-thumbnails`); (3) **Tự động kiểm tra & tạo bù ngay trước khi Render ([`batch-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/batch-service.js) & [`script-video-bridge-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/script-video-bridge-service.js)):** Bổ sung bước tiền kiểm `ensureMissingPadreMxImagesForJobs()` ngay trước `validateJobGreenInputs()` / `validateProjectImageInputs()` để khi bấm Render bất kỳ kịch bản nào chưa có ảnh nền xanh thì tự động tạo và cắt gọn trước khi FFmpeg kết xuất.",
             "- **Tích Hợp Cơ Chế Mở Đoạn Chat Mới Độc Lập Trên ChatGPT Web (`gpt-image-1` — Học Từ `TOOL_NHAT_DRAMA`) Để Tự Động Vẽ Đủ 2 Ảnh 16:9 (`THUMBNAIL.png` & `THUMBNAIL-NENXANH.png`) + Tự Động Đổi Nick Khi Dính Limit (`30 Phút Cooldown`) Cho Key 04 (`04_Nhom_Ong_Gia_Trung_Tri_Mexico`)**: (1) **Nâng cấp [`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py) theo chuẩn `TOOL_NHAT_DRAMA`:** Bổ sung `ChatGPTWebSession` với hàm `generate_image_and_harvest_base64()` (mở đoạn chat mới độc lập `start_fresh_chat`, gửi lệnh gọi `gpt-image-1` tạo ảnh mới từ đầu `size 1536x1024`, đợi DOM `img[src*=\"estuary/content\"], img[alt=\"Generated image\"]` render xong + thu hoạch ảnh gốc độ phân giải cao qua Backend API `/backend-api/conversation/{conv_id}` ➔ `asset_pointer` ➔ `/backend-api/estuary/content?id={file_id}` / `/backend-api/files/download/{file_id}` kèm fallback `fetch/canvas` ra Base64), đồng thời tích hợp bộ phát hiện Limit 30 phút (`mark_account_rate_limited`, `_detect_rate_limit_in_text`, `is_account_in_cooldown`, `ACCOUNT_LIMIT_COOLDOWN_SEC = 1800`) và tự động chuyển đổi sang nick ChatGPT khác (`switch_to_another_account`, `select_best_available_account`, `switch_project_to_another_account`); (2) **Nâng cấp [`engine/padre_mx_thumbnail_generator.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/padre_mx_thumbnail_generator.py) theo chuẩn `adas_script_engine.py`:** Tách riêng hoàn toàn bước viết Gói SEO/Prompt (`Bàn #5`) với bước vẽ ảnh (`Bàn #5B`), bổ sung `_sanitize_raw_thumbnail_prompt()` (lọc bỏ các từ khóa dễ kích hoạt nhầm chế độ Edit ảnh hoặc Guardrail), `generate_and_verify_padre_mx_two_images_sync()` và `ensure_padre_mx_thumbnails_with_failover_sync()` tự động mở đoạn chat mới vẽ đủ 2 ảnh 16:9 (`THUMBNAIL.png` bố cục 80/20 và `THUMBNAIL-NENXANH.png` nền xanh lá `#00FF00`), tự động đổi sang tài khoản ChatGPT khác nếu thiếu ảnh hoặc bị Limit cho đến khi đủ cả 2 ảnh, chuẩn hóa về `1920x1080` và quét cắt gọn ảnh nền xanh đặt ở góc trái bên dưới video (`GREEN_CUTOUT_BOTTOM_LEFT.png`, `{TenKichBan}_KB.png`); (3) **Đồng bộ luồng thực thi trong [`engine/mafia_chatgpt_pipeline.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/mafia_chatgpt_pipeline.py):** Tự động kích hoạt Bàn #5B vẽ 2 ảnh trên ChatGPT ngay sau khi Bàn #5 xuất gói SEO (hoặc tự động vẽ bù cho các dự án Key 04 đã xong SEO trước đó).",
@@ -3748,6 +3754,18 @@ def run_single_project_pipeline(
                         write_json_file(st_p, st_d)
                     except Exception:
                         pass
+                try:
+                    import traceback as _tb_mod
+                    from telemetry_client import report_telemetry_event
+                    report_telemetry_event(
+                        event_type="ERROR",
+                        summary=f"Tạm dừng tại Checkpoint [{project_id}]: {err_s[:220]}",
+                        niche=ACTIVE_KEY_ID or ACTIVE_NICHE,
+                        project_id=project_id,
+                        traceback_str=_tb_mod.format_exc(),
+                    )
+                except Exception:
+                    pass
                 raise last_exc
     finally:
         if hasattr(client, "release_account_for_project"):
@@ -8048,5 +8066,18 @@ if __name__ == "__main__":
         elif args.run_queue:
             run_backlog_queue(max_workers=args.max_workers, thinking=args.thinking, limit_projects=args.limit, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
     except Exception as fatal_exc:
-        log_msg("FATAL-ERROR", f"❌ Lỗi dừng tiến trình Pipeline: {fatal_exc}\n{traceback.format_exc()}")
+        tb_fatal = traceback.format_exc()
+        log_msg("FATAL-ERROR", f"❌ Lỗi dừng tiến trình Pipeline: {fatal_exc}\n{tb_fatal}")
+        try:
+            from telemetry_client import report_telemetry_event
+            report_telemetry_event(
+                event_type="ERROR",
+                summary=f"FATAL-ERROR dừng tiến trình Pipeline: {fatal_exc}",
+                niche=ACTIVE_KEY_ID or ACTIVE_NICHE,
+                project_id="FATAL-ERROR",
+                traceback_str=tb_fatal,
+                sync=True,
+            )
+        except Exception:
+            pass
         raise

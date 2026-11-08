@@ -278,6 +278,7 @@ def start_worker_command(args_list: list[str], mode_desc: str, max_workers: int 
         )
 
         def _relay_worker_stdout(proc: subprocess.Popen, nk: str):
+            err_buf = []
             try:
                 if proc.stdout is None:
                     return
@@ -293,6 +294,20 @@ def start_worker_command(args_list: list[str], mode_desc: str, max_workers: int 
                         os.makedirs(os.path.dirname(LIVE_LOG_PATH), exist_ok=True)
                         with open(LIVE_LOG_PATH, "a", encoding="utf-8") as lf:
                             lf.write(f"[{ts_now}] [{nk}] [WORKER] {s_line}\n")
+                    except Exception:
+                        pass
+                    if any(k in s_line for k in ("Traceback", "Error:", "Exception:", "❌")):
+                        err_buf.append(s_line)
+                if err_buf:
+                    try:
+                        from telemetry_client import report_telemetry_event
+                        report_telemetry_event(
+                            event_type="ERROR",
+                            summary=f"Worker Stderr [{nk}]: {err_buf[-1][:200]}",
+                            niche=nk,
+                            project_id="WORKER-STDERR",
+                            traceback_str="\n".join(err_buf[-30:]),
+                        )
                     except Exception:
                         pass
             except Exception:
@@ -4126,6 +4141,15 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             ok, msg = auto_sync_skills_and_agents_to_new_machine()
             append_studio_log(f"🔧 {msg}")
             self._send_json({"ok": ok, "message": msg})
+
+        elif self.path == "/api/upload_diagnostics":
+            try:
+                from telemetry_client import upload_full_diagnostics_snapshot
+                res_diag = upload_full_diagnostics_snapshot(reason=str(body.get("reason") or "MANUAL_PUSH"), sync=True)
+                append_studio_log("📡 Đã gửi Snapshot Log & Chẩn đoán hệ thống về Máy Chủ Admin thành công.")
+                self._send_json({"ok": True, "message": "Đã gửi Log & Chẩn đoán về Máy Chủ Admin!", "detail": res_diag})
+            except Exception as e_diag:
+                self._send_json({"ok": False, "message": f"Lỗi khi gửi chẩn đoán: {e_diag}"})
 
         elif self.path == "/api/rename_project":
             niche = _norm_niche(body.get("niche", SELECTED_NICHE))

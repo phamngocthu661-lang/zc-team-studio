@@ -18,9 +18,25 @@ try {
 } catch {}
 process.on('uncaughtException', (err) => {
   try { console.warn('[MAIN UNCAUGHT EXCEPTION IGNORED]:', err?.message || err); } catch {}
+  try {
+    telemetryService?.reportEvent?.({
+      eventType: 'ERROR',
+      summary: `Uncaught Exception in Electron Main: ${err?.message || err}`,
+      projectId: 'ELECTRON-MAIN',
+      traceback: err?.stack || String(err)
+    })?.catch?.(() => {});
+  } catch {}
 });
 process.on('unhandledRejection', (reason) => {
   try { console.warn('[MAIN UNHANDLED REJECTION IGNORED]:', reason?.message || reason); } catch {}
+  try {
+    telemetryService?.reportEvent?.({
+      eventType: 'WARNING',
+      summary: `Unhandled Rejection in Electron Main: ${reason?.message || reason}`,
+      projectId: 'ELECTRON-MAIN',
+      traceback: reason?.stack || String(reason)
+    })?.catch?.(() => {});
+  } catch {}
 });
 
 const { AppDatabase } = require('./database');
@@ -38,6 +54,7 @@ const { StoryVideoService } = require('./services/story-video-service');
 const { LicenseService } = require('./services/license-service');
 const { ScriptVideoBridgeService } = require('./services/script-video-bridge-service');
 const { UpdaterService } = require('./services/updater-service');
+const { TelemetryService } = require('./services/telemetry-service');
 const { appDataPaths } = require('./services/path-utils');
 const { registerIpc } = require('./ipc');
 
@@ -47,6 +64,7 @@ let ffmpegService;
 let subtitleOverlayService;
 let scriptBridgeService;
 let updaterService;
+let telemetryService;
 let quitting = false;
 
 function bringMainWindowToFront() {
@@ -239,6 +257,15 @@ app.whenReady().then(async () => {
     scriptBridgeService,
     relaunchApp: relaunchEntireApplication
   });
+  telemetryService = new TelemetryService({
+    database,
+    licenseService,
+    scriptBridgeService,
+    updaterService,
+    paths
+  });
+  scriptBridgeService.telemetryService = telemetryService;
+  telemetryService.startBackgroundLoops();
   registerIpc({
     mainWindow,
     database,
