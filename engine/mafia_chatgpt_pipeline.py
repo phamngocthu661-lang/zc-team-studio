@@ -43,8 +43,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Tự động nhận diện thư mục gốc theo vị trí thực tế của file và đưa vào sys.path
 _CODE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _CODE_ROOT not in sys.path:
-    sys.path.insert(0, _CODE_ROOT)
+_ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def _resolve_unified_studio_root(base_dir: str) -> str:
@@ -61,8 +60,12 @@ def _resolve_unified_studio_root(base_dir: str) -> str:
 
 
 STUDIO_ROOT = _resolve_unified_studio_root(_CODE_ROOT)
-if STUDIO_ROOT not in sys.path:
-    sys.path.insert(0, STUDIO_ROOT)
+for _p in (STUDIO_ROOT, _ENGINE_DIR, _CODE_ROOT):
+    if _p in sys.path:
+        sys.path.remove(_p)
+sys.path.insert(0, STUDIO_ROOT)
+sys.path.insert(0, _ENGINE_DIR)
+sys.path.insert(0, _CODE_ROOT)
 
 
 def _migrate_backlog_and_projects_if_split():
@@ -75,6 +78,24 @@ def _migrate_backlog_and_projects_if_split():
     projects_base = os.path.join(STUDIO_ROOT, "PROJECTS")
     for d in (queues_dir, memory_dir, progress_dir, logs_dir, config_dir, projects_base):
         os.makedirs(d, exist_ok=True)
+
+    # 0. Nếu chạy trong môi trường đóng gói (resources/app khác với STUDIO_ROOT) và ở STUDIO_ROOT có bản engine/*.py cũ từ V1.0.0, tự động đồng bộ bản mới nhất sang để tránh xung đột import
+    if os.path.normcase(os.path.abspath(_CODE_ROOT)) != os.path.normcase(os.path.abspath(STUDIO_ROOT)):
+        try:
+            outer_eng = os.path.join(STUDIO_ROOT, "engine")
+            if os.path.isdir(outer_eng) and os.path.isdir(_ENGINE_DIR):
+                for fn in os.listdir(_ENGINE_DIR):
+                    if fn.endswith(".py"):
+                        src_py = os.path.join(_ENGINE_DIR, fn)
+                        dst_py = os.path.join(outer_eng, fn)
+                        if os.path.isfile(src_py):
+                            shutil.copy2(src_py, dst_py)
+            src_srv = os.path.join(_CODE_ROOT, "mafia_dashboard_server.py")
+            dst_srv = os.path.join(STUDIO_ROOT, "mafia_dashboard_server.py")
+            if os.path.isfile(src_srv) and os.path.isfile(dst_srv):
+                shutil.copy2(src_srv, dst_srv)
+        except Exception:
+            pass
 
     # 1. Nếu trước đó dữ liệu hàng đợi từng được tạo trong resources/app (_CODE_ROOT) khác với STUDIO_ROOT (exeDir), gộp về data/queues
     for scan_root in (_CODE_ROOT, STUDIO_ROOT):
@@ -434,12 +455,12 @@ KEY_PROFILES_12 = {
 KEY_PROFILES_12_LOWER_MAP = {k.lower(): k for k in KEY_PROFILES_12}
 
 LIVE_STUDIO_LOG_PATH = os.path.join(STUDIO_ROOT, "data", "logs", "LIVE_STUDIO_LOG.txt")
-PIPE_LOCK = threading.Lock()
-POOL_LOCK = threading.Lock()
-BACKLOG_LOCK = threading.Lock()
-LOG_LOCK = threading.Lock()
-BACKEND_API_LOCK = threading.Lock()
-SEND_PRIORITY_LOCK = threading.Lock()
+PIPE_LOCK = threading.RLock()
+POOL_LOCK = threading.RLock()
+BACKLOG_LOCK = threading.RLock()
+LOG_LOCK = threading.RLock()
+BACKEND_API_LOCK = threading.RLock()
+SEND_PRIORITY_LOCK = threading.RLock()
 _PENDING_SEND_COUNT = 0
 _LAST_BACKEND_API_TS = 0.0
 GLOBAL_USAGE_LIMIT_ERROR = ""
@@ -3522,6 +3543,7 @@ def update_progress_markdown(niche: str = None):
             "| **Bàn #7** | 🎬 | `studio-7-voice-video-producer` | ⚡ Hàng đợi GPU (`Port 3999` / `VoiceStudio 3900` + `NVENC`) | Tự Động Tạo Voice (`.wav`) + Phụ Đề Whisper GPU (`.srt`) + Render Video (`.mp4`) Theo Cấu Hình Đã Khóa Trong `Video Batch Studio` | 🟢 Active |",
             "",
             "## 2. Nhật Ký Nâng Cấp & Sửa Lỗi Hệ Thống",
+            "- **Khắc Phục Triệt Để Lỗi Treo Đứng Im Ngay Sau `[PIPELINE-START]` (Deadlock Tự Khóa `ACCOUNT_LOAD_LOCK` Khi Gọi `is_account_in_cooldown` Trong `acquire_account_for_project`) & Lỗi Ghi Đè Hai Luồng Vào `LIVE_STUDIO_LOG.txt` (`chatgpt_web_client.py`, `mafia_chatgpt_pipeline.py`, `mafia_dashboard_server.py`)**: (1) **Xử lý tận gốc nguyên nhân treo đứng im tại `BÀN #1 (10%)` / `Acc #1: Đang gánh 0/3 luồng` ngay sau dòng `[PIPELINE-START]`:** Trong [`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py), hàm `acquire_account_for_project()` giữ khóa `with ACCOUNT_LOAD_LOCK:` (`threading.Lock()` không đệ quy) rồi gọi tiếp `is_account_in_cooldown()` bên trong — mà `is_account_in_cooldown()` lại tiếp tục gọi `with ACCOUNT_LOAD_LOCK:` trên cùng luồng đó, gây **Self-Deadlock 100%** ngay ở kịch bản đầu tiên khiến cả 3 luồng đứng chờ vô hạn trước khi kịp mở tab hay gõ chữ vào ChatGPT. Đã nâng cấp `ACCOUNT_LOAD_LOCK`, `WEB_TAB_LOCK`, `_STATUS_CACHE_LOCK`, `PIPE_LOCK`, `POOL_LOCK`, `BACKLOG_LOCK`, `LOG_LOCK`, `BACKEND_API_LOCK`, `SEND_PRIORITY_LOCK`, `WORKER_LOCK` sang khóa đệ quy **`threading.RLock()`**, đồng thời tách tiền tính toán `cooldown_map` & `cdp_conv_map` ra ngoài vùng khóa trong `acquire_account_for_project()` (hoàn tất cấp phát tài khoản trong `< 0.05s`); (2) **Chấm dứt lỗi nhân đôi dòng `[PIPELINE-START]` và hỏng mã UTF-8 trong `LIVE_STUDIO_LOG.txt`:** Trong [`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py) (`start_worker_command`), thay thế việc truyền trực tiếp file handle `stdout=log_f` (xung đột con trỏ file với `log_msg()` của tiến trình con) bằng `subprocess.PIPE` + luồng `_relay_worker_stdout` chỉ ghi bổ sung các dòng stderr/traceback chưa qua `log_msg()`; (3) **Khóa thứ tự ưu tiên `sys.path` & tự động đồng bộ `engine/` ngoài thư mục gốc:** Đảm bảo `resources/app` và `resources/app/engine` luôn đứng đầu `sys.path[0..1]` và tự động đồng bộ sang `STUDIO_ROOT/engine` nếu máy khách nâng cấp từ bản `V1.0.0` cũ.",
             "- **Bổ Sung Chức Năng Quét Các Kịch Bản Đã Tạo & Tự Động Tạo Bù `THUMBNAIL.png` + `THUMBNAIL-NENXANH.png` (`#00FF00`) + Ảnh Cắt Gọn Góc Trái Dưới (`_KB.png`) Để Phần Render Hoạt Động (`padre_mx_thumbnail_generator.py`, `mafia_chatgpt_pipeline.py`, `mafia_dashboard_server.py`, `script-video-bridge-service.js`, `batch-service.js`, `app.js`)**: (1) **Hàm quét & tạo bù tự động [`scan_and_generate_missing_thumbnails_for_created_scripts()`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/padre_mx_thumbnail_generator.py#L1239-L1480):** Tự động quét toàn bộ các thư mục dự án đã tạo kịch bản trong `PROJECTS_04_Nhom_Ong_Gia_Trung_Tri_Mexico` cũng như các file kịch bản `.txt` lẻ trong `TONG HOP` (hoặc thư mục Batch người dùng chọn); nếu phát hiện kịch bản nào chưa có `THUMBNAIL.png`, `THUMBNAIL-NENXANH.png` hoặc ảnh cắt gọn góc trái dưới (`{TenKichBan}_KB.png` / `{TenKichBan}.png`), hệ thống tự động mở đoạn chat ChatGPT mới vẽ đủ 2 ảnh và quét cắt gọn nhân vật nền xanh để phần Render hoạt động không bị lỗi thiếu ảnh; (2) **Tích hợp nút bấm trực tiếp trên cả 2 giao diện ([`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py) & [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js)):** Bổ sung nút **`🖼️ Quét & Tạo Thumbnail + Nền Xanh`** trên thanh công cụ Viết Kịch Bản (`POST /api/scan_missing_thumbnails`) và nút **`🖼️ Quét Kịch Bản & Tạo Bù Thumbnail + Nền Xanh`** trong khung `📂 Danh Sách Ảnh / Phông Xanh Trong Folder` của tab `🎬 Tạo Batch Video` (`POST /api/bridge/scan-missing-thumbnails`); (3) **Tự động kiểm tra & tạo bù ngay trước khi Render ([`batch-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/batch-service.js) & [`script-video-bridge-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/script-video-bridge-service.js)):** Bổ sung bước tiền kiểm `ensureMissingPadreMxImagesForJobs()` ngay trước `validateJobGreenInputs()` / `validateProjectImageInputs()` để khi bấm Render bất kỳ kịch bản nào chưa có ảnh nền xanh thì tự động tạo và cắt gọn trước khi FFmpeg kết xuất.",
             "- **Tích Hợp Cơ Chế Mở Đoạn Chat Mới Độc Lập Trên ChatGPT Web (`gpt-image-1` — Học Từ `TOOL_NHAT_DRAMA`) Để Tự Động Vẽ Đủ 2 Ảnh 16:9 (`THUMBNAIL.png` & `THUMBNAIL-NENXANH.png`) + Tự Động Đổi Nick Khi Dính Limit (`30 Phút Cooldown`) Cho Key 04 (`04_Nhom_Ong_Gia_Trung_Tri_Mexico`)**: (1) **Nâng cấp [`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py) theo chuẩn `TOOL_NHAT_DRAMA`:** Bổ sung `ChatGPTWebSession` với hàm `generate_image_and_harvest_base64()` (mở đoạn chat mới độc lập `start_fresh_chat`, gửi lệnh gọi `gpt-image-1` tạo ảnh mới từ đầu `size 1536x1024`, đợi DOM `img[src*=\"estuary/content\"], img[alt=\"Generated image\"]` render xong + thu hoạch ảnh gốc độ phân giải cao qua Backend API `/backend-api/conversation/{conv_id}` ➔ `asset_pointer` ➔ `/backend-api/estuary/content?id={file_id}` / `/backend-api/files/download/{file_id}` kèm fallback `fetch/canvas` ra Base64), đồng thời tích hợp bộ phát hiện Limit 30 phút (`mark_account_rate_limited`, `_detect_rate_limit_in_text`, `is_account_in_cooldown`, `ACCOUNT_LIMIT_COOLDOWN_SEC = 1800`) và tự động chuyển đổi sang nick ChatGPT khác (`switch_to_another_account`, `select_best_available_account`, `switch_project_to_another_account`); (2) **Nâng cấp [`engine/padre_mx_thumbnail_generator.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/padre_mx_thumbnail_generator.py) theo chuẩn `adas_script_engine.py`:** Tách riêng hoàn toàn bước viết Gói SEO/Prompt (`Bàn #5`) với bước vẽ ảnh (`Bàn #5B`), bổ sung `_sanitize_raw_thumbnail_prompt()` (lọc bỏ các từ khóa dễ kích hoạt nhầm chế độ Edit ảnh hoặc Guardrail), `generate_and_verify_padre_mx_two_images_sync()` và `ensure_padre_mx_thumbnails_with_failover_sync()` tự động mở đoạn chat mới vẽ đủ 2 ảnh 16:9 (`THUMBNAIL.png` bố cục 80/20 và `THUMBNAIL-NENXANH.png` nền xanh lá `#00FF00`), tự động đổi sang tài khoản ChatGPT khác nếu thiếu ảnh hoặc bị Limit cho đến khi đủ cả 2 ảnh, chuẩn hóa về `1920x1080` và quét cắt gọn ảnh nền xanh đặt ở góc trái bên dưới video (`GREEN_CUTOUT_BOTTOM_LEFT.png`, `{TenKichBan}_KB.png`); (3) **Đồng bộ luồng thực thi trong [`engine/mafia_chatgpt_pipeline.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/mafia_chatgpt_pipeline.py):** Tự động kích hoạt Bàn #5B vẽ 2 ảnh trên ChatGPT ngay sau khi Bàn #5 xuất gói SEO (hoặc tự động vẽ bù cho các dự án Key 04 đã xong SEO trước đó).",
             "- **Khắc Phục Triệt Để Lỗi Khi Bấm Nút `X` Đóng Ứng Dụng (`main.js`, `database.js`, `ffmpeg.js`, `ipc.js`, `app.js`)**: (1) Bổ sung cờ `this.closed = true` và bọc `try/catch` toàn bộ hàm đọc/ghi/đóng SQLite trong [`src/main/database.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/database.js) để chặn lỗi `ERR_SQLITE_ERROR: database is not open` khi các tác vụ nền (`ffmpegService.checkSystem`, `licenseTimer`, IPC) hoàn tất sau khi người dùng bấm `X`; (2) Nâng cấp `safeWriteJson` trong [`src/main/services/ffmpeg.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/ffmpeg.js) dùng tên file tạm duy nhất kèm `try/catch` chống xung đột `EPERM/ENOENT` khi đóng đồng loạt tiến trình con `ffmpeg/ffprobe` lúc tắt app; (3) Kiểm tra kép `!mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()` trong [`src/main/ipc.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/ipc.js), chặn `EPIPE` / `dialog.showErrorBox` và đặt `forceExitTimer` `1200ms` trong [`src/main/main.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/main.js), giúp bấm `X` tắt ứng dụng mượt mà trong `< 1s` (`0` lỗi, `0` tiến trình treo nền).",
@@ -3824,6 +3846,7 @@ def _run_single_project_pipeline_inner(
             or state.get("assigned_account_id")
             or (cur_hid.split(":")[-1] if ":" in cur_hid else "")
         )
+        log_msg(project_id, f"⏳ [BỘ CHIA TẢI ĐA ACC] Đang xin cấp phát khe luồng trên tài khoản ChatGPT cho [{project_id}]...")
         acc_cfg = client.acquire_account_for_project(
             project_id=project_id,
             preferred_acc_id=pref_acc,
@@ -4481,6 +4504,10 @@ YÊU CẦU THỰC HIỆN NGAY:
 """
         thread_label_prefix = kspec["key_id"] if ACTIVE_KEY_ID in KEY_PROFILES_12 else ("Mexico Ba Co" if ACTIVE_NICHE == "mexico" else ("Homeless V12" if ACTIVE_NICHE == "homeless" else "Mafia Story"))
         if not state.get("thread_id"):
+            log_msg(
+                project_id,
+                f"🌐 [BÀN #1 -> CHATGPT WEB] Đang mở tab & gửi Prompt Bước 1 ({len(prompt_step1):,} ký tự, model={thinking}) cho [{project_id}]...",
+            )
             tid, hid = client.create_story_thread(
                 title_label=f"{thread_label_prefix} [{project_id}] - DESK_1_TITLE",
                 prompt=prompt_step1,

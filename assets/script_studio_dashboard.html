@@ -913,6 +913,7 @@
         <button class="btn btn-green btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #34d399;" onclick="openChatGPTWebLogin('acc_1')" title="Mở trình duyệt Chrome để đăng nhập tài khoản ChatGPT">🔑 Đăng Nhập ChatGPT</button>
         <button class="btn btn-blue btn-sm" style="padding:6px 10px; font-size:11.8px; font-weight:700;" onclick="addTitlesOnly()">📥 Lưu Tiêu Đề &amp; Mã</button>
         <button id="btnUpdateTitlesMain" class="btn btn-dark btn-sm" style="padding:6px 11px; font-size:11.8px; font-weight:800; border:1px solid #38bdf8; color:#38bdf8; background:rgba(14,165,233,0.14);" onclick="updateTitlesFromComposerNow()" title="Cập nhật lại Tiêu đề & Mã kịch bản cho danh sách hiện tại (Nếu ô nhập đang trống, bấm lần 1 để nạp danh sách Tiêu đề hiện tại lên ô nhập, sửa xong bấm lần 2 để lưu đè!)">🔄 Cập Nhật Tiêu Đề</button>
+        <button id="btnScanMissingThumbs" class="btn btn-dark btn-sm" style="padding:6px 11px; font-size:11.8px; font-weight:800; border:1px solid #f59e0b; color:#fde68a; background:rgba(245,158,11,0.14);" onclick="scanAndGenerateMissingThumbnailsNow()" title="Quét toàn bộ các kịch bản đã tạo: nếu chưa có Thumbnail (THUMBNAIL.png) và Ảnh nền xanh (THUMBNAIL-NENXANH.png / _KB.png) thì tự động tạo để phần Render Video hoạt động!">🖼️ Quét &amp; Tạo Thumbnail + Nền Xanh</button>
         <button class="btn btn-gold btn-sm" style="padding:6px 12px; font-size:11.8px; font-weight:800; background:linear-gradient(135deg,#00ff88,#10b981); color:#04130b; border-color:#00ff88;" onclick="addAndRunWithAutoVideoNow()" title="Lưu Tiêu đề + Mã kịch bản, tự động viết kịch bản qua 9 Bàn AI rồi tự động Tạo Voice + Phụ đề + Render Video MP4 luôn!">🎬 Viết Kịch Bản ➔ Làm Video Luôn</button>
         <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
         <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
@@ -1745,6 +1746,29 @@ async function addTitlesOnly() {
     document.getElementById('customNamesInput').value = '';
   }
   await fetchStatus();
+}
+
+async function scanAndGenerateMissingThumbnailsNow() {
+  const btn = document.getElementById('btnScanMissingThumbs');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = '⏳ Đang quét kịch bản...';
+  }
+  showMsg('🔍 Đang quét toàn bộ các kịch bản đã tạo để kiểm tra Thumbnail (THUMBNAIL.png) & Ảnh nền xanh (THUMBNAIL-NENXANH.png / _KB.png)...');
+  try {
+    const r = await apiPost('/api/scan_missing_thumbnails', {
+      niche: document.getElementById('nicheSelector')?.value || CURRENT_NICHE || '04_Nhom_Ong_Gia_Trung_Tri_Mexico'
+    });
+    showMsg(r.message || (r.ok ? '✅ Đã kích hoạt quét & tạo bù Thumbnail + Ảnh nền xanh!' : '❌ Không thể quét kịch bản.'), !r.ok);
+    fetchStatus();
+  } catch (e) {
+    showMsg('❌ Lỗi khi quét kịch bản: ' + e, true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = '🖼️ Quét & Tạo Thumbnail + Nền Xanh';
+    }
+  }
 }
 
 async function addAndRunWithAutoVideoNow() {

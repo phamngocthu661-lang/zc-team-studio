@@ -79,8 +79,11 @@ BACKLOG_PATH = os.path.join(STUDIO_ROOT, "data", "queues", "QUEUE_BACKLOG.json")
 LIVE_LOG_PATH = os.path.join(STUDIO_ROOT, "data", "logs", "LIVE_STUDIO_LOG.txt")
 PORT = 8098
 
-for _p in (ENGINE_DIR, _CODE_ROOT, STUDIO_ROOT):
-    if _p and _p not in sys.path:
+for _p in (STUDIO_ROOT, _CODE_ROOT, ENGINE_DIR):
+    if _p in sys.path:
+        sys.path.remove(_p)
+for _p in (STUDIO_ROOT, _CODE_ROOT, ENGINE_DIR):
+    if _p:
         sys.path.insert(0, _p)
 
 from mafia_chatgpt_pipeline import (
@@ -112,7 +115,7 @@ from license_manager import (
 )
 
 # Quản lý tiến trình chạy nền & kênh đang chọn (12 Key mới + Mafia + Homeless V12 + MEXICO BÀ CÔ)
-WORKER_LOCK = threading.Lock()
+WORKER_LOCK = threading.RLock()
 ACTIVE_PROCESS = None
 ACTIVE_MODE = "IDLE"
 ACTIVE_MAX_WORKERS = 3
@@ -263,14 +266,43 @@ def start_worker_command(args_list: list[str], mode_desc: str, max_workers: int 
     with WORKER_LOCK:
         cmd = [sys.executable, "-u", ENGINE_SCRIPT, "--niche", niche_key] + args_list
         append_studio_log(f"🚀 Khởi chạy lệnh [{niche_key.upper()}]: {mode_desc} | Python={sys.executable}")
-        log_f = open(LIVE_LOG_PATH, "a", encoding="utf-8", buffering=1)
         ACTIVE_PROCESS = subprocess.Popen(
             cmd,
             cwd=STUDIO_ROOT,
-            stdout=log_f,
+            stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
+
+        def _relay_worker_stdout(proc: subprocess.Popen, nk: str):
+            try:
+                if proc.stdout is None:
+                    return
+                for raw_line in proc.stdout:
+                    s_line = (raw_line or "").rstrip("\r\n")
+                    if not s_line.strip():
+                        continue
+                    # Các dòng do log_msg() trong mafia_chatgpt_pipeline.py đã tự ghi trực tiếp vào LIVE_STUDIO_LOG.txt
+                    if s_line.startswith("[20") and "] [" in s_line:
+                        continue
+                    ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    try:
+                        os.makedirs(os.path.dirname(LIVE_LOG_PATH), exist_ok=True)
+                        with open(LIVE_LOG_PATH, "a", encoding="utf-8") as lf:
+                            lf.write(f"[{ts_now}] [{nk}] [WORKER] {s_line}\n")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        threading.Thread(
+            target=_relay_worker_stdout,
+            args=(ACTIVE_PROCESS, niche_key),
+            daemon=True,
+        ).start()
         ACTIVE_MODE = f"[{niche_key.upper()}] {mode_desc}"
         ACTIVE_MAX_WORKERS = max_workers
         return True, f"🚀 Đã khởi chạy [{niche_key.upper()}]: {mode_desc} (PID={ACTIVE_PROCESS.pid})"

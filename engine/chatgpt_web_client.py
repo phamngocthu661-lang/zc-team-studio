@@ -118,8 +118,8 @@ WEB_ACCOUNTS_CONFIG = [
 WEB_ACCOUNTS_BY_ID = {cfg["acc_id"]: cfg for cfg in WEB_ACCOUNTS_CONFIG}
 WEB_ACCOUNTS_BY_PORT = {cfg["port"]: cfg for cfg in WEB_ACCOUNTS_CONFIG}
 
-WEB_TAB_LOCK = threading.Lock()
-ACCOUNT_LOAD_LOCK = threading.Lock()
+WEB_TAB_LOCK = threading.RLock()
+ACCOUNT_LOAD_LOCK = threading.RLock()
 CDP_PORT_LOCKS = {
     9222: threading.Lock(),
     9223: threading.Lock(),
@@ -127,7 +127,7 @@ CDP_PORT_LOCKS = {
 }
 
 # Bộ nhớ đệm trạng thái 3 tài khoản (TTL 3.5s) để Dashboard tải nhanh tức thì
-_STATUS_CACHE_LOCK = threading.Lock()
+_STATUS_CACHE_LOCK = threading.RLock()
 _STATUS_CACHE_TS = 0.0
 _STATUS_CACHE_DATA = None
 _LAST_VERIFIED_LOGIN_BY_PORT = {}
@@ -1365,7 +1365,9 @@ class ChatGPTWebMultiTabClient:
     """
 
     def __init__(self):
-        ensure_all_initialized_browsers_open(run_hidden=True)
+        st_init = check_all_web_accounts_status(force_refresh=False)
+        if not st_init.get("browser_running"):
+            ensure_all_initialized_browsers_open(run_hidden=True)
         self._thread_to_tab = {"acc_1": {}, "acc_2": {}, "acc_3": {}}
         self._reserved_tab_ids = {"acc_1": set(), "acc_2": set(), "acc_3": set()}
         self._active_busy_tabs = {"acc_1": set(), "acc_2": set(), "acc_3": set()}
@@ -1425,9 +1427,27 @@ class ChatGPTWebMultiTabClient:
         pref_norm = normalize_acc_id(preferred_acc_id) if preferred_acc_id else ""
         excl = {normalize_acc_id(x) for x in (exclude_accs or set()) if x}
 
-        while True:
+        for _wait_round in range(180):
             logged_accs = self.get_logged_in_accounts()
             logged_map = {a["acc_id"]: a for a in logged_accs}
+            cooldown_map = {a["acc_id"]: is_account_in_cooldown(a["acc_id"]) for a in logged_accs}
+            if pref_norm and pref_norm not in cooldown_map:
+                cooldown_map[pref_norm] = is_account_in_cooldown(pref_norm)
+            cdp_conv_map = {}
+            for a_info in logged_accs:
+                aid = a_info["acc_id"]
+                try:
+                    p_port = get_account_config(aid)["port"]
+                    if is_cdp_browser_running(port=p_port):
+                        t_list = _cdp_http_json("/json/list", timeout=1.5, port=p_port)
+                        cdp_conv_map[aid] = sum(
+                            1 for t_it in t_list
+                            if t_it.get("type") == "page" and "/c/" in str(t_it.get("url") or "")
+                        )
+                    else:
+                        cdp_conv_map[aid] = 0
+                except Exception:
+                    cdp_conv_map[aid] = 0
 
             with ACCOUNT_LOAD_LOCK:
                 # 1. Nếu project_id đã được gán sẵn trong phiên chạy này và Acc đó vẫn hợp lệ + không bị loại trừ/cooldown
@@ -1436,7 +1456,7 @@ class ChatGPTWebMultiTabClient:
                     existing_aid
                     and existing_aid in logged_map
                     and existing_aid not in excl
-                    and not is_account_in_cooldown(existing_aid)[0]
+                    and not cooldown_map.get(existing_aid, (False, 0, ""))[0]
                 ):
                     GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(existing_aid, set()).add(project_id)
                     GLOBAL_PROJECT_TO_ACC[project_id] = existing_aid
@@ -1449,7 +1469,7 @@ class ChatGPTWebMultiTabClient:
                     pref_norm
                     and pref_norm in logged_map
                     and pref_norm not in excl
-                    and not is_account_in_cooldown(pref_norm)[0]
+                    and not cooldown_map.get(pref_norm, (False, 0, ""))[0]
                 ):
                     act_set = GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(pref_norm, set())
                     if project_id in act_set or len(act_set) < MAX_THREADS_PER_ACCOUNT:
@@ -1467,22 +1487,12 @@ class ChatGPTWebMultiTabClient:
                     aid = a_info["acc_id"]
                     if aid in excl:
                         continue
-                    in_cd, rem_cd, _ = is_account_in_cooldown(aid)
+                    in_cd, rem_cd, _ = cooldown_map.get(aid, (False, 0, ""))
                     act_set = GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(aid, set())
                     in_mem_load = len(act_set)
-                    cdp_conv_load = 0
-                    try:
-                        p_port = get_account_config(aid)["port"]
-                        if is_cdp_browser_running(port=p_port):
-                            t_list = _cdp_http_json("/json/list", timeout=1.5, port=p_port)
-                            cdp_conv_load = sum(
-                                1 for t_it in t_list
-                                if t_it.get("type") == "page" and "/c/" in str(t_it.get("url") or "")
-                            )
-                    except Exception:
-                        pass
+                    cdp_conv_load = cdp_conv_map.get(aid, 0)
                     load_cnt = max(in_mem_load, min(cdp_conv_load, MAX_THREADS_PER_ACCOUNT - 1)) if in_mem_load == 0 else in_mem_load
-                    if load_cnt < MAX_THREADS_PER_ACCOUNT:
+                    if load_cnt < MAX_THREADS_PER_ACCOUNT or _wait_round >= 10:
                         rr_rank = (idx - (_ROUND_ROBIN_COUNTER % max(1, n_logged))) % max(1, n_logged)
                         candidates.append((1 if in_cd else 0, rem_cd if in_cd else 0, load_cnt, rr_rank, aid))
 
@@ -1499,6 +1509,15 @@ class ChatGPTWebMultiTabClient:
 
             # Nếu tất cả các tài khoản đều đang chạy đủ 3/3 luồng, đợi 2s để khe luồng giải phóng
             time.sleep(2.0)
+
+        fallback_aid = (logged_accs[0]["acc_id"] if logged_accs else "acc_1")
+        with ACCOUNT_LOAD_LOCK:
+            GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(fallback_aid, set()).add(project_id)
+            self._project_to_acc[project_id] = fallback_aid
+            GLOBAL_PROJECT_TO_ACC[project_id] = fallback_aid
+            if thread_id:
+                self._thread_to_acc[thread_id] = fallback_aid
+        return get_account_config(fallback_aid)
 
     def switch_project_to_another_account(self, project_id: str, extra_exclude: set = None) -> dict:
         """
