@@ -3343,7 +3343,15 @@ def resolve_project_export_prefix(project_id: str, project_dir: str = "", state:
     return m.group(1) if m else (sanitize_custom_script_name(project_id)[:20] or "001")
 
 
-def export_to_tong_hop_folder(project_id: str, project_dir: str, niche: str = None) -> tuple[str, str]:
+def export_to_tong_hop_folder(
+    project_id: str,
+    project_dir: str,
+    niche: str = None,
+    generate_chatgpt_thumbnails: bool = False,
+    preferred_acc_id: str = None,
+    client=None,
+    log_fn=None,
+) -> tuple[str, str]:
     """
     Sao lưu thêm 1 bản Kịch bản (đã lọc sạch các dòng Part 1..N để tạo TTS) và SEO vào thư mục
     tổng hợp riêng của từng bên (`PROJECTS\\PROJECTS_<Key>\\TONG HOP`).
@@ -3383,23 +3391,47 @@ def export_to_tong_hop_folder(project_id: str, project_dir: str, niche: str = No
                 shutil.copy2(src_seo, seo_dst)
 
         # Riêng Key 04_Nhom_Ong_Gia_Trung_Tri_Mexico (PADRE MX V1.2.1):
-        # Tự động tạo cặp THUMBNAIL.png + THUMBNAIL-NENXANH.png (80/20) và quét cắt gọn ảnh nền xanh
-        # ({TenKichBan}_KB.png / {TenKichBan}.png) để gắn vào góc trái bên dưới video cho từng kịch bản.
+        # Tự động tạo cặp THUMBNAIL.png + THUMBNAIL-NENXANH.png (80/20) trên ChatGPT Web (gpt-image-1)
+        # và quét cắt gọn ảnh nền xanh ({TenKichBan}_KB.png / {TenKichBan}.png) để gắn vào góc trái bên dưới video.
         active_cfg_key = get_niche_config(resolved_niche or ACTIVE_KEY_ID or ACTIVE_NICHE).get("key_id", "")
         if active_cfg_key == "04_Nhom_Ong_Gia_Trung_Tri_Mexico" and os.path.exists(src_kb):
             try:
-                from padre_mx_thumbnail_generator import generate_padre_mx_thumbnail_pair_and_cropped_green
-                seo_txt_content = read_text_file(src_seo) if os.path.exists(src_seo) else ""
-                locked_title_p = os.path.join(project_dir, "LOCKED_TITLE.txt")
-                w_title = read_text_file(locked_title_p).strip() if os.path.exists(locked_title_p) else ""
-                generate_padre_mx_thumbnail_pair_and_cropped_green(
-                    project_id=project_id,
-                    project_dir=project_dir,
-                    winner_title=w_title,
-                    seo_text=seo_txt_content,
-                    tong_hop_base_name=prefix,
-                    tong_hop_dir=th_dir,
-                )
+                thumb_src = os.path.join(project_dir, "THUMBNAIL.png")
+                green_src = os.path.join(project_dir, "THUMBNAIL-NENXANH.png")
+                cutout_src = os.path.join(project_dir, "GREEN_CUTOUT_BOTTOM_LEFT.png")
+                if generate_chatgpt_thumbnails and os.path.exists(src_seo):
+                    from padre_mx_thumbnail_generator import generate_padre_mx_thumbnail_pair_and_cropped_green
+                    seo_txt_content = read_text_file(src_seo) if os.path.exists(src_seo) else ""
+                    locked_title_p = os.path.join(project_dir, "LOCKED_TITLE.txt")
+                    w_title = read_text_file(locked_title_p).strip() if os.path.exists(locked_title_p) else ""
+                    generate_padre_mx_thumbnail_pair_and_cropped_green(
+                        project_id=project_id,
+                        project_dir=project_dir,
+                        winner_title=w_title,
+                        seo_text=seo_txt_content,
+                        tong_hop_base_name=prefix,
+                        tong_hop_dir=th_dir,
+                        preferred_acc_id=preferred_acc_id,
+                        client=client,
+                        log_fn=log_fn,
+                    )
+                else:
+                    # Chỉ đồng bộ các file ảnh đã có sẵn sang TONG HOP (không mở trình duyệt khi chỉ cập nhật bảng MD)
+                    if os.path.exists(cutout_src) and os.path.getsize(cutout_src) > 1024:
+                        for dst_img in (
+                            os.path.join(th_dir, f"{prefix}_KB.png"),
+                            os.path.join(th_dir, f"{prefix}.png"),
+                        ):
+                            if not os.path.exists(dst_img) or os.path.getsize(dst_img) != os.path.getsize(cutout_src):
+                                shutil.copy2(cutout_src, dst_img)
+                    if os.path.exists(thumb_src) and os.path.getsize(thumb_src) > 1024:
+                        dst_t = os.path.join(th_dir, f"{prefix}_THUMBNAIL.png")
+                        if not os.path.exists(dst_t) or os.path.getsize(dst_t) != os.path.getsize(thumb_src):
+                            shutil.copy2(thumb_src, dst_t)
+                    if os.path.exists(green_src) and os.path.getsize(green_src) > 1024:
+                        dst_g = os.path.join(th_dir, f"{prefix}_THUMBNAIL-NENXANH.png")
+                        if not os.path.exists(dst_g) or os.path.getsize(dst_g) != os.path.getsize(green_src):
+                            shutil.copy2(green_src, dst_g)
             except Exception as e_thumb:
                 print(f"[PADRE_MX_THUMBNAIL_WARN] {project_id}: {e_thumb}")
 
@@ -3490,6 +3522,8 @@ def update_progress_markdown(niche: str = None):
             "| **Bàn #7** | 🎬 | `studio-7-voice-video-producer` | ⚡ Hàng đợi GPU (`Port 3999` / `VoiceStudio 3900` + `NVENC`) | Tự Động Tạo Voice (`.wav`) + Phụ Đề Whisper GPU (`.srt`) + Render Video (`.mp4`) Theo Cấu Hình Đã Khóa Trong `Video Batch Studio` | 🟢 Active |",
             "",
             "## 2. Nhật Ký Nâng Cấp & Sửa Lỗi Hệ Thống",
+            "- **Bổ Sung Chức Năng Quét Các Kịch Bản Đã Tạo & Tự Động Tạo Bù `THUMBNAIL.png` + `THUMBNAIL-NENXANH.png` (`#00FF00`) + Ảnh Cắt Gọn Góc Trái Dưới (`_KB.png`) Để Phần Render Hoạt Động (`padre_mx_thumbnail_generator.py`, `mafia_chatgpt_pipeline.py`, `mafia_dashboard_server.py`, `script-video-bridge-service.js`, `batch-service.js`, `app.js`)**: (1) **Hàm quét & tạo bù tự động [`scan_and_generate_missing_thumbnails_for_created_scripts()`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/padre_mx_thumbnail_generator.py#L1239-L1480):** Tự động quét toàn bộ các thư mục dự án đã tạo kịch bản trong `PROJECTS_04_Nhom_Ong_Gia_Trung_Tri_Mexico` cũng như các file kịch bản `.txt` lẻ trong `TONG HOP` (hoặc thư mục Batch người dùng chọn); nếu phát hiện kịch bản nào chưa có `THUMBNAIL.png`, `THUMBNAIL-NENXANH.png` hoặc ảnh cắt gọn góc trái dưới (`{TenKichBan}_KB.png` / `{TenKichBan}.png`), hệ thống tự động mở đoạn chat ChatGPT mới vẽ đủ 2 ảnh và quét cắt gọn nhân vật nền xanh để phần Render hoạt động không bị lỗi thiếu ảnh; (2) **Tích hợp nút bấm trực tiếp trên cả 2 giao diện ([`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py) & [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js)):** Bổ sung nút **`🖼️ Quét & Tạo Thumbnail + Nền Xanh`** trên thanh công cụ Viết Kịch Bản (`POST /api/scan_missing_thumbnails`) và nút **`🖼️ Quét Kịch Bản & Tạo Bù Thumbnail + Nền Xanh`** trong khung `📂 Danh Sách Ảnh / Phông Xanh Trong Folder` của tab `🎬 Tạo Batch Video` (`POST /api/bridge/scan-missing-thumbnails`); (3) **Tự động kiểm tra & tạo bù ngay trước khi Render ([`batch-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/batch-service.js) & [`script-video-bridge-service.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/script-video-bridge-service.js)):** Bổ sung bước tiền kiểm `ensureMissingPadreMxImagesForJobs()` ngay trước `validateJobGreenInputs()` / `validateProjectImageInputs()` để khi bấm Render bất kỳ kịch bản nào chưa có ảnh nền xanh thì tự động tạo và cắt gọn trước khi FFmpeg kết xuất.",
+            "- **Tích Hợp Cơ Chế Mở Đoạn Chat Mới Độc Lập Trên ChatGPT Web (`gpt-image-1` — Học Từ `TOOL_NHAT_DRAMA`) Để Tự Động Vẽ Đủ 2 Ảnh 16:9 (`THUMBNAIL.png` & `THUMBNAIL-NENXANH.png`) + Tự Động Đổi Nick Khi Dính Limit (`30 Phút Cooldown`) Cho Key 04 (`04_Nhom_Ong_Gia_Trung_Tri_Mexico`)**: (1) **Nâng cấp [`engine/chatgpt_web_client.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/chatgpt_web_client.py) theo chuẩn `TOOL_NHAT_DRAMA`:** Bổ sung `ChatGPTWebSession` với hàm `generate_image_and_harvest_base64()` (mở đoạn chat mới độc lập `start_fresh_chat`, gửi lệnh gọi `gpt-image-1` tạo ảnh mới từ đầu `size 1536x1024`, đợi DOM `img[src*=\"estuary/content\"], img[alt=\"Generated image\"]` render xong + thu hoạch ảnh gốc độ phân giải cao qua Backend API `/backend-api/conversation/{conv_id}` ➔ `asset_pointer` ➔ `/backend-api/estuary/content?id={file_id}` / `/backend-api/files/download/{file_id}` kèm fallback `fetch/canvas` ra Base64), đồng thời tích hợp bộ phát hiện Limit 30 phút (`mark_account_rate_limited`, `_detect_rate_limit_in_text`, `is_account_in_cooldown`, `ACCOUNT_LIMIT_COOLDOWN_SEC = 1800`) và tự động chuyển đổi sang nick ChatGPT khác (`switch_to_another_account`, `select_best_available_account`, `switch_project_to_another_account`); (2) **Nâng cấp [`engine/padre_mx_thumbnail_generator.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/padre_mx_thumbnail_generator.py) theo chuẩn `adas_script_engine.py`:** Tách riêng hoàn toàn bước viết Gói SEO/Prompt (`Bàn #5`) với bước vẽ ảnh (`Bàn #5B`), bổ sung `_sanitize_raw_thumbnail_prompt()` (lọc bỏ các từ khóa dễ kích hoạt nhầm chế độ Edit ảnh hoặc Guardrail), `generate_and_verify_padre_mx_two_images_sync()` và `ensure_padre_mx_thumbnails_with_failover_sync()` tự động mở đoạn chat mới vẽ đủ 2 ảnh 16:9 (`THUMBNAIL.png` bố cục 80/20 và `THUMBNAIL-NENXANH.png` nền xanh lá `#00FF00`), tự động đổi sang tài khoản ChatGPT khác nếu thiếu ảnh hoặc bị Limit cho đến khi đủ cả 2 ảnh, chuẩn hóa về `1920x1080` và quét cắt gọn ảnh nền xanh đặt ở góc trái bên dưới video (`GREEN_CUTOUT_BOTTOM_LEFT.png`, `{TenKichBan}_KB.png`); (3) **Đồng bộ luồng thực thi trong [`engine/mafia_chatgpt_pipeline.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/engine/mafia_chatgpt_pipeline.py):** Tự động kích hoạt Bàn #5B vẽ 2 ảnh trên ChatGPT ngay sau khi Bàn #5 xuất gói SEO (hoặc tự động vẽ bù cho các dự án Key 04 đã xong SEO trước đó).",
             "- **Khắc Phục Triệt Để Lỗi Khi Bấm Nút `X` Đóng Ứng Dụng (`main.js`, `database.js`, `ffmpeg.js`, `ipc.js`, `app.js`)**: (1) Bổ sung cờ `this.closed = true` và bọc `try/catch` toàn bộ hàm đọc/ghi/đóng SQLite trong [`src/main/database.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/database.js) để chặn lỗi `ERR_SQLITE_ERROR: database is not open` khi các tác vụ nền (`ffmpegService.checkSystem`, `licenseTimer`, IPC) hoàn tất sau khi người dùng bấm `X`; (2) Nâng cấp `safeWriteJson` trong [`src/main/services/ffmpeg.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/services/ffmpeg.js) dùng tên file tạm duy nhất kèm `try/catch` chống xung đột `EPERM/ENOENT` khi đóng đồng loạt tiến trình con `ffmpeg/ffprobe` lúc tắt app; (3) Kiểm tra kép `!mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()` trong [`src/main/ipc.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/ipc.js), chặn `EPIPE` / `dialog.showErrorBox` và đặt `forceExitTimer` `1200ms` trong [`src/main/main.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/main.js), giúp bấm `X` tắt ứng dụng mượt mà trong `< 1s` (`0` lỗi, `0` tiến trình treo nền).",
             "- **Sửa Triệt Để Lỗi Phóng To Icon Logo (`38x38px`), Tinh Chỉnh Bố Cục Giao Diện `Cyber Terminal Studio Matrix`, Chụp Ảnh Màn Hình Kiểm Định 5 Tab & Test Chức Năng Tự Động (`100% PASS`)**: (1) **Khắc phục lỗi Logo bị hiển thị kích thước gốc `828x828`:** Bổ sung đầy đủ các class `.topbar-logo`, `.topbar-brand`, `.topbar-title-wrap`, `.topbar-title-row`, `.key-select-shell`, `.nav-badge`, `.side-telemetry` trong [`src/renderer/styles.css`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/styles.css), khóa cứng `width=\"38\" height=\"38\" style=\"width:38px;height:38px;max-width:38px;max-height:38px;\"` trong [`src/renderer/index.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/index.html) (`28x28` trong [`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py)) và chuẩn hóa file [`assets/zc-logo.png`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/assets/zc-logo.png) về `128x128` px (`logoRect` thực tế đo qua CDP = `38x38` px); (2) **Chuẩn hóa bố cục 1 dòng & màu Cyber Neon Green (`#00ff88`):** Đồng bộ nút `🔍 Quét ảnh`, khung `📂 Danh Sách Ảnh / Phông Xanh Trong Folder` trong [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js), mở rộng Sidebar `242px` (`white-space: nowrap`) để 10 mục menu (`01`..`10`) và thanh công cụ Topbar / Script Bridge nằm gọn trên 1 hàng ngang không bị rớt dòng; (3) **Chụp ảnh màn hình thực tế & Kiểm thử chức năng tự động ([`verify_ui_and_functions.py`](file:///C:/Users/hungp/.gemini/antigravity/brain/f37afbfd-a644-4843-881c-9b8aa5adc539/scratch/verify_ui_and_functions.py)):** Kết nối trực tiếp vào tiến trình Electron (`Port 9229`), chụp 5 ảnh màn hình thực tế (`01_tab_batch_video.png` .. `05_license_modal.png`) và xác nhận 100% chức năng hoạt động ổn định (`appInfo: ZC TEAM v5.6.1`, `licenseStatus: ACTIVE Còn 360 ngày`, `systemCheck: FFmpeg OK · H.264 NVENC · GTX 1060 6GB`, `voiceStatus: ONLINE Port 3900 CUDA 2 luồng`, `Port 8098: 9 Bàn Active`, đồng bộ 2 chiều Selection Option `#topGlobalKeySelect` <-> `#topChannelKeySelector`).",
             "- **Chuyển Đổi Giao Diện Ứng Dụng Sang Bản Mới `Cyber Terminal Studio Matrix` (Google Stitch), Đổi Tên Ứng Dụng Thành `ZC TEAM` (Kèm Logo/Icon Mới) & Đổi Phần Chọn Key Sang Dạng `Selection Option` (`<select><option>`)**: (1) **Đổi tên ứng dụng thành `ZC TEAM` kèm Logo & Icon mới (`assets/zc-logo.png`, `assets/icon.ico`):** Cập nhật toàn diện trên cửa sổ Desktop Electron ([`src/main/main.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/main/main.js), [`package.json`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/package.json)), Topbar ứng dụng ([`src/renderer/index.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/index.html)), Hộp thoại Bản quyền (`ZC TEAM · LICENSE GUARD MATRIX`) và thanh công cụ Web Studio ([`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py)); (2) **Chuyển đổi giao diện sang chuẩn Stitch `Cyber Terminal Studio Matrix` (`#00ff88` Cyber Neon Green, `#10b981`, `#090b10` / `#0f131a`):** Đồng bộ CSS & HTML trên cả 10 Tab của ứng dụng Desktop ([`src/renderer/styles.css`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/styles.css), [`src/renderer/index.html`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/index.html), [`src/renderer/app.js`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/src/renderer/app.js)) và giao diện nhúng Bàn #1→#7 ([`mafia_dashboard_server.py`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/mafia_dashboard_server.py)), bao gồm Sidebar đánh số `01..10` có huy hiệu (`AI`, `GPU`, `3900`, `REELS`, `16:9`) và hộp Telemetry (`:3999 | :8098 | :3900`); (3) **Chuyển phần chọn Key / Kênh sang dạng `Selection Option` (`<select><option>`):** Thay thế 3 tab ngang trên thanh công cụ bằng hộp chọn `<select id=\"topChannelKeySelector\">` (đồng bộ 2 chiều với `<select id=\"topGlobalKeySelect\">` trên Topbar và `<select id=\"nicheSelector\">`), kèm `<select id=\"licenseKeyPresetSelect\">` trong hộp thoại Bản quyền; (4) Đóng gói lại [`Ban-Giao-Khach-Hang-EXE/VideoBatchStudio/resources/app.asar`](file:///D:/ZC_TEAM/TOOL_ZC_TEAM/Ban-Giao-Khach-Hang-EXE/VideoBatchStudio/resources/app.asar) và khởi động lại ứng dụng `ZC TEAM` trên màn hình chính.",
@@ -6665,15 +6699,32 @@ Hãy dựa trên **LOCKED / PRIMARY TITLE** (`{state['winner_title']}`), Giàn �
             f"✅ [{'Bàn #7 Check lại file TTS `verificador-tts-drama-familiar-mexico`' if ACTIVE_NICHE == 'mexico' else 'Bàn #6 `studio-6-visual-tts-director`'}] Đã chuẩn hóa {tts_stats.get('total_fixes', 0)} vị trí phát âm TTS (Bung viết tắt={tts_stats.get('abbreviations_expanded', 0)}, Số/Đơn vị={tts_stats.get('numbers_units_expanded', 0)}, Ký tự lạ={tts_stats.get('strange_chars_removed', 0)} | Thời lượng ước tính: ~{tts_stats.get('estimated_tts_minutes', 0)} phút)!",
         )
 
-        kb_tonghop_path, seo_tonghop_path = export_to_tong_hop_folder(project_id, project_dir, niche=ACTIVE_KEY_ID or ACTIVE_NICHE)
+        kb_tonghop_path, seo_tonghop_path = export_to_tong_hop_folder(
+            project_id,
+            project_dir,
+            niche=ACTIVE_KEY_ID or ACTIVE_NICHE,
+            generate_chatgpt_thumbnails=True,
+            preferred_acc_id=state.get("account_id", "acc_1"),
+            client=client,
+            log_fn=lambda m: log_msg(project_id, m),
+        )
         if kspec.get("key_id") == "04_Nhom_Ong_Gia_Trung_Tri_Mexico":
             thumb_p = os.path.join(project_dir, "THUMBNAIL.png")
             green_p = os.path.join(project_dir, "THUMBNAIL-NENXANH.png")
             cutout_p = os.path.join(project_dir, "GREEN_CUTOUT_BOTTOM_LEFT.png")
             if os.path.exists(thumb_p) and os.path.exists(green_p) and os.path.exists(cutout_p):
+                if "STEP_5B_CHATGPT_THUMBNAILS_DONE" not in state["completed_steps"]:
+                    state["completed_steps"].append("STEP_5B_CHATGPT_THUMBNAILS_DONE")
+                record_agent_chat_state(
+                    "THUMBNAIL_DESK_5B",
+                    "Bàn #5B — Vẽ 2 Ảnh Thumbnail & Nền Xanh ChatGPT (gpt-image-1)",
+                    state.get("thread_id", "chatgpt-image-1"),
+                    status="COMPLETED",
+                    turns_cnt=2,
+                )
                 log_msg(
                     project_id,
-                    f"🖼️ [KEY 04 PADRE MX V1.2.1] Đã tạo tự động bộ Thumbnail 80/20 + Ảnh nền xanh #00FF00 & Cắt gọn góc trái dưới:\n"
+                    f"🖼️ [KEY 04 PADRE MX V1.2.1 — CHATGPT GPT-IMAGE-1] Đã mở đoạn chat mới vẽ đủ 2 ảnh 16:9 + Cắt gọn ảnh nền xanh #00FF00:\n"
                     f"   • THUMBNAIL 80/20: {thumb_p}\n"
                     f"   • THUMBNAIL-NENXANH (#00FF00): {green_p}\n"
                     f"   • Ảnh nền xanh đã cắt gọn (Góc trái dưới riêng cho kịch bản): {cutout_p}",
@@ -6747,6 +6798,34 @@ Hãy dựa trên **LOCKED / PRIMARY TITLE** (`{state['winner_title']}`), Giàn �
                 )
         except Exception as e_br:
             log_msg(project_id, f"ℹ️ [Bàn #7 Bridge] Ghi chú kết nối Video Batch Studio: {e_br}")
+
+    # Bổ sung cơ chế tự động vẽ bù 2 ảnh ChatGPT (THUMBNAIL.png & THUMBNAIL-NENXANH.png)
+    # nếu dự án Key 04 đã xong Bước 5 từ trước nhưng chưa có ảnh vẽ bằng ChatGPT (STEP_5B_CHATGPT_THUMBNAILS_DONE)
+    if (
+        kspec.get("key_id") == "04_Nhom_Ong_Gia_Trung_Tri_Mexico"
+        and "STEP_5_DONE" in state.get("completed_steps", [])
+        and "STEP_5B_CHATGPT_THUMBNAILS_DONE" not in state.get("completed_steps", [])
+        and os.path.exists(os.path.join(project_dir, "FULL_SEO.txt"))
+    ):
+        log_msg(
+            project_id,
+            "🎨 [BƯỚC 5B - Bàn Vẽ Ảnh Độc Lập ChatGPT (`gpt-image-1`)] Phát hiện dự án đã có Gói SEO nhưng chưa vẽ đủ 2 ảnh trên ChatGPT. Đang mở đoạn chat mới độc lập để vẽ `THUMBNAIL.png` & `THUMBNAIL-NENXANH.png`...",
+        )
+        export_to_tong_hop_folder(
+            project_id,
+            project_dir,
+            niche=ACTIVE_KEY_ID or ACTIVE_NICHE,
+            generate_chatgpt_thumbnails=True,
+            preferred_acc_id=state.get("account_id", "acc_1"),
+            client=client,
+            log_fn=lambda m: log_msg(project_id, m),
+        )
+        thumb_p = os.path.join(project_dir, "THUMBNAIL.png")
+        green_p = os.path.join(project_dir, "THUMBNAIL-NENXANH.png")
+        cutout_p = os.path.join(project_dir, "GREEN_CUTOUT_BOTTOM_LEFT.png")
+        if os.path.exists(thumb_p) and os.path.exists(green_p) and os.path.exists(cutout_p):
+            state["completed_steps"].append("STEP_5B_CHATGPT_THUMBNAILS_DONE")
+            save_state("COMPLETED_ALL_5_STEPS")
 
     return state
 
@@ -7680,6 +7759,27 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
         pending_items = pending_items[:limit_projects]
 
     if not pending_items:
+        if cfg.get("key_id") == "04_Nhom_Ong_Gia_Trung_Tri_Mexico":
+            try:
+                from padre_mx_thumbnail_generator import scan_and_generate_missing_thumbnails_for_created_scripts
+                scan_check = scan_and_generate_missing_thumbnails_for_created_scripts(
+                    projects_root=cfg["projects_root"],
+                    scan_folder=cfg["tong_hop_dir"],
+                    dry_run=True,
+                )
+                if int(scan_check.get("missing_count") or 0) > 0:
+                    log_msg(
+                        "KEY04-THUMB-SCAN",
+                        f"🔍 Phát hiện {scan_check['missing_count']}/{scan_check.get('total_created_scripts', 0)} kịch bản đã tạo của Key 04 chưa có đủ Thumbnail & Ảnh nền xanh ➔ Đang tự động tạo bù để phần Render hoạt động...",
+                    )
+                    scan_and_generate_missing_thumbnails_for_created_scripts(
+                        projects_root=cfg["projects_root"],
+                        scan_folder=cfg["tong_hop_dir"],
+                        dry_run=False,
+                        log_fn=log_msg,
+                    )
+            except Exception as e_sc04:
+                log_msg("KEY04-THUMB-WARN", f"⚠️ Lưu ý khi quét tạo bù Thumbnail/Nền xanh Key 04: {e_sc04}")
         log_msg("QUEUE-DONE", f"✅ Tất cả kịch bản trong hàng đợi kênh [{cfg['label']}] đều đã hoàn thành 100% (hoặc danh sách đang trống) — Tự động dừng!")
         update_progress_markdown(cfg["niche"])
         return
@@ -7768,10 +7868,54 @@ def run_backlog_queue(max_workers: int = 3, thinking: str = "medium", limit_proj
             pending_items = _collect_pending_backlog_items(attempted_in_session)
             if pending_items:
                 log_msg("QUEUE-CONTINUE", f"🔄 Phát hiện thêm {len(pending_items)} kịch bản trong hàng đợi [{cfg['label']}], tiếp tục viết cho đến hết...")
+        if cfg.get("key_id") == "04_Nhom_Ong_Gia_Trung_Tri_Mexico":
+            try:
+                from padre_mx_thumbnail_generator import scan_and_generate_missing_thumbnails_for_created_scripts
+                scan_check = scan_and_generate_missing_thumbnails_for_created_scripts(
+                    projects_root=cfg["projects_root"],
+                    scan_folder=cfg["tong_hop_dir"],
+                    dry_run=True,
+                )
+                if int(scan_check.get("missing_count") or 0) > 0:
+                    log_msg(
+                        "KEY04-THUMB-SCAN",
+                        f"🔍 Phát hiện {scan_check['missing_count']} kịch bản đã tạo của Key 04 chưa có đủ Thumbnail & Ảnh nền xanh ➔ Đang tạo bù để phần Render hoạt động...",
+                    )
+                    scan_and_generate_missing_thumbnails_for_created_scripts(
+                        projects_root=cfg["projects_root"],
+                        scan_folder=cfg["tong_hop_dir"],
+                        dry_run=False,
+                        client=client,
+                        log_fn=log_msg,
+                    )
+            except Exception as e_sc04_end:
+                log_msg("KEY04-THUMB-WARN", f"⚠️ Lưu ý khi quét tạo bù Thumbnail/Nền xanh cuối hàng đợi Key 04: {e_sc04_end}")
         log_msg("QUEUE-DONE", f"✅ ĐÃ VIẾT XONG TOÀN BỘ KỊCH BẢN TRONG HÀNG ĐỢI [{cfg['label']}] ({total_processed_count} kịch bản) — TỰ ĐỘNG DỪNG WORKER VIẾT KỊCH BẢN!")
     finally:
         client.close()
         notify_video_batch_studio_queue_completed(cfg["niche"], total_projects=total_processed_count)
+
+
+def scan_and_backfill_key04_thumbnails(
+    scan_folder: str = None,
+    dry_run: bool = False,
+    require_chatgpt_verified: bool = False,
+) -> dict:
+    """
+    Hàm gọi trực tiếp từ Giao diện Web Studio (`mafia_dashboard_server.py`) hoặc Cầu nối Render (`Port 3999`):
+    Quét toàn bộ các kịch bản đã tạo của Key 04 (`04_Nhom_Ong_Gia_Trung_Tri_Mexico`), nếu kịch bản nào chưa có
+    `THUMBNAIL.png` và `THUMBNAIL-NENXANH.png` (kèm ảnh nền xanh cắt gọn `{TenKichBan}_KB.png`) thì tự động tạo
+    để phần Render Video có thể hoạt động ngay!
+    """
+    cfg = get_niche_config("04_Nhom_Ong_Gia_Trung_Tri_Mexico")
+    from padre_mx_thumbnail_generator import scan_and_generate_missing_thumbnails_for_created_scripts
+    return scan_and_generate_missing_thumbnails_for_created_scripts(
+        projects_root=cfg["projects_root"],
+        scan_folder=scan_folder or cfg["tong_hop_dir"],
+        dry_run=dry_run,
+        require_chatgpt_verified=require_chatgpt_verified,
+        log_fn=log_msg,
+    )
 
 
 if __name__ == "__main__":

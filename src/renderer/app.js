@@ -73,7 +73,8 @@ function ensureProjectImageControls(){
             <strong style="color:#00ff88;font-size:12px;font-family:'Space Grotesk',sans-serif;">📂 Danh Sách Ảnh / Phông Xanh Trong Folder</strong>
             <span id="projectImageFolderCountBadge" style="font-size:10.5px;padding:2px 8px;border-radius:4px;background:#131820;color:#00ff88;border:1px solid rgba(0,255,136,0.35);font-family:'JetBrains Mono',monospace;">Chưa quét</span>
           </div>
-          <div style="display:flex;gap:6px;align-items:center;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <button type="button" id="btnScanAndGenMissingThumbsBatch" style="font-size:11px;padding:4px 10px;background:rgba(245,158,11,0.16);color:#fde68a;border:1px solid #f59e0b;border-radius:5px;cursor:pointer;font-weight:700;" title="Quét các kịch bản đã tạo (.txt): nếu chưa có Thumbnail & Ảnh nền xanh thì tự động tạo để phần Render hoạt động">🖼️ Quét Kịch Bản &amp; Tạo Bù Thumbnail + Nền Xanh</button>
             <button type="button" id="btnScanFolderImagesNow" style="font-size:11px;padding:4px 10px;background:#131820;color:#e6edf3;border:1px solid #262f3d;border-radius:5px;cursor:pointer;">🔄 Làm mới danh sách</button>
             <button type="button" id="btnResetAllFolderImagesToTemplate" style="font-size:11px;padding:4px 10px;background:#131820;color:#8b949e;border:1px solid #262f3d;border-radius:5px;cursor:pointer;" title="Đưa tất cả ảnh về lại khung mặc định của Template">📐 Đồng bộ tất cả theo Template</button>
           </div>
@@ -99,6 +100,43 @@ function ensureProjectImageControls(){
   };
   if($('btnQuickScanProjectImages'))$('btnQuickScanProjectImages').onclick=()=>triggerScanFolder({pickIfEmpty:true});
   if($('btnScanFolderImagesNow'))$('btnScanFolderImagesNow').onclick=()=>triggerScanFolder({pickIfEmpty:true});
+  if($('btnScanAndGenMissingThumbsBatch'))$('btnScanAndGenMissingThumbsBatch').onclick=async()=>{
+    const btn=$('btnScanAndGenMissingThumbsBatch');
+    const folder=$('projectImageFolder')?.value?.trim()||$('voiceFolder')?.value?.trim()||'';
+    if(btn){btn.disabled=true;btn.textContent='⏳ Đang quét kịch bản & tạo ảnh...';}
+    toast('🔍 Đang quét các kịch bản đã tạo để tạo bù Thumbnail & Ảnh nền xanh...');
+    try{
+      let res=null;
+      try{
+        const r8098=await fetch('http://127.0.0.1:8098/api/scan_missing_thumbnails',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({scan_folder:folder,niche:'04_Nhom_Ong_Gia_Trung_Tri_Mexico'})
+        });
+        if(r8098.ok)res=await r8098.json();
+      }catch{}
+      if(!res){
+        const r3999=await fetch('http://127.0.0.1:3999/api/bridge/scan-missing-thumbnails',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({scan_folder:folder,dry_run:false})
+        });
+        if(r3999.ok)res=await r3999.json();
+      }
+      if(res?.message){
+        toast(res.message);
+      }else if(res?.ok){
+        toast(`✅ Đã quét ${res.total_created_scripts||0} kịch bản (Đã tạo bù: ${res.generated_count||0} kịch bản)!`);
+      }else{
+        toast('⚠️ Không thể quét kịch bản: '+(res?.error||'Kiểm tra kết nối'));
+      }
+      if(folder)await scanAndRenderProjectImageFolderList(folder);
+    }catch(e){
+      toast('❌ Lỗi khi quét & tạo bù ảnh: '+(e?.message||e));
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='🖼️ Quét Kịch Bản & Tạo Bù Thumbnail + Nền Xanh';}
+    }
+  };
   if($('btnResetAllFolderImagesToTemplate'))$('btnResetAllFolderImagesToTemplate').onclick=()=>{
     if(!Object.keys(state.jobGreenConfigs||{}).length)return toast('Tất cả ảnh đang dùng khung chuẩn của Template.');
     if(!confirm('Đưa toàn bộ ảnh về lại vị trí & kích thước chuẩn của Template hiện tại?'))return;

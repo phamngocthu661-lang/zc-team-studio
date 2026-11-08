@@ -141,6 +141,149 @@ GLOBAL_ACTIVE_PROJECTS_BY_ACC = {
 GLOBAL_PROJECT_TO_ACC = {}
 _ROUND_ROBIN_COUNTER = 0
 
+CHATGPT_ACCOUNTS = WEB_ACCOUNTS_BY_ID
+ACCOUNT_LIMIT_COOLDOWN_SEC = 1800  # Tạm dừng 30 phút (1800 giây) khi tài khoản bị Limit
+_ACCOUNT_COOLDOWN_UNTIL = {
+    "acc_1": 0.0,
+    "acc_2": 0.0,
+    "acc_3": 0.0,
+}
+_ACCOUNT_COOLDOWN_REASON = {
+    "acc_1": "",
+    "acc_2": "",
+    "acc_3": "",
+}
+
+
+class AccountRateLimitError(RuntimeError):
+    """Ngoại lệ chuyên biệt khi tài khoản ChatGPT bị giới hạn (Rate Limit / Quota / Không phản hồi)."""
+
+    def __init__(self, acc_id: str, message: str):
+        super().__init__(message)
+        self.acc_id = acc_id
+
+
+def mark_account_rate_limited(
+    acc_id: str,
+    reason: str = "",
+    cooldown_sec: int = ACCOUNT_LIMIT_COOLDOWN_SEC,
+) -> float:
+    """
+    Đánh dấu tài khoản `acc_id` bị Limit -> Tạm dừng nhận kịch bản/ảnh mới trong `cooldown_sec` (mặc định 30 phút = 1800s).
+    Sau đúng 30 phút hệ thống sẽ tự động mở khóa để thử lại.
+    """
+    global _STATUS_CACHE_TS
+    aid = normalize_acc_id(acc_id)
+    if aid not in WEB_ACCOUNTS_BY_ID:
+        return 0.0
+    now = time.time()
+    until_ts = now + max(60, int(cooldown_sec))
+    clean_reason = (reason or "Tài khoản chạm giới hạn (Rate Limit / Timeout)").strip()[:180]
+    with ACCOUNT_LOAD_LOCK:
+        _ACCOUNT_COOLDOWN_UNTIL[aid] = until_ts
+        _ACCOUNT_COOLDOWN_REASON[aid] = clean_reason
+    with _STATUS_CACHE_LOCK:
+        _STATUS_CACHE_TS = 0.0
+    resume_str = time.strftime("%H:%M:%S", time.localtime(until_ts))
+    label = WEB_ACCOUNTS_BY_ID.get(aid, {}).get("label", aid)
+    print(
+        f"⏸️ [{label}] Phát hiện bị LIMIT / nghẽn ({clean_reason}) -> "
+        f"Tạm dừng {label} trong {int(cooldown_sec // 60)} phút (Mở lại lúc {resume_str}) và chuyển sang nick khác!",
+        flush=True,
+    )
+    return until_ts
+
+
+def is_account_in_cooldown(acc_id: str) -> tuple[bool, int, str]:
+    """
+    Kiểm tra xem `acc_id` có đang trong thời gian tạm dừng 30 phút vì Limit hay không.
+    Tự động mở khóa ngay khi hết 30 phút.
+    """
+    aid = normalize_acc_id(acc_id)
+    if aid not in WEB_ACCOUNTS_BY_ID:
+        return False, 0, ""
+    now = time.time()
+    unlocked_now = False
+    with ACCOUNT_LOAD_LOCK:
+        until_ts = float(_ACCOUNT_COOLDOWN_UNTIL.get(aid, 0.0) or 0.0)
+        reason = str(_ACCOUNT_COOLDOWN_REASON.get(aid, "") or "")
+        if until_ts <= 0.0:
+            return False, 0, ""
+        if now >= until_ts:
+            _ACCOUNT_COOLDOWN_UNTIL[aid] = 0.0
+            _ACCOUNT_COOLDOWN_REASON[aid] = ""
+            unlocked_now = True
+        else:
+            return True, int(round(until_ts - now)), reason
+    if unlocked_now:
+        label = WEB_ACCOUNTS_BY_ID.get(aid, {}).get("label", aid)
+        print(
+            f"▶️ [{label}] Đã hết 30 phút tạm dừng Limit -> Tự động mở khóa {label} để hoạt động trở lại!",
+            flush=True,
+        )
+    return False, 0, ""
+
+
+def clear_account_cooldown(acc_id: str = None) -> None:
+    """Xóa trạng thái tạm dừng Limit cho 1 hoặc toàn bộ tài khoản."""
+    global _STATUS_CACHE_TS
+    with ACCOUNT_LOAD_LOCK:
+        targets = [normalize_acc_id(acc_id)] if acc_id else list(WEB_ACCOUNTS_BY_ID.keys())
+        for aid in targets:
+            if aid in _ACCOUNT_COOLDOWN_UNTIL:
+                _ACCOUNT_COOLDOWN_UNTIL[aid] = 0.0
+                _ACCOUNT_COOLDOWN_REASON[aid] = ""
+    with _STATUS_CACHE_LOCK:
+        _STATUS_CACHE_TS = 0.0
+
+
+def get_earliest_cooldown_remaining_sec(candidate_accs: list[str] = None) -> int:
+    """Trả về số giây còn lại ngắn nhất để ít nhất 1 tài khoản thoát khỏi trạng thái tạm dừng 30 phút."""
+    accs = candidate_accs or list(WEB_ACCOUNTS_BY_ID.keys())
+    rem_list = []
+    for aid in accs:
+        in_cd, rem_s, _ = is_account_in_cooldown(aid)
+        if not in_cd:
+            return 0
+        if rem_s > 0:
+            rem_list.append(rem_s)
+    return min(rem_list) if rem_list else 0
+
+
+_RATE_LIMIT_PATTERNS = re.compile(
+    r"(?:"
+    r"you(?:['’]?ve|\s+have)?\s+reached\s+(?:your|the)(?:\s+\w+){0,3}\s+(?:limit|usage\s+cap|message\s+cap|cap|quota)|"
+    r"you(?:['’]?ve|\s+have)?\s+hit\s+(?:your|the)(?:\s+\w+){0,3}\s+(?:limit|cap|quota)|"
+    r"rate\s+limit|"
+    r"usage\s+cap|"
+    r"message\s+cap|"
+    r"too\s+many\s+requests|"
+    r"requests\s+too\s+quickly|"
+    r"wait\s+before\s+generating\s+more\s+images|"
+    r"image\s+generation\s+limit|"
+    r"limit\s+for\s+image\s+generations|"
+    r"try\s+again\s+in\s+\d+\s*(?:minute|minutes|hour|hours)|"
+    r"please\s+wait\s+\d+\s*(?:minute|minutes|hour|hours)\s+before|"
+    r"unusual\s+activity\s+from\s+your\s+system|"
+    r"đã\s+đạt\s+giới\s+hạn|"
+    r"vượt\s+quá\s+giới\s+hạn|"
+    r"límite\s+de\s+generación\s+de\s+imágenes|"
+    r"demasiadas\s+solicitudes"
+    r")",
+    flags=re.IGNORECASE,
+)
+
+
+def _detect_rate_limit_in_text(text: str, max_len_for_content_check: int = 900) -> str:
+    """Phát hiện thông báo giới hạn (Rate Limit / Quota) từ văn bản trả về hoặc banner cảnh báo của ChatGPT."""
+    t = (text or "").strip()
+    if not t or len(t) > max_len_for_content_check:
+        return ""
+    m = _RATE_LIMIT_PATTERNS.search(t)
+    if m:
+        return t[:180].replace("\n", " ").strip()
+    return ""
+
 
 def normalize_acc_id(raw_acc: str) -> str:
     s = str(raw_acc or "").strip().lower()
@@ -1071,6 +1214,77 @@ def ensure_all_initialized_browsers_open(run_hidden: bool = True) -> None:
                 pass
 
 
+def ensure_all_saved_chatgpt_accounts_open(run_hidden: bool = False) -> list[str]:
+    """
+    Đảm bảo toàn bộ các tài khoản ChatGPT đã lưu phiên đăng nhập trên ổ cứng (`Acc #1`, `Acc #2`, `Acc #3`)
+    được khởi chạy và trả về danh sách `acc_id` đã đăng nhập sẵn sàng.
+    """
+    ensure_all_initialized_browsers_open(run_hidden=run_hidden)
+    st = check_all_web_accounts_status(force_refresh=False)
+    logged = [a["acc_id"] for a in st.get("accounts", []) if a.get("logged_in")]
+    if not logged:
+        st = check_all_web_accounts_status(force_refresh=True)
+        logged = [a["acc_id"] for a in st.get("accounts", []) if a.get("logged_in")]
+    return logged
+
+
+def select_best_available_account(
+    preferred_acc_id: str = None,
+    project_id: str = "",
+    exclude_accs: set = None,
+) -> str:
+    """
+    Chọn tài khoản ChatGPT tối ưu nhất (học theo cơ chế `select_best_available_account` của `TOOL_NHAT_DRAMA`):
+    1. Ưu tiên các tài khoản đã đăng nhập, KHÔNG nằm trong `exclude_accs` và KHÔNG bị tạm dừng 30 phút (`is_account_in_cooldown`).
+    2. Nếu mọi tài khoản ngoài `exclude_accs` đều đang tạm dừng, lấy tài khoản đã đăng nhập không bị cooldown.
+    3. Nếu tất cả các nick đều đang trong 30p cooldown, chọn nick ngoài `exclude_accs` có thời gian chờ còn lại ngắn nhất.
+    4. Chia tải Least-Loaded + Round-Robin giữa các tài khoản sẵn sàng.
+    """
+    global _ROUND_ROBIN_COUNTER
+    excl = {normalize_acc_id(x) for x in (exclude_accs or set()) if x}
+    pref = normalize_acc_id(preferred_acc_id) if preferred_acc_id else ""
+
+    st_all = check_all_web_accounts_status(force_refresh=False)
+    logged_in_accs = [a["acc_id"] for a in st_all.get("accounts", []) if a.get("logged_in")]
+    if len(logged_in_accs) < 2 or excl:
+        logged_in_accs = ensure_all_saved_chatgpt_accounts_open(run_hidden=True) or logged_in_accs
+
+    if pref and pref in logged_in_accs and pref not in excl and not is_account_in_cooldown(pref)[0]:
+        act_cnt = len(GLOBAL_ACTIVE_PROJECTS_BY_ACC.get(pref, set()))
+        if act_cnt < MAX_THREADS_PER_ACCOUNT:
+            return pref
+
+    ready_accs = [
+        aid for aid in logged_in_accs
+        if aid not in excl and not is_account_in_cooldown(aid)[0]
+    ]
+    if not ready_accs:
+        ready_accs = [aid for aid in logged_in_accs if not is_account_in_cooldown(aid)[0]]
+    if not ready_accs and logged_in_accs:
+        cand_pool = [aid for aid in logged_in_accs if aid not in excl] or list(logged_in_accs)
+        cand_pool.sort(key=lambda a: is_account_in_cooldown(a)[1])
+        ready_accs = [cand_pool[0]]
+
+    if ready_accs:
+        with ACCOUNT_LOAD_LOCK:
+            loads = {a: len(GLOBAL_ACTIVE_PROJECTS_BY_ACC.get(a, set())) for a in ready_accs}
+            min_load = min(loads.values())
+            least_loaded = [a for a in ready_accs if loads[a] == min_load]
+            chosen = least_loaded[_ROUND_ROBIN_COUNTER % len(least_loaded)]
+            _ROUND_ROBIN_COUNTER += 1
+            return chosen
+
+    open_accs = [
+        a["acc_id"] for a in st_all.get("accounts", [])
+        if a.get("browser_running") and a["acc_id"] not in excl and not is_account_in_cooldown(a["acc_id"])[0]
+    ]
+    if not open_accs:
+        open_accs = [aid for aid in ("acc_1", "acc_2", "acc_3") if aid not in excl and not is_account_in_cooldown(aid)[0]]
+    fallback = open_accs[0] if open_accs else ("acc_2" if "acc_1" in excl else "acc_1")
+    ensure_chrome_debug_browser_open(open_chatgpt_home=True, force_bring_to_front=False, run_hidden=True, acc_id=fallback)
+    return fallback
+
+
 def check_all_web_accounts_status(force_refresh: bool = False) -> dict:
     """
     Kiểm tra toàn bộ 3 Tài khoản ChatGPT Web (`Acc #1`, `Acc #2`, `Acc #3`), tính toán tổng số Acc đã đăng nhập
@@ -1196,35 +1410,47 @@ class ChatGPTWebMultiTabClient:
         project_id: str,
         preferred_acc_id: str = "",
         thread_id: str = "",
+        exclude_accs: set = None,
     ) -> dict:
         """
         Phân bổ tài khoản ChatGPT (`Acc #1`, `Acc #2`, `Acc #3`) cho dự án `project_id`:
         - Quy tắc 1: Chia đều nhiệm vụ giữa các tài khoản đã đăng nhập (`Least-Loaded + Round-Robin`), ưu tiên tài khoản
-          đang chạy ít luồng nhất.
+          đang chạy ít luồng nhất và KHÔNG nằm trong trạng thái tạm dừng 30 phút (`is_account_in_cooldown`).
         - Quy tắc 2: Mỗi tài khoản chạy tối đa `MAX_THREADS_PER_ACCOUNT = 3` luồng. Nếu cả 3 luồng của 1 Acc đã đầy,
           tự động phân sang Acc còn trống tiếp theo (hoặc chờ khe trống nếu tất cả các Acc đều đã chạm trần 3 luồng/Acc).
-        - Quy tắc 3: Nếu dự án đang chạy dở (`thread_id` đã có sẵn trên `preferred_acc_id`) và Acc đó đã đăng nhập + còn khe,
+        - Quy tắc 3: Nếu dự án đang chạy dở (`thread_id` đã có sẵn trên `preferred_acc_id`) và Acc đó đã đăng nhập + còn khe + không cooldown,
           giữ nguyên trên đúng Acc đó để nối tiếp đoạn chat 5 bước không bị đứt mạch!
         """
         global _ROUND_ROBIN_COUNTER
         pref_norm = normalize_acc_id(preferred_acc_id) if preferred_acc_id else ""
+        excl = {normalize_acc_id(x) for x in (exclude_accs or set()) if x}
 
         while True:
             logged_accs = self.get_logged_in_accounts()
             logged_map = {a["acc_id"]: a for a in logged_accs}
 
             with ACCOUNT_LOAD_LOCK:
-                # 1. Nếu project_id đã được gán sẵn trong phiên chạy này và Acc đó vẫn hợp lệ
+                # 1. Nếu project_id đã được gán sẵn trong phiên chạy này và Acc đó vẫn hợp lệ + không bị loại trừ/cooldown
                 existing_aid = self._project_to_acc.get(project_id)
-                if existing_aid and existing_aid in logged_map:
+                if (
+                    existing_aid
+                    and existing_aid in logged_map
+                    and existing_aid not in excl
+                    and not is_account_in_cooldown(existing_aid)[0]
+                ):
                     GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(existing_aid, set()).add(project_id)
                     GLOBAL_PROJECT_TO_ACC[project_id] = existing_aid
                     if thread_id:
                         self._thread_to_acc[thread_id] = existing_aid
                     return get_account_config(existing_aid)
 
-                # 2. Nếu dự án được chỉ định preferred_acc_id (hoặc resume từ STATE.json) và Acc đó đã đăng nhập + chưa vượt quá 3 luồng
-                if pref_norm and pref_norm in logged_map:
+                # 2. Nếu dự án được chỉ định preferred_acc_id (hoặc resume từ STATE.json) và Acc đó đã đăng nhập + chưa vượt quá 3 luồng + không cooldown
+                if (
+                    pref_norm
+                    and pref_norm in logged_map
+                    and pref_norm not in excl
+                    and not is_account_in_cooldown(pref_norm)[0]
+                ):
                     act_set = GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(pref_norm, set())
                     if project_id in act_set or len(act_set) < MAX_THREADS_PER_ACCOUNT:
                         act_set.add(project_id)
@@ -1234,11 +1460,14 @@ class ChatGPTWebMultiTabClient:
                             self._thread_to_acc[thread_id] = pref_norm
                         return get_account_config(pref_norm)
 
-                # 3. Chia đều (Least-Loaded + Round-Robin) giữa tất cả các Acc đã đăng nhập và có số luồng đang chạy < 3
+                # 3. Chia đều (Least-Loaded + Round-Robin) giữa tất cả các Acc đã đăng nhập, không cooldown và có số luồng đang chạy < 3
                 candidates = []
                 n_logged = len(logged_accs)
                 for idx, a_info in enumerate(logged_accs):
                     aid = a_info["acc_id"]
+                    if aid in excl:
+                        continue
+                    in_cd, rem_cd, _ = is_account_in_cooldown(aid)
                     act_set = GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(aid, set())
                     in_mem_load = len(act_set)
                     cdp_conv_load = 0
@@ -1255,11 +1484,11 @@ class ChatGPTWebMultiTabClient:
                     load_cnt = max(in_mem_load, min(cdp_conv_load, MAX_THREADS_PER_ACCOUNT - 1)) if in_mem_load == 0 else in_mem_load
                     if load_cnt < MAX_THREADS_PER_ACCOUNT:
                         rr_rank = (idx - (_ROUND_ROBIN_COUNTER % max(1, n_logged))) % max(1, n_logged)
-                        candidates.append((load_cnt, rr_rank, aid))
+                        candidates.append((1 if in_cd else 0, rem_cd if in_cd else 0, load_cnt, rr_rank, aid))
 
                 if candidates:
-                    candidates.sort(key=lambda x: (x[0], x[1]))
-                    chosen_aid = candidates[0][2]
+                    candidates.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
+                    chosen_aid = candidates[0][4]
                     _ROUND_ROBIN_COUNTER += 1
                     GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(chosen_aid, set()).add(project_id)
                     self._project_to_acc[project_id] = chosen_aid
@@ -1270,6 +1499,22 @@ class ChatGPTWebMultiTabClient:
 
             # Nếu tất cả các tài khoản đều đang chạy đủ 3/3 luồng, đợi 2s để khe luồng giải phóng
             time.sleep(2.0)
+
+    def switch_project_to_another_account(self, project_id: str, extra_exclude: set = None) -> dict:
+        """
+        Đóng/giải phóng tài khoản vừa bị Limit/Lỗi của `project_id` và chuyển ngay sang tài khoản (nick) ChatGPT khác đang rảnh.
+        """
+        old_aid = self._project_to_acc.get(project_id) or GLOBAL_PROJECT_TO_ACC.get(project_id) or "acc_1"
+        self.release_account_for_project(project_id)
+        excl = {old_aid}
+        if extra_exclude:
+            excl.update(extra_exclude)
+        new_aid = select_best_available_account(preferred_acc_id=None, project_id=project_id, exclude_accs=excl)
+        with ACCOUNT_LOAD_LOCK:
+            GLOBAL_ACTIVE_PROJECTS_BY_ACC.setdefault(new_aid, set()).add(project_id)
+            self._project_to_acc[project_id] = new_aid
+            GLOBAL_PROJECT_TO_ACC[project_id] = new_aid
+        return get_account_config(new_aid)
 
     def release_account_for_project(self, project_id: str) -> None:
         """Giải phóng khe luồng trên tài khoản khi dự án hoàn thành hoặc tạm dừng."""
@@ -2642,13 +2887,25 @@ class ChatGPTWebMultiTabClient:
                             document.querySelector('button[data-testid="regenerate-thread-error-button"]')
                         )
                     );
+                    let alertText = '';
+                    try {
+                        const alertNodes = Array.from(document.querySelectorAll('[role="alert"], .toast-root, [data-testid*="limit"], [data-testid*="rate"], [class*="rate-limit"]'));
+                        if (alertNodes.length > 0) {
+                            alertText = alertNodes.map(a => (a.innerText || '').trim()).filter(Boolean).join(' | ').slice(0, 400);
+                        }
+                    } catch (e) {}
                     const turnNodes = Array.from(document.querySelectorAll('[data-turn-key]'));
                     if (turnNodes.length > 0) {
                         const lastT = turnNodes[turnNodes.length - 1];
                         const asstNodes = lastT.querySelectorAll('[data-message-author-role="assistant"], .markdown, .prose');
                         let charLen = 0;
+                        let lastAsstTxt = '';
                         if (asstNodes.length > 0) {
-                            asstNodes.forEach(n => { charLen += (n.innerText || n.textContent || '').trim().length; });
+                            asstNodes.forEach(n => {
+                                const t = (n.innerText || n.textContent || '').trim();
+                                charLen += t.length;
+                                if (t) lastAsstTxt += (lastAsstTxt ? '\n' : '') + t;
+                            });
                         } else {
                             const uBubble = lastT.querySelector('[data-user-message-bubble="true"], [data-message-author-role="user"]');
                             const uLen = uBubble ? (uBubble.innerText || uBubble.textContent || '').trim().length : 0;
@@ -2664,13 +2921,16 @@ class ChatGPTWebMultiTabClient:
                             streaming: stopBtn,
                             asst_count: asstCount,
                             user_count: turnNodes.length,
-                            char_len: charLen
+                            char_len: charLen,
+                            alert_text: alertText,
+                            last_asst_head: lastAsstTxt.slice(0, 650)
                         });
                     }
                     const asstEls = document.querySelectorAll('[data-message-author-role="assistant"], [data-chatgpt-selection-message-id]');
                     const userEls = document.querySelectorAll('[data-message-author-role="user"], [data-user-message-bubble="true"]');
                     const lastAsst = asstEls.length > 0 ? asstEls[asstEls.length - 1] : null;
-                    const charLen = lastAsst ? (lastAsst.innerText || lastAsst.textContent || '').trim().length : 0;
+                    const lastAsstTxt = lastAsst ? (lastAsst.innerText || lastAsst.textContent || '').trim() : '';
+                    const charLen = lastAsstTxt.length;
                     return JSON.stringify({
                         conv_id: convId,
                         load_error: loadError,
@@ -2679,7 +2939,9 @@ class ChatGPTWebMultiTabClient:
                         streaming: stopBtn,
                         asst_count: asstEls.length,
                         user_count: userEls.length,
-                        char_len: charLen
+                        char_len: charLen,
+                        alert_text: alertText,
+                        last_asst_head: lastAsstTxt.slice(0, 650)
                     });
                 })()
                 """
@@ -2710,11 +2972,72 @@ class ChatGPTWebMultiTabClient:
                 has_load_err = bool(dom_st.get("load_error"))
                 has_too_long_err = bool(dom_st.get("too_long_error"))
                 has_stream_err = bool(dom_st.get("stream_error"))
+                alert_txt = str(dom_st.get("alert_text") or "").strip()
+                last_asst_head = str(dom_st.get("last_asst_head") or "").strip()
                 if cur_chars > 0 or is_streaming:
                     zero_char_since = time.time()
 
                 with WEB_TAB_LOCK:
                     self._tab_last_used_ts[tab_id] = time.time()
+
+                # CƠ CHẾ PHÁT HIỆN LIMIT TẠM DỪNG 30 PHÚT & TỰ ĐỘNG ĐỔI SANG NICK KHÁC:
+                rl_detected = _detect_rate_limit_in_text(alert_txt, 500) or (
+                    _detect_rate_limit_in_text(last_asst_head, 650) if (not is_streaming and cur_chars < 650) else ""
+                )
+                if rl_detected:
+                    mark_account_rate_limited(
+                        aid,
+                        reason=f"ChatGPT báo giới hạn tại {step_label}: {rl_detected}",
+                        cooldown_sec=ACCOUNT_LIMIT_COOLDOWN_SEC,
+                    )
+                    recovery_prompt = (
+                        self._last_sent_prompt.get(thread_id)
+                        or self._last_sent_prompt.get(orig_thread_id)
+                        or ""
+                    )
+                    with WEB_TAB_LOCK:
+                        self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
+                    new_cfg = self.switch_project_to_another_account(project_id, extra_exclude={aid})
+                    aid = new_cfg["acc_id"]
+                    acc_label = new_cfg["label"]
+                    host_id = f"chatgpt_web:{aid}"
+                    log_msg(
+                        project_id,
+                        f"🔀 [FAILOVER NICK CHATGPT] Tài khoản cũ bị Limit ({rl_detected}) -> Đã tạm dừng 30p và chuyển ngay sang [{acc_label}] tại [{step_label}]!",
+                    )
+                    tab_id, ws_url = self._get_or_create_tab_ws(
+                        thread_id="",
+                        force_new_chat=True,
+                        acc_id=aid,
+                        project_id=project_id,
+                    )
+                    with WEB_TAB_LOCK:
+                        self._active_busy_tabs.setdefault(aid, set()).add(tab_id)
+                        self._tab_last_used_ts[tab_id] = time.time()
+                    if recovery_prompt:
+                        re_res = self._inject_and_send_prompt_on_ws(
+                            ws_url,
+                            recovery_prompt,
+                            thinking=self._last_sent_thinking.get(thread_id, "medium"),
+                        )
+                        if "error" not in re_res and re_res.get("ok"):
+                            new_tid = re_res.get("thread_id") or f"webtab_{aid}_{tab_id}"
+                            thread_id = new_tid
+                            expected_min_turns = 1
+                            with WEB_TAB_LOCK:
+                                self._thread_to_tab.setdefault(aid, {})[thread_id] = tab_id
+                                self._thread_to_acc[thread_id] = aid
+                            self._last_sent_prompt[thread_id] = recovery_prompt
+                            _update_live_note(
+                                f"🔀 [{acc_label}] Đã chuyển từ nick bị Limit sang [{acc_label}] và gửi lại [{step_label}]!",
+                                elapsed,
+                                updated_tid=thread_id,
+                            )
+                            zero_char_since = time.time()
+                            stable_hits = 0
+                            last_char_len = 0
+                            time.sleep(3.5)
+                            continue
 
                 # CƠ CHẾ TỰ CHỮA LÀNH TỨC THÌ (AUTO-HEAL):
                 # Nếu gặp lỗi "Could not load this ChatGPT conversation" / "The messages you submitted were too long" HOẶC đứng im 0 ký tự quá 95s mà không streaming:
@@ -2862,8 +3185,590 @@ class ChatGPTWebMultiTabClient:
 
                 time.sleep(3.5)
 
+            mark_account_rate_limited(
+                aid,
+                reason=f"Quá thời gian chờ ({timeout_sec}s) không phản hồi tại bước {step_label}",
+                cooldown_sec=ACCOUNT_LIMIT_COOLDOWN_SEC,
+            )
             raise TimeoutError(f"[{project_id}] Quá thời gian chờ ({timeout_sec}s) tại bước [{step_label}] trên Tab ChatGPT Web [{acc_label}]")
         finally:
             with WEB_TAB_LOCK:
                 self._active_busy_tabs.setdefault(aid, set()).discard(tab_id)
                 self._tab_last_used_ts[tab_id] = time.time()
+
+
+class ChatGPTWebSession:
+    """
+    Phiên làm việc độc lập trên Tab ChatGPT Web (học & đồng bộ 100% cơ chế từ `TOOL_NHAT_DRAMA/backend/chatgpt_web_client.py`):
+    - Mở Tab mới độc lập (`open_session_tab` / `start_fresh_chat`),
+    - Gửi lệnh tạo ảnh Thumbnail / Ảnh nền xanh (`generate_image_and_harvest_base64`),
+    - Chờ ảnh render trên DOM (`img[src*="estuary/content"], img[alt="Generated image"]`) + thu hoạch ảnh gốc
+      độ phân giải cao qua Backend API (`/backend-api/conversation/{conv_id}` -> `/backend-api/estuary/content?id=file_id`
+      & `/backend-api/files/download/{file_id}`) và xuất ra Base64.
+    - Phát hiện Limit tạm dừng 30 phút (`mark_account_rate_limited`, `_detect_rate_limit_in_text`) và tự động đổi sang
+      tài khoản (nick) ChatGPT khác (`switch_to_another_account`).
+    """
+
+    def __init__(
+        self,
+        project_id: str,
+        acc_id: str = None,
+        exclude_accs: set = None,
+        client: ChatGPTWebMultiTabClient = None,
+    ):
+        self.project_id = project_id
+        self.excluded_accs = set(exclude_accs or set())
+        self.acc_id = select_best_available_account(acc_id, project_id=project_id, exclude_accs=self.excluded_accs)
+        self.cfg = get_account_config(self.acc_id)
+        self.port = self.cfg["port"]
+        self.client = client or ChatGPTWebMultiTabClient()
+        self.tab_id = None
+        self.ws_url = None
+        self.resumed_existing_chat = False
+
+    def open_session_tab(self, force_new_chat: bool = True) -> bool:
+        """Cấp phát 1 Tab độc lập trên trình duyệt của `self.acc_id`."""
+        try:
+            ensure_chrome_debug_browser_open(
+                open_chatgpt_home=True,
+                force_bring_to_front=False,
+                run_hidden=True,
+                acc_id=self.acc_id,
+            )
+            tid, ws_u = self.client._get_or_create_tab_ws(
+                thread_id="",
+                force_new_chat=force_new_chat,
+                acc_id=self.acc_id,
+                project_id=self.project_id,
+            )
+            if tid and ws_u:
+                self.tab_id = tid
+                self.ws_url = ws_u
+                with WEB_TAB_LOCK:
+                    self.client._active_busy_tabs.setdefault(self.acc_id, set()).add(tid)
+                    self.client._tab_last_used_ts[tid] = time.time()
+                return True
+        except Exception:
+            pass
+        return False
+
+    def start_fresh_chat(self, step_name: str = "") -> bool:
+        """
+        Chuyển về ĐOẠN CHAT MỚI HOÀN TOÀN (New Chat) ngay trên Tab đang khóa của luồng này (`self.tab_id`).
+        """
+        if not self.ws_url or not self.tab_id:
+            return self.open_session_tab(force_new_chat=True)
+
+        self.resumed_existing_chat = False
+        try:
+            tabs_now = _cdp_http_json("/json/list", timeout=2.0, port=self.port) or []
+        except Exception:
+            tabs_now = []
+        if not any(t.get("id") == self.tab_id for t in tabs_now):
+            self.tab_id = None
+            self.ws_url = None
+            return self.open_session_tab(force_new_chat=True)
+
+        try:
+            cur_path = _eval_js_in_tab(
+                self.ws_url,
+                "window.location.pathname || '/'",
+                await_promise=False,
+                timeout=3.0,
+            )
+        except Exception:
+            cur_path = None
+
+        if cur_path is None:
+            self.close_session_tab(keep_open=False)
+            return self.open_session_tab(force_new_chat=True)
+        elif isinstance(cur_path, str) and not cur_path.startswith("/c/") and cur_path != "blank":
+            pass
+        else:
+            try:
+                _eval_js_in_tab(
+                    self.ws_url,
+                    "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                    await_promise=False,
+                    timeout=3.0,
+                )
+            except Exception:
+                self.tab_id = None
+                self.ws_url = None
+                return self.open_session_tab(force_new_chat=True)
+
+        time.sleep(0.6)
+        composer_sel = '#prompt-textarea, #mobile-composer-prompt, textarea[id*="prompt"], div.ProseMirror[contenteditable="true"], [data-composer-markdown], div[role="textbox"][contenteditable="true"], main textarea'
+        for tick in range(45):
+            try:
+                st = _eval_js_in_tab(
+                    self.ws_url,
+                    f"""
+                    (() => {{
+                        const path = window.location.pathname || '/';
+                        const hasBox = Boolean(document.querySelector({json.dumps(composer_sel)}));
+                        const isFresh = !path.includes('/c/');
+                        return JSON.stringify({{ ready: Boolean(hasBox && isFresh), path: path, isFresh: isFresh }});
+                    }})()
+                    """,
+                    await_promise=False,
+                    timeout=3.0,
+                )
+                parsed = json.loads(st) if isinstance(st, str) and st.strip().startswith("{") else {}
+                if parsed.get("ready"):
+                    time.sleep(0.4)
+                    return True
+                if not parsed.get("isFresh") and tick in (3, 10):
+                    _eval_js_in_tab(
+                        self.ws_url,
+                        "window.onbeforeunload = null; window.location.href = 'https://chatgpt.com/'; true;",
+                        await_promise=False,
+                        timeout=3.0,
+                    )
+            except Exception:
+                pass
+            time.sleep(0.5)
+        return False
+
+    def switch_to_another_account(self, extra_exclude: set = None) -> bool:
+        """
+        Đóng tab hiện tại trên tài khoản vừa bị Limit/Lỗi và chuyển ngay phiên làm việc sang tài khoản (nick) khác đang rảnh.
+        """
+        old_acc = self.acc_id
+        try:
+            self.close_session_tab(keep_open=False)
+        except Exception:
+            pass
+        self.excluded_accs.add(old_acc)
+        if extra_exclude:
+            self.excluded_accs.update(extra_exclude)
+        new_acc = select_best_available_account(
+            preferred_acc_id=None,
+            project_id=self.project_id,
+            exclude_accs=self.excluded_accs,
+        )
+        self.acc_id = new_acc
+        self.cfg = get_account_config(self.acc_id)
+        self.port = self.cfg["port"]
+        self.tab_id = None
+        self.ws_url = None
+        self.resumed_existing_chat = False
+        print(
+            f"[{self.project_id}] 🔀 Đã chuyển phiên từ {get_account_config(old_acc).get('label', old_acc)} "
+            f"sang {self.cfg['label']} (Cổng {self.port})!",
+            flush=True,
+        )
+        return self.open_session_tab(force_new_chat=True)
+
+    def close_session_tab(self, keep_open: bool = False):
+        if self.tab_id:
+            with WEB_TAB_LOCK:
+                self.client._active_busy_tabs.setdefault(self.acc_id, set()).discard(self.tab_id)
+                self.client._reserved_tab_ids.setdefault(self.acc_id, set()).discard(self.tab_id)
+            if not keep_open:
+                try:
+                    force_close_or_recycle_tab(self.port, self.tab_id, self.ws_url or "", allow_close_last=False)
+                except Exception:
+                    pass
+            self.tab_id = None
+            self.ws_url = None
+
+    def generate_image_and_harvest_base64(
+        self,
+        prompt_text: str,
+        step_label: str = "THUMBNAIL_GEN",
+        timeout_sec: int = 300,
+        progress_cb=None,
+        should_stop_cb=None,
+    ) -> dict:
+        """
+        Gửi lệnh tạo ảnh (`gpt-image-1` / GPT-4o Image) vào ChatGPT Web trên Tab độc lập,
+        tự động đợi ảnh render xong trên DOM (`img[src*="estuary/content"], img[alt="Generated image"]`)
+        + thu hoạch ảnh gốc độ phân giải cao qua Backend API (`/backend-api/conversation/{conv_id}`
+        -> `/backend-api/estuary/content?id=file_id` & `/backend-api/files/download/{file_id}`) và xuất ra Base64.
+        """
+        if not self.ws_url:
+            if not self.open_session_tab(force_new_chat=True):
+                return {"success": False, "error": f"Không thể kết nối tới khung chat ChatGPT trên {self.cfg['label']}."}
+
+        img_stamp = f"img_seen_{int(time.time() * 1000)}"
+        try:
+            _eval_js_in_tab(
+                self.ws_url,
+                f"""
+                (() => {{
+                    const stamp = {json.dumps(img_stamp)};
+                    document.querySelectorAll('img').forEach(im => im.setAttribute('data-studio-img-seen', stamp));
+                    document.querySelectorAll('[data-markdown-text-style="assistant-message"], [data-message-author-role="assistant"], article[data-turn="assistant"], div[data-turn="assistant"]').forEach(n => n.setAttribute('data-studio-turn-seen', stamp));
+                    return true;
+                }})()
+                """,
+                await_promise=False,
+                timeout=4.0,
+            )
+        except Exception:
+            pass
+
+        escaped_prompt_json = json.dumps(prompt_text, ensure_ascii=True)
+        inject_js = f"""
+        (async () => {{
+            const text = {escaped_prompt_json};
+            document.querySelectorAll('button[aria-label="Remove pasted text attachment"]').forEach(b => b.click());
+            const el = document.querySelector(
+                '#prompt-textarea, #mobile-composer-prompt, textarea[id*="prompt"], div.ProseMirror[contenteditable="true"], [data-composer-markdown], div[role="textbox"][contenteditable="true"], main textarea'
+            );
+            if (!el) return JSON.stringify({{ ok: false, err: 'NO_PROMPT_BOX' }});
+            el.focus();
+            if (el.tagName === 'TEXTAREA') {{
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+                nativeSetter.call(el, text);
+                el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                await new Promise(r => setTimeout(r, 120));
+            }} else {{
+                if ((el.innerText || '').trim().length > 0) {{
+                    const sel = window.getSelection();
+                    const range = document.createRange();
+                    range.selectNodeContents(el);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    document.execCommand('delete', false, null);
+                    await new Promise(r => setTimeout(r, 80));
+                }}
+                const dt = new DataTransfer();
+                dt.setData('text/plain', text);
+                el.dispatchEvent(new ClipboardEvent('paste', {{ clipboardData: dt, bubbles: true, cancelable: true }}));
+                await new Promise(r => setTimeout(r, 90));
+                if ((el.innerText || '').trim().length < 3) {{
+                    try {{
+                        document.execCommand('insertText', false, text);
+                    }} catch (e) {{}}
+                    await new Promise(r => setTimeout(r, 90));
+                }}
+            }}
+
+            let sentConfirmed = false;
+            for (let s = 0; s < 25; s++) {{
+                await new Promise(r => setTimeout(r, 320));
+                const stopNow = document.querySelector('[data-testid="stop-button"], form button[aria-label*="Stop" i], button[aria-label*="Stop streaming" i]');
+                const curBox = document.querySelector('#prompt-textarea, #mobile-composer-prompt, textarea[id*="prompt"], div.ProseMirror[contenteditable="true"], [role="textbox"][contenteditable="true"], main textarea');
+                const curTextLen = curBox ? ((curBox.tagName === 'TEXTAREA' ? curBox.value : curBox.innerText) || '').trim().length : 0;
+                if (stopNow || (s > 0 && curTextLen === 0)) {{
+                    sentConfirmed = true;
+                    break;
+                }}
+                const sendBtn = document.querySelector('button[data-testid="send-button"], button[data-testid="fruitjuice-send-button"], form button[aria-label*="Send" i], button[aria-label*="Send prompt" i], form button[type="submit"]');
+                if (sendBtn && !sendBtn.disabled) {{
+                    sendBtn.click();
+                }} else if (s >= 6) {{
+                    el.dispatchEvent(new KeyboardEvent('keydown', {{ key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }}));
+                }}
+            }}
+            return JSON.stringify({{ ok: sentConfirmed }});
+        }})()
+        """
+        try:
+            raw_inj = _eval_js_in_tab(self.ws_url, inject_js, await_promise=True, timeout=35.0)
+            inj_res = json.loads(raw_inj) if isinstance(raw_inj, str) and raw_inj.strip().startswith("{") else {}
+        except Exception as e:
+            inj_res = {"ok": False, "err": str(e)}
+        if not isinstance(inj_res, dict) or not inj_res.get("ok"):
+            return {"success": False, "error": f"Không thể gửi lệnh tạo ảnh: {inj_res}"}
+
+        start_t = time.time()
+        idle_after_stream_ticks = 0
+
+        poll_img_js = f"""
+        (() => {{
+            const stamp = {json.dumps(img_stamp)};
+            const turnStates = Array.from(document.querySelectorAll('[data-talvt-turn-state]')).map(e => e.getAttribute('data-talvt-turn-state'));
+            const hasIncompleteTurn = turnStates.some(s => s && s !== 'complete');
+            const stopBtn = document.querySelector('[data-testid="stop-button"], button[aria-label*="Stop" i], button[aria-label*="Dừng" i], .result-streaming');
+            const bodyTxt = (document.body ? document.body.innerText : '').slice(-1500).toLowerCase();
+            const isCreatingImgText = (
+                bodyTxt.includes('creating image')
+                || bodyTxt.includes('đang tạo hình ảnh')
+                || bodyTxt.includes('generating image')
+                || bodyTxt.includes('creando imagen')
+            );
+            const isStreaming = Boolean(stopBtn || hasIncompleteTurn || isCreatingImgText);
+
+            const allImgs = Array.from(
+                document.querySelectorAll('img[src*="estuary/content"], img[alt="Generated image"], main img, article img, [data-message-author-role="assistant"] img')
+            );
+            const newImgs = allImgs.filter(im => {{
+                if (im.getAttribute('data-studio-img-seen') === stamp) return false;
+                const alt = (im.getAttribute('alt') || '').toLowerCase();
+                if (alt.includes('user') || alt.includes('profile') || alt.includes('avatar')) return false;
+                const nw = im.naturalWidth || 0;
+                const nh = im.naturalHeight || 0;
+                const src = im.currentSrc || im.src || '';
+                return im.complete && nw >= 350 && nh >= 200 && src.length > 10;
+            }});
+
+            if (newImgs.length > 0) {{
+                try {{ newImgs[newImgs.length - 1].scrollIntoView({{ block: 'center' }}); }} catch (e) {{}}
+            }}
+
+            let latestText = '';
+            const turns = Array.from(document.querySelectorAll('[data-markdown-text-style="assistant-message"], [data-message-author-role="assistant"], article[data-turn="assistant"], div[data-turn="assistant"]'));
+            const newTurns = turns.filter(n => n.getAttribute('data-studio-turn-seen') !== stamp);
+            if (newTurns.length > 0) {{
+                latestText = newTurns.map(n => (n.innerText || '').trim()).join('\\n').trim();
+            }}
+            let alertText = '';
+            try {{
+                const alertNodes = Array.from(document.querySelectorAll('[role="alert"], .toast-root, [data-testid*="limit"], [data-testid*="rate"], [class*="rate-limit"]'));
+                if (alertNodes.length > 0) {{
+                    alertText = alertNodes.map(a => (a.innerText || '').trim()).filter(Boolean).join(' | ').slice(0, 400);
+                }}
+            }} catch (e) {{}}
+
+            return JSON.stringify({{
+                isStreaming: isStreaming,
+                isCreatingImgText: isCreatingImgText,
+                newImgCount: newImgs.length,
+                latestText: latestText,
+                alertText: alertText
+            }});
+        }})()
+        """
+
+        harvest_img_js = f"""
+        (async () => {{
+            const stamp = {json.dumps(img_stamp)};
+            const blobToDataUrl = (blob) => new Promise((resolve) => {{
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result || '');
+                reader.onerror = () => resolve('');
+                reader.readAsDataURL(blob);
+            }});
+
+            // Tầng 1: Thu hoạch từ Backend API (/backend-api/conversation/ -> asset_pointer -> /backend-api/estuary/content?id=... hoặc /backend-api/files/download/)
+            try {{
+                const mUrl = window.location.pathname.match(/\\/c\\/([0-9a-fA-F\\-]{{16,}})/);
+                if (mUrl && mUrl[1]) {{
+                    const convId = mUrl[1];
+                    if (!window.__studioAccessToken) {{
+                        const sr = await fetch('/api/auth/session', {{ credentials: 'include' }});
+                        if (sr.ok) {{
+                            const sd = await sr.json();
+                            if (sd && sd.accessToken) window.__studioAccessToken = sd.accessToken;
+                        }}
+                    }}
+                    if (window.__studioAccessToken) {{
+                        const cr = await fetch('/backend-api/conversation/' + convId, {{
+                            credentials: 'include',
+                            headers: {{ 'Authorization': 'Bearer ' + window.__studioAccessToken, 'Accept': 'application/json' }}
+                        }});
+                        if (cr.ok) {{
+                            const conv = await cr.json();
+                            const mapping = conv.mapping || {{}};
+                            let cur = conv.current_node;
+                            const seen = new Set();
+                            let foundPointer = '';
+                            let w = 1536, h = 1024;
+                            while (cur && !seen.has(cur) && mapping[cur]) {{
+                                seen.add(cur);
+                                const msg = mapping[cur].message;
+                                if (msg && msg.content && Array.isArray(msg.content.parts)) {{
+                                    for (const pt of msg.content.parts) {{
+                                        if (pt && typeof pt === 'object' && pt.asset_pointer) {{
+                                            foundPointer = pt.asset_pointer;
+                                            w = pt.width || w;
+                                            h = pt.height || h;
+                                            break;
+                                        }}
+                                    }}
+                                }}
+                                if (foundPointer) break;
+                                cur = mapping[cur].parent;
+                            }}
+                            if (foundPointer) {{
+                                const fileId = foundPointer.replace('sediment://', '').replace('file-service://', '').trim();
+                                // 1A. Thử trực tiếp /backend-api/estuary/content?id=fileId
+                                try {{
+                                    const estResp = await fetch('/backend-api/estuary/content?id=' + encodeURIComponent(fileId), {{
+                                        credentials: 'include',
+                                        headers: {{ 'Authorization': 'Bearer ' + window.__studioAccessToken }}
+                                    }});
+                                    if (estResp.ok) {{
+                                        const bEst = await estResp.blob();
+                                        if (bEst && bEst.size > 15000) {{
+                                            const dUrlEst = await blobToDataUrl(bEst);
+                                            if (dUrlEst && dUrlEst.includes('base64,')) {{
+                                                return JSON.stringify({{ ok: true, b64: dUrlEst.split('base64,')[1], width: w, height: h, source: 'backend_estuary' }});
+                                            }}
+                                        }}
+                                    }}
+                                }} catch (eEst) {{}}
+
+                                // 1B. Thử qua /backend-api/files/download/fileId?inline=false
+                                try {{
+                                    const dlResp = await fetch('/backend-api/files/download/' + fileId + '?inline=false', {{
+                                        credentials: 'include',
+                                        headers: {{ 'Authorization': 'Bearer ' + window.__studioAccessToken }}
+                                    }});
+                                    if (dlResp.ok) {{
+                                        const dlJson = await dlResp.json();
+                                        const dlUrl = dlJson.download_url || '';
+                                        if (dlUrl) {{
+                                            const imgResp = await fetch(dlUrl);
+                                            if (imgResp.ok) {{
+                                                const b = await imgResp.blob();
+                                                if (b && b.size > 15000) {{
+                                                    const dUrl = await blobToDataUrl(b);
+                                                    if (dUrl && dUrl.includes('base64,')) {{
+                                                        return JSON.stringify({{ ok: true, b64: dUrl.split('base64,')[1], width: w, height: h, source: 'backend_api' }});
+                                                    }}
+                                                }}
+                                            }}
+                                        }}
+                                    }}
+                                }} catch (eDl) {{}}
+                            }}
+                        }}
+                    }}
+                }}
+            }} catch (e) {{}}
+
+            // Tầng 2: Thu hoạch trực tiếp từ thẻ <img> đã tải xong trên giao diện
+            const allImgs = Array.from(
+                document.querySelectorAll('img[src*="estuary/content"], img[alt="Generated image"], main img, article img, [data-message-author-role="assistant"] img')
+            );
+            const newImgs = allImgs.filter(im => {{
+                if (im.getAttribute('data-studio-img-seen') === stamp) return false;
+                const alt = (im.getAttribute('alt') || '').toLowerCase();
+                if (alt.includes('user') || alt.includes('profile') || alt.includes('avatar')) return false;
+                const nw = im.naturalWidth || 0;
+                const nh = im.naturalHeight || 0;
+                return im.complete && nw >= 350 && nh >= 200;
+            }});
+
+            if (newImgs.length > 0) {{
+                const targetImg = newImgs[newImgs.length - 1];
+                const src = targetImg.currentSrc || targetImg.src || '';
+                const nw = targetImg.naturalWidth || 1536;
+                const nh = targetImg.naturalHeight || 1024;
+                try {{
+                    const r = await fetch(src, {{ credentials: 'include' }});
+                    if (r.ok) {{
+                        const b = await r.blob();
+                        if (b && b.size > 15000) {{
+                            const dUrl = await blobToDataUrl(b);
+                            if (dUrl && dUrl.includes('base64,')) {{
+                                return JSON.stringify({{ ok: true, b64: dUrl.split('base64,')[1], width: nw, height: nh, source: 'dom_fetch' }});
+                            }}
+                        }}
+                    }}
+                }} catch (e) {{}}
+                try {{
+                    const canvas = document.createElement('canvas');
+                    canvas.width = nw;
+                    canvas.height = nh;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(targetImg, 0, 0);
+                    const dUrl = canvas.toDataURL('image/png');
+                    if (dUrl && dUrl.includes('base64,')) {{
+                        return JSON.stringify({{ ok: true, b64: dUrl.split('base64,')[1], width: nw, height: nh, source: 'dom_canvas' }});
+                    }}
+                }} catch (e) {{}}
+            }}
+
+            return JSON.stringify({{ ok: false }});
+        }})()
+        """
+
+        while time.time() - start_t < timeout_sec:
+            if should_stop_cb and should_stop_cb():
+                raise RuntimeError("Đã dừng tiến trình theo yêu cầu người dùng.")
+
+            time.sleep(2.5)
+            elapsed = int(time.time() - start_t)
+            try:
+                raw_st = _eval_js_in_tab(self.ws_url, poll_img_js, await_promise=False, timeout=6.0)
+                st = json.loads(raw_st) if isinstance(raw_st, str) and raw_st.strip().startswith("{") else None
+            except Exception:
+                st = None
+            if not isinstance(st, dict):
+                continue
+
+            is_streaming = bool(st.get("isStreaming"))
+            new_img_count = int(st.get("newImgCount") or 0)
+            latest_text = str(st.get("latestText") or "").strip()
+            alert_text = str(st.get("alertText") or "").strip()
+
+            rl_img = _detect_rate_limit_in_text(alert_text, 500) or (
+                _detect_rate_limit_in_text(latest_text, 700) if not is_streaming else ""
+            )
+            if rl_img:
+                mark_account_rate_limited(
+                    self.acc_id,
+                    reason=f"Giới hạn tạo ảnh Thumbnail ({step_label}): {rl_img}",
+                    cooldown_sec=ACCOUNT_LIMIT_COOLDOWN_SEC,
+                )
+                return {
+                    "success": False,
+                    "rate_limited": True,
+                    "acc_id": self.acc_id,
+                    "error": f"Tài khoản {self.cfg['label']} bị giới hạn (Limit) tạo ảnh: {rl_img}",
+                    "assistant_text": latest_text,
+                }
+
+            if progress_cb:
+                try:
+                    progress_cb(step_label, elapsed)
+                except Exception:
+                    pass
+
+            if new_img_count > 0 and not is_streaming:
+                time.sleep(1.5)
+                try:
+                    raw_harv = _eval_js_in_tab(self.ws_url, harvest_img_js, await_promise=True, timeout=25.0)
+                    harv = json.loads(raw_harv) if isinstance(raw_harv, str) and raw_harv.strip().startswith("{") else {}
+                except Exception:
+                    harv = {}
+                if isinstance(harv, dict) and harv.get("ok") and harv.get("b64"):
+                    return {
+                        "success": True,
+                        "b64_data": harv["b64"],
+                        "width": int(harv.get("width") or 1536),
+                        "height": int(harv.get("height") or 1024),
+                        "source": harv.get("source", "dom"),
+                        "assistant_text": latest_text,
+                    }
+
+            if not is_streaming and elapsed > 18:
+                idle_after_stream_ticks += 1
+                if idle_after_stream_ticks >= 4:
+                    try:
+                        raw_harv = _eval_js_in_tab(self.ws_url, harvest_img_js, await_promise=True, timeout=25.0)
+                        harv = json.loads(raw_harv) if isinstance(raw_harv, str) and raw_harv.strip().startswith("{") else {}
+                    except Exception:
+                        harv = {}
+                    if isinstance(harv, dict) and harv.get("ok") and harv.get("b64"):
+                        return {
+                            "success": True,
+                            "b64_data": harv["b64"],
+                            "width": int(harv.get("width") or 1536),
+                            "height": int(harv.get("height") or 1024),
+                            "source": harv.get("source", "api"),
+                            "assistant_text": latest_text,
+                        }
+                    if idle_after_stream_ticks >= 8 and latest_text:
+                        return {
+                            "success": False,
+                            "acc_id": self.acc_id,
+                            "error": f"ChatGPT trả lời văn bản nhưng chưa xuất ảnh: {latest_text[:150]}",
+                            "assistant_text": latest_text,
+                        }
+            else:
+                idle_after_stream_ticks = 0
+
+        return {
+            "success": False,
+            "acc_id": self.acc_id,
+            "timeout": True,
+            "error": f"Quá thời gian chờ tạo ảnh ({timeout_sec}s) tại bước {step_label}.",
+        }
+

@@ -1087,6 +1087,7 @@ class ScriptVideoBridgeService {
 
       const thThumb = path.join(scriptDir, `${cleanBase}_THUMBNAIL.png`);
       const thGreenFull = path.join(scriptDir, `${cleanBase}_NENXANH.png`);
+      const thGreenFullAlt = path.join(scriptDir, `${cleanBase}_THUMBNAIL-NENXANH.png`);
       const thCutoutKb = path.join(scriptDir, `${cleanBase}_KB.png`);
       const thCutoutBase = path.join(scriptDir, `${cleanBase}.png`);
       const thMeta = path.join(scriptDir, `${cleanBase}_GREEN_META.json`);
@@ -1095,9 +1096,18 @@ class ScriptVideoBridgeService {
       const genScript = this._resolvePadreMxGeneratorScript();
       const { execFileSync } = require('node:child_process');
 
-      // Nếu chưa có ảnh nền xanh đã cắt gọn cho kịch bản này, hoặc yêu cầu tạo/quét lại
+      // Kiểm tra đủ cả 3 ảnh: Thumbnail + Ảnh nền xanh gốc + Ảnh nền xanh đã cắt gọn góc trái dưới
+      const hasThumb = fs.existsSync(thThumb) || Boolean(job.projectDir && fs.existsSync(path.join(job.projectDir, 'THUMBNAIL.png')));
+      const existingGreenFullPath = fs.existsSync(thGreenFull)
+        ? thGreenFull
+        : (fs.existsSync(thGreenFullAlt)
+          ? thGreenFullAlt
+          : ((job.projectDir && fs.existsSync(path.join(job.projectDir, 'THUMBNAIL-NENXANH.png')))
+            ? path.join(job.projectDir, 'THUMBNAIL-NENXANH.png')
+            : ''));
+      const hasGreenFull = Boolean(existingGreenFullPath);
       const hasCutout = fs.existsSync(thCutoutKb) || fs.existsSync(thCutoutBase);
-      if ((!hasCutout || forceRegenerate) && genScript && fs.existsSync(genScript)) {
+      if ((!hasThumb || !hasGreenFull || !hasCutout || forceRegenerate) && genScript && fs.existsSync(genScript)) {
         const targetProjDir = (job.projectDir && fs.existsSync(job.projectDir))
           ? job.projectDir
           : path.join(scriptDir, '_padre_mx_assets', cleanBase);
@@ -1105,21 +1115,24 @@ class ScriptVideoBridgeService {
           fs.mkdirSync(targetProjDir, { recursive: true });
         } catch {}
 
-        // Nếu người dùng đã có sẵn file _NENXANH.png nhưng chưa cắt gọn, quét & cắt gọn trực tiếp
-        if (!forceRegenerate && fs.existsSync(thGreenFull) && !hasCutout) {
+        // Nếu người dùng đã có sẵn cả THUMBNAIL.png và _NENXANH.png nhưng chỉ chưa cắt gọn, quét & cắt gọn trực tiếp
+        if (!forceRegenerate && hasThumb && hasGreenFull && !hasCutout) {
           execFileSync(pyExe, [
             genScript,
-            '--crop-only-src', thGreenFull,
+            '--crop-only-src', existingGreenFullPath,
             '--crop-only-out', thCutoutKb
           ], {
             windowsHide: true,
-            timeout: 25000,
+            timeout: 35000,
             encoding: 'utf8'
           });
           if (fs.existsSync(thCutoutKb) && !fs.existsSync(thCutoutBase)) {
             try { fs.copyFileSync(thCutoutKb, thCutoutBase); } catch {}
           }
         } else {
+          this._logToBoth(
+            `🎨 [Key 04 Padre MX] Kịch bản [${cleanBase}] chưa có đủ Thumbnail & Ảnh nền xanh ➔ Đang tiến hành tạo trên ChatGPT Web & cắt gọn góc trái dưới...`
+          );
           execFileSync(pyExe, [
             genScript,
             '--project-id', String(job.projectId || cleanBase),
@@ -1129,7 +1142,7 @@ class ScriptVideoBridgeService {
             '--tong-hop-dir', scriptDir
           ], {
             windowsHide: true,
-            timeout: 35000,
+            timeout: 600000,
             encoding: 'utf8'
           });
         }
@@ -1254,6 +1267,66 @@ class ScriptVideoBridgeService {
       approvedCount,
       state: this.getPublicState()
     };
+  }
+
+  async scanAndGenerateMissingKey04Thumbnails({ scanFolder = '', dryRun = false, requireChatgpt = false } = {}) {
+    const pyExe = this._resolvePythonExecutable(this.settings?.scriptStudioRoot);
+    const genScript = this._resolvePadreMxGeneratorScript();
+    if (!genScript || !fs.existsSync(genScript)) {
+      return { ok: false, error: 'Không tìm thấy engine/padre_mx_thumbnail_generator.py' };
+    }
+    const studioRoot = this.settings?.scriptStudioRoot || this._detectScriptStudioRoot();
+    const projectsRoot = path.join(studioRoot, 'PROJECTS', 'PROJECTS_04_Nhom_Ong_Gia_Trung_Tri_Mexico');
+    const args = [
+      genScript,
+      dryRun ? '--scan-only' : '--scan-and-generate',
+      '--projects-root', projectsRoot
+    ];
+    if (scanFolder && fs.existsSync(scanFolder)) {
+      args.push('--scan-folder', scanFolder);
+    }
+    if (requireChatgpt) {
+      args.push('--require-chatgpt');
+    }
+
+    return new Promise((resolve) => {
+      const { execFile } = require('node:child_process');
+      execFile(
+        pyExe,
+        args,
+        {
+          windowsHide: true,
+          timeout: dryRun ? 30000 : 1200000,
+          maxBuffer: 10 * 1024 * 1024,
+          encoding: 'utf8'
+        },
+        (err, stdout) => {
+          const lines = String(stdout || '').trim().split(/\r?\n/).filter(Boolean);
+          const lastJsonLine = [...lines].reverse().find((ln) => ln.trim().startsWith('{') && ln.trim().endsWith('}'));
+          if (lastJsonLine) {
+            try {
+              const parsed = JSON.parse(lastJsonLine);
+              // Đồng bộ lại các job đang chờ trong hàng đợi Bàn #7 nếu có
+              if (!dryRun) {
+                for (const item of this.queue) {
+                  if (item.niche === '04_Nhom_Ong_Gia_Trung_Tri_Mexico') {
+                    this._ensurePadreMxGreenCutoutForJob(item);
+                  }
+                }
+                this._emitBridgeState();
+              }
+              resolve({ ...parsed, state: this.getPublicState() });
+              return;
+            } catch {}
+          }
+          if (err) {
+            resolve({ ok: false, error: err.message || String(err), stdout: String(stdout || '') });
+            return;
+          }
+          resolve({ ok: true, stdout: String(stdout || '') });
+        }
+      );
+    });
   }
 
   enqueueCompletedScript(payload = {}, { forceImmediate = false } = {}) {
@@ -2095,6 +2168,20 @@ class ScriptVideoBridgeService {
             this._emitBridgeState();
           }
           sendJson(res, 200, { ok: Boolean(targetJob), job: targetJob || null, state: this.getPublicState() });
+          return;
+        }
+
+        if ((req.method === 'POST' || req.method === 'GET') && pathname === '/api/bridge/scan-missing-thumbnails') {
+          const body = req.method === 'POST' ? await readJsonBody(req) : {};
+          const dryRun = req.method === 'GET' ? (urlObj.searchParams.get('dry_run') !== '0') : Boolean(body.dry_run || body.dryRun);
+          const requireChatgpt = Boolean(body.require_chatgpt || body.requireChatgpt || urlObj.searchParams.get('require_chatgpt') === '1');
+          const scanFolder = String(body.scan_folder || body.scanFolder || urlObj.searchParams.get('scan_folder') || '').trim();
+          const result = await this.scanAndGenerateMissingKey04Thumbnails({
+            scanFolder,
+            dryRun,
+            requireChatgpt
+          });
+          sendJson(res, 200, result);
           return;
         }
 

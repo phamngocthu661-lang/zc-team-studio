@@ -2003,6 +2003,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <button class="btn btn-green btn-sm" style="padding:6px 10px; font-size:11.8px; border:1px solid #34d399;" onclick="openChatGPTWebLogin('acc_1')" title="Mở trình duyệt Chrome để đăng nhập tài khoản ChatGPT">🔑 Đăng Nhập ChatGPT</button>
         <button class="btn btn-blue btn-sm" style="padding:6px 10px; font-size:11.8px; font-weight:700;" onclick="addTitlesOnly()">📥 Lưu Tiêu Đề &amp; Mã</button>
         <button id="btnUpdateTitlesMain" class="btn btn-dark btn-sm" style="padding:6px 11px; font-size:11.8px; font-weight:800; border:1px solid #38bdf8; color:#38bdf8; background:rgba(14,165,233,0.14);" onclick="updateTitlesFromComposerNow()" title="Cập nhật lại Tiêu đề & Mã kịch bản cho danh sách hiện tại (Nếu ô nhập đang trống, bấm lần 1 để nạp danh sách Tiêu đề hiện tại lên ô nhập, sửa xong bấm lần 2 để lưu đè!)">🔄 Cập Nhật Tiêu Đề</button>
+        <button id="btnScanMissingThumbs" class="btn btn-dark btn-sm" style="padding:6px 11px; font-size:11.8px; font-weight:800; border:1px solid #f59e0b; color:#fde68a; background:rgba(245,158,11,0.14);" onclick="scanAndGenerateMissingThumbnailsNow()" title="Quét toàn bộ các kịch bản đã tạo: nếu chưa có Thumbnail (THUMBNAIL.png) và Ảnh nền xanh (THUMBNAIL-NENXANH.png / _KB.png) thì tự động tạo để phần Render Video hoạt động!">🖼️ Quét &amp; Tạo Thumbnail + Nền Xanh</button>
         <button class="btn btn-gold btn-sm" style="padding:6px 12px; font-size:11.8px; font-weight:800; background:linear-gradient(135deg,#00ff88,#10b981); color:#04130b; border-color:#00ff88;" onclick="addAndRunWithAutoVideoNow()" title="Lưu Tiêu đề + Mã kịch bản, tự động viết kịch bản qua 9 Bàn AI rồi tự động Tạo Voice + Phụ đề + Render Video MP4 luôn!">🎬 Viết Kịch Bản ➔ Làm Video Luôn</button>
         <button class="btn btn-gold btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="addAndRunNow()">🚀 Lưu &amp; Chạy Ngay</button>
         <button class="btn btn-green btn-sm" style="padding:6px 11px; font-size:11.8px;" onclick="runQueueNow()">▶️ Chạy Tiếp Hàng Đợi</button>
@@ -2835,6 +2836,29 @@ async function addTitlesOnly() {
     document.getElementById('customNamesInput').value = '';
   }
   await fetchStatus();
+}
+
+async function scanAndGenerateMissingThumbnailsNow() {
+  const btn = document.getElementById('btnScanMissingThumbs');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = '⏳ Đang quét kịch bản...';
+  }
+  showMsg('🔍 Đang quét toàn bộ các kịch bản đã tạo để kiểm tra Thumbnail (THUMBNAIL.png) & Ảnh nền xanh (THUMBNAIL-NENXANH.png / _KB.png)...');
+  try {
+    const r = await apiPost('/api/scan_missing_thumbnails', {
+      niche: document.getElementById('nicheSelector')?.value || CURRENT_NICHE || '04_Nhom_Ong_Gia_Trung_Tri_Mexico'
+    });
+    showMsg(r.message || (r.ok ? '✅ Đã kích hoạt quét & tạo bù Thumbnail + Ảnh nền xanh!' : '❌ Không thể quét kịch bản.'), !r.ok);
+    fetchStatus();
+  } catch (e) {
+    showMsg('❌ Lỗi khi quét kịch bản: ' + e, true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = '🖼️ Quét & Tạo Thumbnail + Nền Xanh';
+    }
+  }
 }
 
 async function addAndRunWithAutoVideoNow() {
@@ -4560,12 +4584,82 @@ class MafiaDashboardHandler(BaseHTTPRequestHandler):
             append_studio_log(f"📦 [ADMIN-PACKAGE] {msg}")
             self._send_json({"ok": ok, "message": msg, "zip_path": zpath})
 
+        elif self.path == "/api/scan_missing_thumbnails":
+            from padre_mx_thumbnail_generator import scan_and_generate_missing_thumbnails_for_created_scripts
+            cfg04 = get_niche_config("04_Nhom_Ong_Gia_Trung_Tri_Mexico")
+            scan_folder = str(body.get("scan_folder") or "").strip() or cfg04["TONG_HOP_ROOT"]
+            check_res = scan_and_generate_missing_thumbnails_for_created_scripts(
+                projects_root=cfg04["PROJECTS_ROOT"],
+                scan_folder=scan_folder,
+                dry_run=True,
+                require_chatgpt_verified=False,
+            )
+            missing_cnt = int(check_res.get("missing_count") or 0)
+            total_cnt = int(check_res.get("total_created_scripts") or 0)
+            use_require_chatgpt = False
+            if missing_cnt == 0 and total_cnt > 0:
+                # Kiểm tra xem có kịch bản nào mới chỉ có ảnh dự phòng (chưa vẽ bằng ChatGPT Web) không
+                check_chatgpt = scan_and_generate_missing_thumbnails_for_created_scripts(
+                    projects_root=cfg04["PROJECTS_ROOT"],
+                    scan_folder=scan_folder,
+                    dry_run=True,
+                    require_chatgpt_verified=True,
+                )
+                if int(check_chatgpt.get("missing_count") or 0) > 0:
+                    check_res = check_chatgpt
+                    missing_cnt = int(check_chatgpt.get("missing_count") or 0)
+                    use_require_chatgpt = True
+
+            if total_cnt == 0:
+                msg = "ℹ️ Chưa tìm thấy file kịch bản (.txt) nào đã tạo trong thư mục Key 04 để tạo Thumbnail & Ảnh nền xanh."
+                append_studio_log(msg)
+                self._send_json({"ok": True, "message": msg, "scan": check_res})
+                return
+
+            if missing_cnt == 0:
+                msg = f"✅ Đã quét {total_cnt}/{total_cnt} kịch bản đã tạo của Key 04: Tất cả đều đã có đủ THUMBNAIL.png + THUMBNAIL-NENXANH.png & ảnh cắt gọn góc trái dưới (_KB.png) sẵn sàng cho Render!"
+                append_studio_log(msg)
+                self._send_json({"ok": True, "message": msg, "scan": check_res})
+                return
+
+            missing_names = ", ".join(x.get("clean_base", "") for x in (check_res.get("missing_items") or [])[:5])
+            start_msg = (
+                f"🎨 Phát hiện {missing_cnt}/{total_cnt} kịch bản đã tạo ({missing_names}) chưa có đủ Thumbnail & Ảnh nền xanh ChatGPT "
+                f"➔ Đang mở đoạn chat mới trên ChatGPT Web tạo THUMBNAIL.png + THUMBNAIL-NENXANH.png & cắt gọn góc trái dưới để phần Render hoạt động!"
+            )
+            append_studio_log(start_msg)
+
+            def _bg_scan_and_gen():
+                try:
+                    res_gen = scan_and_generate_missing_thumbnails_for_created_scripts(
+                        projects_root=cfg04["PROJECTS_ROOT"],
+                        scan_folder=scan_folder,
+                        dry_run=False,
+                        require_chatgpt_verified=use_require_chatgpt,
+                        log_fn=lambda pid, m: append_studio_log(f"[{pid}] {m}"),
+                    )
+                    gen_cnt = int(res_gen.get("generated_count") or 0)
+                    append_studio_log(
+                        f"🎉 Hoàn tất quét & tạo bù Thumbnail + Ảnh nền xanh (#00FF00) + cắt gọn góc trái dưới cho {gen_cnt}/{missing_cnt} kịch bản Key 04! Phần Render Video đã sẵn sàng 100%!"
+                    )
+                except Exception as e_bg:
+                    append_studio_log(f"❌ Lỗi khi quét & tạo bù Thumbnail/Nền xanh Key 04: {e_bg}")
+
+            threading.Thread(target=_bg_scan_and_gen, daemon=True).start()
+            self._send_json({"ok": True, "message": start_msg, "scan": check_res})
+
         elif self.path == "/api/send_to_video_studio":
             niche = _norm_niche(body.get("niche", SELECTED_NICHE))
             cfg = get_niche_config(niche)
             pid = str(body.get("project_id", "")).strip()
             pdir = os.path.join(cfg["PROJECTS_ROOT"], pid)
-            kb_path, seo_path = export_to_tong_hop_folder(pid, pdir, niche=niche)
+            kb_path, seo_path = export_to_tong_hop_folder(
+                pid,
+                pdir,
+                niche=niche,
+                generate_chatgpt_thumbnails=True,
+                log_fn=lambda m: append_studio_log(f"[{pid}] {m}"),
+            )
             if not kb_path or not os.path.exists(kb_path):
                 self._send_json({"ok": False, "message": f"Dự án [{pid}] chưa có file FULL_SCRIPT.txt để chuyển sang tạo Video."})
                 return

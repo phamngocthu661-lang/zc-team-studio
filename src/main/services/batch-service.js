@@ -2286,6 +2286,85 @@ class BatchService {
     throw error;
   }
 
+  ensureMissingPadreMxImagesForJobs(config, jobs = [], callbacks = {}) {
+    if (!Array.isArray(jobs) || !jobs.length) return;
+    const folderHints = [
+      config.voiceFolder,
+      config.projectImageFolder,
+      config.jobGreenFolder,
+      config.singleVoicePath ? path.dirname(config.singleVoicePath) : ''
+    ].filter(Boolean).join(' ');
+    const isPadreMxContext = /04_Nhom_Ong_Gia_Trung_Tri_Mexico/i.test(folderHints) ||
+      String(config.projectImageMode || '').toUpperCase() === 'GREEN' ||
+      jobGreenEnabled(config);
+    if (!isPadreMxContext) return;
+
+    const appDir = path.resolve(__dirname, '..', '..', '..');
+    const exeDir = path.dirname(process.execPath);
+    const scriptCandidates = [
+      path.join(appDir, 'engine', 'padre_mx_thumbnail_generator.py'),
+      path.join(exeDir, 'resources', 'app', 'engine', 'padre_mx_thumbnail_generator.py'),
+      'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\engine\\padre_mx_thumbnail_generator.py'
+    ];
+    const genScript = scriptCandidates.find((p) => fs.existsSync(p));
+    if (!genScript) return;
+
+    const pyCandidates = [
+      path.join(appDir, 'python_runtime', 'python.exe'),
+      path.join(exeDir, 'python_runtime', 'python.exe'),
+      'D:\\ZC_TEAM\\TOOL_ZC_TEAM\\python_runtime\\python.exe',
+      'C:\\Users\\hungp\\AppData\\Local\\Programs\\Python\\Python314\\python.exe',
+      'python'
+    ];
+    const pyExe = pyCandidates.find((p) => p === 'python' || fs.existsSync(p)) || 'python';
+    const { execFileSync } = require('node:child_process');
+
+    for (const job of jobs) {
+      const voiceRef = job.voicePath || job.voice_path || job.scriptPath || job.voiceName || '';
+      if (!voiceRef) continue;
+      const hasGreen = Boolean(job.greenAssetPath || resolveJobGreenAsset(voiceRef, config));
+      const projMatch = this.projectImageMatch(job, config);
+      const hasProjImg = Boolean(projMatch.assetPath);
+
+      const scriptDir = path.dirname(voiceRef);
+      const rawBase = path.basename(voiceRef, path.extname(voiceRef));
+      const cleanBase = rawBase.replace(/_(KB|SCRIPT|VOICE)$/i, '');
+      const thThumb = path.join(scriptDir, `${cleanBase}_THUMBNAIL.png`);
+      const thGreen = path.join(scriptDir, `${cleanBase}_NENXANH.png`);
+      const thGreenAlt = path.join(scriptDir, `${cleanBase}_THUMBNAIL-NENXANH.png`);
+      const thCutoutKb = path.join(scriptDir, `${cleanBase}_KB.png`);
+      const thCutoutBase = path.join(scriptDir, `${cleanBase}.png`);
+
+      const missingAny = !hasGreen && !hasProjImg && (!fs.existsSync(thCutoutKb) || !fs.existsSync(thThumb) || (!fs.existsSync(thGreen) && !fs.existsSync(thGreenAlt)));
+      if (!missingAny && (hasGreen || hasProjImg || fs.existsSync(thCutoutKb) || fs.existsSync(thCutoutBase))) {
+        continue;
+      }
+
+      try {
+        callbacks.onLog?.(
+          `🔍 [QUÉT KỊCH BẢN ĐÃ TẠO] Kịch bản [${cleanBase}] chưa có đủ Thumbnail & Ảnh nền xanh ➔ Đang tiến hành tạo tự động để Render Video hoạt động...`
+        );
+        const targetProjDir = path.join(scriptDir, '_padre_mx_assets', cleanBase);
+        fs.mkdirSync(targetProjDir, { recursive: true });
+        execFileSync(pyExe, [
+          genScript,
+          '--project-id', cleanBase,
+          '--project-dir', targetProjDir,
+          '--title', cleanBase.replace(/_/g, ' '),
+          '--tong-hop-base', cleanBase,
+          '--tong-hop-dir', scriptDir
+        ], {
+          windowsHide: true,
+          timeout: 600000,
+          encoding: 'utf8'
+        });
+        job.greenAssetPath = resolveJobGreenAsset(voiceRef, config) || (fs.existsSync(thCutoutKb) ? thCutoutKb : null);
+      } catch (err) {
+        callbacks.onLog?.(`⚠️ Lưu ý khi tạo bù Thumbnail/Nền xanh cho [${cleanBase}]: ${err.message || err}`);
+      }
+    }
+  }
+
   validateJobGreenInputs(config, jobs) {
     if (!jobGreenEnabled(config)) return;
     const missing = [];
@@ -2782,6 +2861,7 @@ class BatchService {
       };
     }
     this.validateMatchedSubtitles(config, jobs);
+    this.ensureMissingPadreMxImagesForJobs(config, jobs, callbacks);
     this.validateJobGreenInputs(config, jobs);
     this.validateProjectImageInputs(config, jobs);
     await this.hydrateJobDurations(jobs);
